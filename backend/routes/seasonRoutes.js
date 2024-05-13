@@ -1,15 +1,14 @@
+// backend/routes/seasonRoutes.js
+
 import express from 'express';
 import SeasonController from '../controllers/seasonController.js';
 
 const router = express.Router();
 
-// Create a new season
-router.post('/', SeasonController.createSeason);
-
-// Get all seasons
+router.post('/create', SeasonController.createSeason);
 router.get('/', SeasonController.getAllSeasons);
-
-// Get season by ID
 router.get('/:id', SeasonController.getSeasonById);
+router.put('/:id', SeasonController.updateSeason);
+router.delete('/:id', SeasonController.deleteSeason);
 
 export default router;

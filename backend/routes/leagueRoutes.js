@@ -1,16 +1,15 @@
+// backend/routes/leagueRoutes.js
+
 import express from 'express';
 import LeagueController from '../controllers/leagueController.js';
-import upload from '../middlewares/fileUpload.js';
+import { upload } from '../middlewares/fileUpload.js';
 
 const router = express.Router();
 
-// Create a new league
-router.post('/', upload.single('leagueLogo'),  LeagueController.createLeague);
-
-// Get all leagues
+router.post('/create', upload.single('leagueLogo'), LeagueController.createLeague);
 router.get('/', LeagueController.getAllLeagues);
-
-// Get league by ID
 router.get('/:id', LeagueController.getLeagueById);
+router.put('/:id', upload.single('leagueLogo'), LeagueController.updateLeague);
+router.delete('/:id', LeagueController.deleteLeague);
 
 export default router;

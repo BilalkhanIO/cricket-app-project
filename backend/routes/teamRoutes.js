@@ -1,22 +1,15 @@
+// backend/routes/teamRoutes.js
+
 import express from 'express';
 import TeamController from '../controllers/teamController.js';
-import upload from '../middlewares/fileUpload.js';
+import { upload } from '../middlewares/fileUpload.js';
 
 const router = express.Router();
 
-// Create a new team
-router.post('/',upload.single('teamLogo'), TeamController.createTeam);
-
-// Get all teams
+router.post('/create', upload.single('teamLogo'), TeamController.createTeam);
 router.get('/', TeamController.getAllTeams);
-
-// Get team by ID
 router.get('/:id', TeamController.getTeamById);
-
-// Assign player to team
-router.post('/:teamId/assign-player', TeamController.assignPlayerToTeam);
-
-// Remove player from team
-router.post('/:teamId/remove-player', TeamController.removePlayerFromTeam);
+router.put('/:id', upload.single('teamLogo'), TeamController.updateTeam);
+router.delete('/:id', TeamController.deleteTeam);
 
 export default router;
