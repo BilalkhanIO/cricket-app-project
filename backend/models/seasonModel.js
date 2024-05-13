@@ -1,5 +1,4 @@
 // backend/models/season.model.js
-
 import mongoose from 'mongoose';
 
 const seasonSchema = new mongoose.Schema({

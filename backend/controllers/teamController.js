@@ -1,14 +1,19 @@
+// backend/controllers/teamController.js
+
 import Team from '../models/teamModel.js';
+import {upload, deleteOldFile} from '../middlewares/fileUpload.js';
+
 
 const TeamController = {
   async createTeam(req, res) {
     try {
-      const { name, leagueId, seasonId, players, logo, jerseyColor, standings } = req.body;
+      const { name, leagueId, seasonId, players, jerseyColor, standings } = req.body;
+      const logo = req.file ? req.file.path : null;
 
       const team = new Team({
         name,
-        leagueId,
-        seasonId,
+        league: leagueId,
+        season: seasonId,
         players,
         logo,
         jerseyColor,
@@ -23,10 +28,9 @@ const TeamController = {
       res.status(500).json({ message: 'An error occurred while creating team' });
     }
   },
-
   async getAllTeams(req, res) {
     try {
-      const teams = await Team.find();
+      const teams = await Team.find().populate('league').populate('season').populate('players');
       res.status(200).json({ teams });
     } catch (error) {
       console.error('Error fetching teams:', error);
@@ -37,7 +41,7 @@ const TeamController = {
   async getTeamById(req, res) {
     try {
       const teamId = req.params.id;
-      const team = await Team.findById(teamId);
+      const team = await Team.findById(teamId).populate('league').populate('season').populate('players');
 
       if (!team) {
         return res.status(404).json({ message: 'Team not found' });
@@ -50,59 +54,46 @@ const TeamController = {
     }
   },
 
-// Logic for assigning a player to a team
-async assignPlayerToTeam(req, res){
-  try {
-    const { teamId } = req.params;
-    const { playerId } = req.body;
+  async updateTeam(req, res) {
+    try {
+      const teamId = req.params.id;
+      const { name, leagueId, seasonId, players, jerseyColor, standings } = req.body;
+      let logo = req.team.logo;
 
-    // Retrieve the team from the database
-    const team = await Team.findById(teamId);
-    if (!team) {
-      return res.status(404).json({ message: 'Team not found' });
+      if (req.file) {
+        // Delete the old file
+        deleteOldFile(req.team.logo);
+        logo = req.file.path;
+      }
+
+      const updatedTeam = await Team.findByIdAndUpdate(teamId, { name, league: leagueId, season: seasonId, players, logo, jerseyColor, standings }, { new: true, runValidators: true });
+
+      if (!updatedTeam) {
+        return res.status(404).json({ message: 'Team not found' });
+      }
+
+      res.status(200).json({ message: 'Team updated successfully', team: updatedTeam });
+    } catch (error) {
+      console.error('Error updating team:', error);
+      res.status(500).json({ message: 'An error occurred while updating team' });
     }
+  },
 
-    // Check if the player is already in the team's players array
-    if (team.players.includes(playerId)) {
-      return res.status(400).json({ message: 'Player already assigned to the team' });
+  async deleteTeam(req, res) {
+    try {
+      const teamId = req.params.id;
+      const deletedTeam = await Team.findByIdAndDelete(teamId);
+
+      if (!deletedTeam) {
+        return res.status(404).json({ message: 'Team not found' });
+      }
+
+      res.status(200).json({ message: 'Team deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting team:', error);
+      res.status(500).json({ message: 'An error occurred while deleting team' });
     }
-
-    // Add the player to the team's players array
-    team.players.push(playerId);
-
-    // Save the updated team data
-    const updatedTeam = await team.save();
-
-    res.status(200).json({ message: 'Player assigned to team successfully', team: updatedTeam });
-  } catch (error) {
-    console.error('Error assigning player to team:', error);
-    res.status(500).json({ message: 'Internal server error' });
-  }
-},
-
-// Logic for removing a player from a team
- async removePlayerFromTeam(req, res) {
-  try {
-    const { teamId } = req.params;
-    const { playerId } = req.body;
-
-    // Retrieve the team from the database
-    const team = await Team.findById(teamId);
-    if (!team) {
-      return res.status(404).json({ message: 'Team not found' });
-    }
-
-    // Filter out the player's ID from the team's players array
-    team.players = team.players.filter((id) => id !== playerId);
-
-    // Save the updated team data
-    const updatedTeam = await team.save();
-
-    res.status(200).json({ message: 'Player removed from team successfully', team: updatedTeam });
-  } catch (error) {
-    console.error('Error removing player from team:', error);
-    res.status(500).json({ message: 'Internal server error' });
-  }
-}
+  },
 };
+
 export default TeamController;

@@ -5,7 +5,7 @@ import playerRoutes from './playerRoutes.js';
 import teamRoutes from './teamRoutes.js';
 import seasonRoutes from './seasonRoutes.js';
 import leagueRoutes from './leagueRoutes.js';
-import matchRoutes from './MatcheRoutes.js';
+import matchRoutes from './matchRoutes.js';
 import scoreRoutes from './scoreRoutes.js';
 
 const router = express.Router();

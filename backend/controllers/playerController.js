@@ -1,87 +1,90 @@
 // backend/controllers/playerController.js
 
 import Player from '../models/playerModel.js';
-import upload from '../middlewares/fileUpload.js';
+import {upload, deleteOldFile} from '../middlewares/fileUpload.js';
 
-const uploadPlayerImage = upload.single('playerImage');
-// Create a new player
-const createPlayer = async (req, res) => {
-  try {
-    const { name, age, teamId } = req.body;
-    const imageUrl = req.file.path;
-    const player = new Player({ name, age, team: teamId, imageUrl });
-    await player.save();
-    res.status(201).json(player);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+const PlayerController = {
+  async createPlayer(req, res) {
+    try {
+      const { name, bio, playerType, teamId } = req.body;
+      const playerImage = req.file.path;
 
-// Get a player by ID
-const getPlayerById = async (req, res) => {
-  try {
-    const player = await Player.findById(req.params.id);
-    if (!player) {
-      return res.status(404).json({ message: 'Player not found' });
+      const player = new Player({ name, bio, playerType, team: teamId, playerImage });
+      await player.save();
+
+      res.status(201).json({ message: 'Player created successfully', player });
+    } catch (error) {
+      console.error('Error creating player:', error);
+      res.status(500).json({ message: 'An error occurred while creating player' });
     }
-    res.json(player);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+  },
 
-// Update a player
-const updatePlayer = async (req, res) => {
-  try {
-    const playerId = req.params.id;
-    const { name, age, teamId } = req.body;
-
-    let imageUrl = '';
-    if (req.file) {
-      imageUrl = req.file.path;
-    }else{
-    const player = await Player.findById(req.params.id);
-    if (!player) {
-      return res.status(404).json({ message: 'Player not found' });
+  async getAllPlayers(req, res) {
+    try {
+      const players = await Player.find().populate('team').populate('seasonRecords').populate('matchStats');
+      res.status(200).json({ players });
+    } catch (error) {
+      console.error('Error fetching players:', error);
+      res.status(500).json({ message: 'An error occurred while fetching players' });
     }
-    imageUrl = player.imageUrl;
+  },
+
+  async getPlayerById(req, res) {
+    try {
+      const playerId = req.params.id;
+      const player = await Player.findById(playerId).populate('team').populate('seasonRecords').populate('matchStats');
+
+      if (!player) {
+        return res.status(404).json({ message: 'Player not found' });
+      }
+
+      res.status(200).json({ player });
+    } catch (error) {
+      console.error('Error fetching player by ID:', error);
+      res.status(500).json({ message: 'An error occurred while fetching player' });
     }
+  },
 
-    const player = await Player.findById(playerId);
-    player.name = name;
-    player.age = age;
-    player.team = teamId;
-    player.imageUrl = imageUrl;
-    await player.save();
-    res.json(player);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+  async updatePlayer(req, res) {
+    try {
+      const playerId = req.params.id;
+      const { name, bio, playerType, teamId } = req.body;
+      let playerImage = req.player.playerImage;
 
-// Delete a player
-const deletePlayer = async (req, res) => {
-  try {
-    const player = await Player.findById(req.params.id);
-    if (!player) {
-      return res.status(404).json({ message: 'Player not found' });
+      if (req.file) {
+        // Delete the old file
+        deleteOldFile(req.player.playerImage);
+        playerImage = req.file.path;
+      }
+
+      const updatedPlayer = await Player.findByIdAndUpdate(playerId, { name, bio, playerType, team: teamId, playerImage }, { new: true, runValidators: true });
+
+      if (!updatedPlayer) {
+        return res.status(404).json({ message: 'Player not found' });
+      }
+
+      res.status(200).json({ message: 'Player updated successfully', player: updatedPlayer });
+    } catch (error) {
+      console.error('Error updating player:', error);
+      res.status(500).json({ message: 'An error occurred while updating player' });
     }
-    await player.remove();
-    res.json({ message: 'Player deleted successfully' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+  },
+
+  async deletePlayer(req, res) {
+    try {
+      const playerId = req.params.id;
+      const deletedPlayer = await Player.findByIdAndDelete(playerId);
+
+      if (!deletedPlayer) {
+        return res.status(404).json({ message: 'Player not found' });
+      }
+
+      res.status(200).json({ message: 'Player deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting player:', error);
+      res.status(500).json({ message: 'An error occurred while deleting player' });
+    }
+  },
 };
 
-// Get all players
-const getAllPlayers = async (req, res) => {
-  try {
-    const players = await Player.find();
-    res.json(players);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-
-export { createPlayer, getPlayerById, updatePlayer, deletePlayer, getAllPlayers };
+export default PlayerController;

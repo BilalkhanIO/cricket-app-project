@@ -1,15 +1,14 @@
+// backend/routes/matchRoutes.js
+
 import express from 'express';
 import MatchController from '../controllers/matchController.js';
 
 const router = express.Router();
 
-// Create a new match
-router.post('/', MatchController.createMatch);
-
-// Get all matches
+router.post('/create', MatchController.createMatch);
 router.get('/', MatchController.getAllMatches);
-
-// Get match by ID
 router.get('/:id', MatchController.getMatchById);
+router.put('/:id', MatchController.updateMatch);
+router.delete('/:id', MatchController.deleteMatch);
 
 export default router;

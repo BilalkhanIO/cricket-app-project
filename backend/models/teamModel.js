@@ -1,5 +1,4 @@
 // backend/models/team.model.js
-
 import mongoose from 'mongoose';
 
 const teamSchema = new mongoose.Schema({

@@ -1,5 +1,4 @@
 // backend/models/match.model.js
-
 import mongoose from 'mongoose';
 
 const matchSchema = new mongoose.Schema({
@@ -11,11 +10,7 @@ const matchSchema = new mongoose.Schema({
   date: { type: Date, required: true },
   toss: { type: Object },
   winner: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
-  scorecard: { type:mongoose.Schema.Types.ObjectId,ref: 'Score' },
-  bowling: { type: Object },
-  batting: { type: Object },
-  scorecard: { type: Object },
-  result: { type: Object },
+  scorecard: { type: mongoose.Schema.Types.ObjectId, ref: 'Scorecard' },
   manOfTheMatch: { type: mongoose.Schema.Types.ObjectId, ref: 'Player' },
 });
 

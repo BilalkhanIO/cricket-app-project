@@ -1,23 +1,15 @@
 // backend/routes/playerRoutes.js
 
 import express from 'express';
-import { createPlayer, getPlayerById, updatePlayer, deletePlayer, getAllPlayers, uploadPlayerImage } from '../controllers/playerController.js';
+import PlayerController from '../controllers/playerController.js';
+import { upload } from '../middlewares/fileUpload.js';
 
-const playerRoutes = express.Router();
+const router = express.Router();
 
-// Create a new player
-playerRoutes.post('/', uploadPlayerImage, createPlayer);
+router.post('/create', upload.single('playerImage'), PlayerController.createPlayer);
+router.get('/', PlayerController.getAllPlayers);
+router.get('/:id', PlayerController.getPlayerById);
+router.put('/:id', upload.single('playerImage'), PlayerController.updatePlayer);
+router.delete('/:id', PlayerController.deletePlayer);
 
-// Get a player by ID
-playerRoutes.get('/:id', getPlayerById);
-
-// Update a player
-playerRoutes.put('/:id', updatePlayer);
-
-// Delete a player
-playerRoutes.delete('/:id', deletePlayer);
-
-// Get all players
-playerRoutes.get('/', getAllPlayers);
-
-export default playerRoutes;
+export default router;
