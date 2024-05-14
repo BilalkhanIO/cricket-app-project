@@ -1,7 +1,7 @@
 // backend/routes/scorecardRoutes.js
 
 import express from 'express';
-import ScoreController from '../controllers/scoreController.js';
+import ScoreController from '../controllers/scorecardController.js';
 
 const router = express.Router();
 
