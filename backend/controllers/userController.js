@@ -3,9 +3,9 @@
 import User from '../models/userModel.js';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import config from '../config.js';
+import {SECRET_KEY} from '../config.js';
 import fs from 'fs';
-import  upload  from '../middlewares/fileUpload.js';
+import  {upload}  from '../middlewares/fileUpload.js';
 const UserController = {
   async registerUser(req, res) {
     try {
@@ -32,7 +32,7 @@ const UserController = {
         return res.status(401).json({ message: 'Invalid email or password' });
       }
 
-      const token = jwt.sign({ userId: user._id }, config.JWT_SECRET, { expiresIn: '1h' });
+      const token = jwt.sign({ userId: user._id }, SECRET_KEY, { expiresIn: '1h' });
 
       res.status(200).json({ message: 'Login successful', token });
     } catch (error) {

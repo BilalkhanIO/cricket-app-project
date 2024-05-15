@@ -1,14 +1,14 @@
 // backend/routes/scorecardRoutes.js
 
 import express from 'express';
-import ScoreController from '../controllers/scoreController.js';
+import ScorecardController from '../controllers/scorecardController.js';
 
 const router = express.Router();
 
-router.post('/create', ScoreController.createScorecard);
-router.get('/', ScoreController.getAllScoreboards);
-router.get('/:id', ScoreController.getScoreboardById);
-router.put('/:id', ScoreController.updateScorecard);
-router.delete('/:id', ScoreController.deleteScorecard);
+router.post('/create', ScorecardController.createScorecard);
+router.get('/', ScorecardController.getAllScoreboards);
+router.get('/:id', ScorecardController.getScoreboardById);
+router.put('/:id', ScorecardController.updateScorecard);
+router.delete('/:id', ScorecardController.deleteScorecard);
 
 export default router;

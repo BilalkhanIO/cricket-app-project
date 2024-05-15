@@ -1,7 +1,8 @@
-// components/LeagueDetails.js
+// src/pages/LeagueDetails.js
+
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { useParams } from 'react-router-dom';
+import axios from 'axios';
 
 const LeagueDetails = () => {
   const { id } = useParams();
@@ -25,28 +26,26 @@ const LeagueDetails = () => {
   }
 
   return (
-    <div className="max-w-md mx-auto p-4">
-      <h2 className="text-2xl font-bold mb-4">{league.name}</h2>
-      <p className="mb-4">{league.description}</p>
-      <img src={league.leagueLogo} alt="League Logo" className="mb-4" />
-      <h3 className="text-xl font-bold mb-2">Seasons</h3>
-      <ul className="mb-4">
-        {league.seasons.map((season) => (
+    <div className="container mx-auto py-8">
+      <h1 className="text-3xl font-bold mb-4">{league.name}</h1>
+      <img src={league.logo} alt={league.name} className="w-full h-60 object-cover mb-4" />
+      <p>{league.description}</p>
+      <h2 className="text-xl font-bold mt-4">Seasons</h2>
+      <ul>
+        {league.seasons.map(season => (
           <li key={season._id}>{season.name}</li>
         ))}
       </ul>
-      <h3 className="text-xl font-bold mb-2">Teams</h3>
-      <ul className="mb-4">
-        {league.teams.map((team) => (
+      <h2 className="text-xl font-bold mt-4">Teams</h2>
+      <ul>
+        {league.teams.map(team => (
           <li key={team._id}>{team.name}</li>
         ))}
       </ul>
-      <h3 className="text-xl font-bold mb-2">Matches</h3>
+      <h2 className="text-xl font-bold mt-4">Matches</h2>
       <ul>
-        {league.matches.map((match) => (
-          <li key={match._id}>
-            {match.team1.name} vs {match.team2.name}
-          </li>
+        {league.matches.map(match => (
+          <li key={match._id}>{match.name}</li>
         ))}
       </ul>
     </div>

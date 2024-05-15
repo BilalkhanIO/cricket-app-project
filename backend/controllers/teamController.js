@@ -1,8 +1,6 @@
 // backend/controllers/teamController.js
 
 import Team from '../models/teamModel.js';
-import {upload, deleteOldFile} from '../middlewares/fileUpload.js';
-
 
 const TeamController = {
   async createTeam(req, res) {

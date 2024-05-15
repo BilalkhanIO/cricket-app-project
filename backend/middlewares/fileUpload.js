@@ -1,14 +1,12 @@
 // backend/middleware/fileUpload.js
 
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
 
 // Define storage for uploaded files
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     // Specify destination folder based on file type
-    if (file.fieldname === 'playerImage') {
+    if (file.fieldname === 'playerPicture') {
       cb(null, 'uploads/players');
     } else if (file.fieldname === 'teamLogo') {
       cb(null, 'uploads/teams');
@@ -43,10 +41,10 @@ const upload = multer({
 });
 
 // Middleware to delete old file
-const deleteOldFile = (filePath) => {
-  if (fs.existsSync(filePath)) {
-    fs.unlinkSync(filePath);
-  }
-};
+// const deleteOldFile = (filePath) => {
+//   if (fs.existsSync(filePath)) {
+//     fs.unlinkSync(filePath);
+//   }
+// };
 
-export { upload, deleteOldFile };
+export { upload };
