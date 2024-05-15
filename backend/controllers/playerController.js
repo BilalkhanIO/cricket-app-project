@@ -1,7 +1,6 @@
 // backend/controllers/playerController.js
 
 import Player from '../models/playerModel.js';
-import {upload, deleteOldFile} from '../middlewares/fileUpload.js';
 
 const PlayerController = {
   async createPlayer(req, res) {

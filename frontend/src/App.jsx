@@ -1,9 +1,15 @@
 
 import React from 'react';
-import AppRouter from './AppRouter';
+import AppRouter from './routes/AppRouter';
+import Header from './components/Header';
+import Footer from './components/Footer';
 
 const App = () => {
-  return <AppRouter />;
+  return <>
+  <Header/>
+  <AppRouter />
+  <Footer/>
+  </>
 };
 
 export default App;

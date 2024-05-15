@@ -1,7 +1,6 @@
 // backend/controllers/leagueController.js
 
 import League from '../models/leagueModel.js';
-import { upload, deleteOldFile } from '../middlewares/fileUpload.js';
 
 const LeagueController = {
     async createLeague(req, res) {
