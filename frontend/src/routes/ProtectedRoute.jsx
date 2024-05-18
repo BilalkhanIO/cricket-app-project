@@ -1,11 +1,22 @@
 import React from 'react';
-// import { useSelector } from 'react-redux';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Route, Redirect } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 
-const ProtectedRoute = () => {
-//   const isAuthenticated = useSelector((state) => state.auth.token); // Assuming you're using Redux for state management
-const isAuthenticated = localStorage.getItem('token'); // Check if user is authenticated
-  return isAuthenticated ? <Outlet /> : <Navigate to="/login" />;
+const ProtectedRoute = ({ component: Component, ...rest }) => {
+  const { user } = useSelector((state) => state.user);
+
+  return (
+    <Route
+      {...rest}
+      render={(props) =>
+        user ? (
+          <Component {...props} />
+        ) : (
+          <Redirect to="/login" />
+        )
+      }
+    />
+  );
 };
 
 export default ProtectedRoute;

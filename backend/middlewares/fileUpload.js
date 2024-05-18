@@ -1,23 +1,16 @@
-// backend/middleware/fileUpload.js
-
 import multer from 'multer';
+import fs from 'fs';
 
 // Define storage for uploaded files
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    // Specify destination folder based on file type
-    if (file.fieldname === 'playerPicture') {
-      cb(null, 'uploads/players');
-    } else if (file.fieldname === 'teamLogo') {
-      cb(null, 'uploads/teams');
-    } else if (file.fieldname === 'leagueLogo') {
-      cb(null, 'uploads/leagues');
-    } else {
-      cb(new Error('Invalid file field'));
+    const uploadDir = 'uploads/profiles';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
     }
+    cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    // Generate unique file name
     const fileName = `${Date.now()}-${file.originalname}`;
     cb(null, fileName);
   }
@@ -25,7 +18,6 @@ const storage = multer.diskStorage({
 
 // File filter
 const fileFilter = (req, file, cb) => {
-  // Allow only JPEG and PNG files
   if (file.mimetype === 'image/jpeg' || file.mimetype === 'image/png') {
     cb(null, true);
   } else {
@@ -36,15 +28,8 @@ const fileFilter = (req, file, cb) => {
 // Set up file upload
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 1024 * 1024 }, // 1 MB file size limit
+  limits: { fileSize: 1024 * 1024 * 2 },
   fileFilter: fileFilter
 });
-
-// Middleware to delete old file
-// const deleteOldFile = (filePath) => {
-//   if (fs.existsSync(filePath)) {
-//     fs.unlinkSync(filePath);
-//   }
-// };
 
 export { upload };

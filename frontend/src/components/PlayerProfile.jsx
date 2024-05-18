@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 
-const PlayerDetails = () => {
+const PlayerProfile = () => {
   const { id } = useParams();
   const [player, setPlayer] = useState(null);
 
@@ -36,4 +36,4 @@ const PlayerDetails = () => {
   );
 };
 
-export default PlayerDetails;
+export default PlayerProfile;
