@@ -10,7 +10,6 @@ const userSchema = new mongoose.Schema({
   contactNumber: { type: String },
   resetPasswordToken: String,
   resetPasswordExpires: Date,
-  teams: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Team' }],
 });
 
 const User = mongoose.model('User', userSchema);

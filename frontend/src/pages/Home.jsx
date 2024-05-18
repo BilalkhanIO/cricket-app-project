@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 
 const Home = () => {
   return (
-    <div className="bg-gray-100 min-h-screen pt-16">
+    <div className="bg-gray-100 min-h-screen p-16">
       <div className="container mx-auto px-4 py-8 md:py-16">
         <h1 className="text-4xl md:text-6xl font-bold text-center mb-4 text-gray-800">Welcome to Our Cricket Management App</h1>
         <p className="text-lg md:text-xl text-center mb-8 text-gray-600">
@@ -12,12 +12,12 @@ const Home = () => {
         <div className="flex justify-center space-x-4">
           <Link to="/sign-in">
             <button className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
-              Sign In
+              Sign In as Manageer
             </button>
           </Link>
           <Link to="/sign-up">
             <button className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
-              Sign Up
+              Sign in as Player
             </button>
           </Link>
         </div>

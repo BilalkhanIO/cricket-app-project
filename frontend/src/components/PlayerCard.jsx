@@ -13,3 +13,5 @@ const PlayerCard = ({ player }) => {
     </div>
   );
 };
+
+export default PlayerCard;
