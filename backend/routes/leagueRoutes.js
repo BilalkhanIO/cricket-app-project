@@ -6,10 +6,10 @@ import { upload } from '../middlewares/fileUpload.js';
 
 const router = express.Router();
 
-router.post('/create', upload.single('leagueLogo'), LeagueController.createLeague);
+router.post('/create', upload.single('logo'), LeagueController.createLeague);
 router.get('/', LeagueController.getAllLeagues);
 router.get('/:id', LeagueController.getLeagueById);
-router.put('/:id', upload.single('leagueLogo'), LeagueController.updateLeague);
+router.put('/:id', upload.single('logo'), LeagueController.updateLeague);
 router.delete('/:id', LeagueController.deleteLeague);
 
 export default router;

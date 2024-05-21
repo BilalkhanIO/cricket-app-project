@@ -7,13 +7,20 @@ import { SECRET_KEY } from '../config.js';
 
 const UserController = {
   async registerUser(req, res) {
+    console.log(req.body);
     try {
-      const { name, email, password, role, contactNumber } = req.body;
-      const profilePicture = req.file ? req.file.path : null;
+      const { name, email, password,  contactNumber } = req.body;
 
+      const existingUser = await User.findOne({email});
+      if(existingUser){
+        return res.status(409).json({ message: 'User already exists with this email' });
+      }
+      if (!password) {
+        return res.status(400).json({ message: 'Password is required' });
+      }
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      const user = new User({ name, email, password: hashedPassword, role, contactNumber, profilePicture });
+      const user = new User({ name, email, password: hashedPassword, contactNumber});
       await user.save();
 
       res.status(201).json({ message: 'User registered successfully', user });
@@ -36,6 +43,7 @@ const UserController = {
       const token = jwt.sign({ userId: user._id }, SECRET_KEY, { expiresIn: '1d' });
 
       res.status(200).json({ message: 'Login successful', token });
+      
     } catch (error) {
       console.error('Error logging in user:', error);
       res.status(500).json({ message: 'An error occurred while logging in user' });

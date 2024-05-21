@@ -47,6 +47,18 @@ export const updateUserProfile = createAsyncThunk('user/updateUserProfile', asyn
   }
 });
 
+export const deleteUserAccount = createAsyncThunk('user/deleteUserAccount', async(_, thunkAPI)=>{
+  try { const response = await axios.delete('http://localhost:3000/api/user/delete',{
+    headers:{
+      Authorization: `Bearer ${localStorage.getItem('token')}`,
+    },
+  });
+  return response.data;
+  } catch (error) {
+    return thunkAPI.rejectWithValue(error.response.data);
+  }
+})
+
 // Slice
 const userSlice = createSlice({
   name: 'user',
@@ -110,6 +122,19 @@ const userSlice = createSlice({
         state.user = action.payload.user;
       })
       .addCase(updateUserProfile.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(deleteUserAccount.pending, (state)=>{
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(deleteUserAccount.fulfilled, (state)=>{
+        state.loading = false;
+        state.user = null;
+        localStorage.removeItem('token');
+      })
+      .addCase(deleteUserAccount.rejected, (state)=>{
         state.loading = false;
         state.error = action.payload;
       });

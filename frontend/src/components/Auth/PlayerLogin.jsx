@@ -47,7 +47,6 @@ const PlayerLogin = () => {
         required
       />
     </div>
-    {error && <div className="text-red-500 mb-4">{error}</div>}
     <p className="text-center mb-8 text-gray-600">
       Don't have an account? <Link to="/sign-up" className="text-gray-800">Sign up here</Link>
     </p>
@@ -55,9 +54,10 @@ const PlayerLogin = () => {
       type="submit"
       className="w-full bg-gray-800 text-white  font-medium p-2 rounded hover:bg-gray-900"
       disabled={loading}
-    >
+      >
       {loading ? 'Logging in...' : 'Login'}
     </button>
+      {error && <div className="text-red-500 mb-4">{error.message}</div>}
   </form>
    
   );

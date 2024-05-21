@@ -10,7 +10,7 @@ const Home = () => {
           Explore the world of cricket with our comprehensive management tools.
         </p>
         <div className="flex justify-center space-x-4">
-          <Link to="/sign-in">
+          <Link to="/login">
             <button className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
               Sign In as Manageer
             </button>

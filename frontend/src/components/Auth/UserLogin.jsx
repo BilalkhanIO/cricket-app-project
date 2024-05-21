@@ -58,6 +58,7 @@ const UserLogin = () => {
     >
       {loading ? 'Logging in...' : 'Login'}
     </button>
+    <p className="text-center mt-4 text-red-600">{error}</p>
   </form>
    
   );

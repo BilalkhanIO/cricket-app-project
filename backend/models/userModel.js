@@ -2,12 +2,12 @@
 import mongoose from 'mongoose';
 
 const userSchema = new mongoose.Schema({
-  name: { type: String, required: true },
+  profilePicture: { type: String },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   role: { type: String, enum: ['admin', 'manager', 'player'], default: 'player' },
-  profilePicture: { type: String },
   contactNumber: { type: String },
+  registrationDate: { type: Date, default: Date.now },
   resetPasswordToken: String,
   resetPasswordExpires: Date,
 });

@@ -8,7 +8,7 @@ router.post('/register', UserController.registerUser);
 router.post('/login', UserController.loginUser);
 router.get('/profile', verifyToken, UserController.getUserProfile);
 router.put('/profile', verifyToken, upload.single('profilePicture'), UserController.updateUserProfile);
-router.delete('/profile', verifyToken, UserController.deleteUser);
+router.delete('/delete', verifyToken, UserController.deleteUser);
 router.post('/request-password-reset', UserController.requestPasswordReset);
 router.post('/reset-password', UserController.resetPassword);
 
