@@ -1,80 +1,98 @@
-// backend/controllers/leagueController.js
-
 import League from '../models/leagueModel.js';
+import fs from 'fs';
 
 const LeagueController = {
-    async createLeague(req, res) {
-      try {
-        const { name, country, logo } = req.body;
-        const leagueLogo = req.file ? req.file.path : null;
-  
-        const league = new League({ name, country, logo: leagueLogo });
-        await league.save();
-  
-        res.status(201).json({ message: 'League created successfully', league });
-      } catch (error) {
-        console.error('Error creating league:', error);
-        res.status(500).json({ message: 'An error occurred while creating league' });
-      }
-    },
-  async getAllLeagues(req, res, next) {
+  async createLeague(req, res) {
+    try {
+      const { name, description } = req.body;
+      const logo = req.file ? req.file.path : null;
+
+      const league = new League({ name, description, logo });
+      await league.save();
+
+      res.status(201).json({ message: 'League created successfully', league });
+    } catch (error) {
+      console.error('Error creating league:', error);
+      res.status(500).json({ message: 'An error occurred while creating the league' });
+    }
+  },
+
+  async getAllLeagues(req, res) {
     try {
       const leagues = await League.find().populate('seasons').populate('teams').populate('matches');
       res.status(200).json({ leagues });
+      console.log(leagues);
     } catch (error) {
-      next(error);
+      console.error('Error fetching leagues:', error);
+      res.status(500).json({ message: 'An error occurred while fetching leagues' });
     }
   },
-  async getLeagueById(req, res, next) {
+
+  async getLeagueById(req, res) {
     try {
       const leagueId = req.params.id;
-      const league = await League.findById(leagueId).populate('seasons').populate('teams').populate('matches');
+      const league = await League.findById(leagueId).populate('seasons').populate('teams').populate('matches').lean();
 
       if (!league) {
-        return next({ status: 404, message: 'League not found' });
+        return res.status(404).json({ message: 'League not found' });
       }
 
       res.status(200).json({ league });
     } catch (error) {
-      next(error);
+      console.error('Error fetching league:', error);
+      res.status(500).json({ message: 'An error occurred while fetching the league' });
     }
   },
+
   async updateLeague(req, res) {
     try {
       const leagueId = req.params.id;
-      const { name, country } = req.body;
-      let logo = req.league.logo;
+      const { name, description } = req.body;
 
-      if (req.file) {
-        // Delete the old file
-        deleteOldFile(req.league.logo);
-        logo = req.file.path;
-      }
+      // Fetch the existing league
+      const existingLeague = await League.findById(leagueId);
 
-      const updatedLeague = await League.findByIdAndUpdate(leagueId, { name, country, logo }, { new: true, runValidators: true });
-
-      if (!updatedLeague) {
+      if (!existingLeague) {
         return res.status(404).json({ message: 'League not found' });
       }
 
-      res.status(200).json({ message: 'League updated successfully', league: updatedLeague });
+      let logo = existingLeague.logo; // Use the existing logo
+
+      if (req.file) {
+        // If a new file is uploaded, delete the old logo file
+        if (logo) {
+          fs.unlinkSync(logo);
+        }
+        logo = req.file.path;
+      }
+
+      // Update the league with the new data
+      existingLeague.name = name;
+      existingLeague.description = description;
+      existingLeague.logo = logo;
+
+      await existingLeague.save();
+
+      res.status(200).json({ message: 'League updated successfully', league: existingLeague });
     } catch (error) {
       console.error('Error updating league:', error);
-      res.status(500).json({ message: 'An error occurred while updating league' });
+      res.status(500).json({ message: 'An error occurred while updating the league', error });
     }
   },
-  async deleteLeague(req, res, next) {
+
+  async deleteLeague(req, res) {
     try {
       const leagueId = req.params.id;
       const deletedLeague = await League.findByIdAndDelete(leagueId);
 
       if (!deletedLeague) {
-        return next({ status: 404, message: 'League not found' });
+        return res.status(404).json({ message: 'League not found' });
       }
 
       res.status(200).json({ message: 'League deleted successfully' });
     } catch (error) {
-      next(error);
+      console.error('Error deleting league:', error);
+      res.status(500).json({ message: 'An error occurred while deleting the league' });
     }
   },
 };
