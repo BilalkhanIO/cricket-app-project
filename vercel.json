@@ -1,0 +1,1 @@
+{"buildCommand": "npm run build", "env": {"NEXTAUTH_SECRET": "@nextauth_secret", "DATABASE_URL": "@database_url"}}
