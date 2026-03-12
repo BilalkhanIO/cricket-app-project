@@ -4,6 +4,8 @@ import { Card } from "@/components/ui/Card";
 import { StatusBadge } from "@/components/ui/Badge";
 import { formatDateTime } from "@/lib/utils";
 
+export const dynamic = 'force-dynamic';
+
 async function getMatches() {
   return prisma.match.findMany({
     include: {

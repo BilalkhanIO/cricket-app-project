@@ -2,6 +2,8 @@ import Link from "next/link";
 import prisma from "@/lib/prisma";
 import { Card } from "@/components/ui/Card";
 
+export const dynamic = 'force-dynamic';
+
 async function getPlayers() {
   return prisma.player.findMany({
     include: {

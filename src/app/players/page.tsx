@@ -4,6 +4,8 @@ import { Card, CardBody } from "@/components/ui/Card";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 
+export const dynamic = 'force-dynamic';
+
 async function getPlayers() {
   return prisma.player.findMany({
     include: {

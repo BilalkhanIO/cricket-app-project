@@ -3,6 +3,8 @@ import prisma from "@/lib/prisma";
 import { Card, CardBody } from "@/components/ui/Card";
 import { formatDateTime } from "@/lib/utils";
 
+export const dynamic = 'force-dynamic';
+
 async function getAnnouncements() {
   return prisma.announcement.findMany({
     include: {

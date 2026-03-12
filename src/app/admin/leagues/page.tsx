@@ -4,6 +4,8 @@ import { Card } from "@/components/ui/Card";
 import { StatusBadge } from "@/components/ui/Badge";
 import { formatDate } from "@/lib/utils";
 
+export const dynamic = 'force-dynamic';
+
 async function getLeagues() {
   return prisma.league.findMany({
     include: {

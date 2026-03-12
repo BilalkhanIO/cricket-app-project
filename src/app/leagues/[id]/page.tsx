@@ -7,6 +7,8 @@ import { formatDate, formatDateTime } from "@/lib/utils";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 
+export const dynamic = 'force-dynamic';
+
 async function getLeague(id: string) {
   return prisma.league.findUnique({
     where: { id },

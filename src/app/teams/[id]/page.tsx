@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/Badge";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 
+export const dynamic = 'force-dynamic';
+
 async function getTeam(id: string) {
   return prisma.team.findUnique({
     where: { id },

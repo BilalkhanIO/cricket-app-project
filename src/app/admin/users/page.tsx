@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/Badge";
 import { roleColors } from "@/lib/utils";
 import { formatDate } from "@/lib/utils";
 
+export const dynamic = 'force-dynamic';
+
 async function getUsers() {
   return prisma.user.findMany({
     orderBy: { createdAt: "desc" },

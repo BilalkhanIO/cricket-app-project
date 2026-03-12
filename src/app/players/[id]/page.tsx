@@ -5,6 +5,8 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 
+export const dynamic = 'force-dynamic';
+
 async function getPlayer(id: string) {
   return prisma.player.findUnique({
     where: { id },

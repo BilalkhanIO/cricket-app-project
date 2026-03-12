@@ -6,6 +6,8 @@ import { formatDateTime } from "@/lib/utils";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 
+export const dynamic = 'force-dynamic';
+
 async function getMatches() {
   return prisma.match.findMany({
     include: {

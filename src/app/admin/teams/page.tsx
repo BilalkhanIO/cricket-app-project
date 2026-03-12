@@ -3,6 +3,8 @@ import prisma from "@/lib/prisma";
 import { Card } from "@/components/ui/Card";
 import { StatusBadge } from "@/components/ui/Badge";
 
+export const dynamic = 'force-dynamic';
+
 async function getTeams() {
   return prisma.team.findMany({
     include: {

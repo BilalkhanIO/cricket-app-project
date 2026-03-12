@@ -6,6 +6,8 @@ import { Input, Select, Textarea } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 
+export const dynamic = 'force-dynamic';
+
 export default function NewLeaguePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);

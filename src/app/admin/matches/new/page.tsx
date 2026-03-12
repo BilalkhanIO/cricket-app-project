@@ -6,6 +6,8 @@ import { Input, Select } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 
+export const dynamic = 'force-dynamic';
+
 export default function NewMatchPage() {
   const router = useRouter();
   const searchParams = useSearchParams();

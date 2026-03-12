@@ -4,6 +4,8 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { StatusBadge } from "@/components/ui/Badge";
 import { formatDate, formatDateTime } from "@/lib/utils";
 
+export const dynamic = 'force-dynamic';
+
 async function getHomeData() {
   const [liveMatches, upcomingMatches, activeLeagues, announcements] = await Promise.all([
     prisma.match.findMany({

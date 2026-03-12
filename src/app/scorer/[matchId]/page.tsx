@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Input";
 import Link from "next/link";
 
+export const dynamic = 'force-dynamic';
+
 interface Player {
   id: string;
   user: { name: string };
