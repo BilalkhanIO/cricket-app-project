@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/ui/Badge";
 import { formatDateTime } from "@/lib/utils";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import LiveCommentary from "./LiveCommentary";
 
 export const dynamic = 'force-dynamic';
 
@@ -59,11 +60,7 @@ export default async function MatchDetailPage({ params }: { params: { id: string
   const inn1 = match.innings.find((i) => i.inningsNumber === 1);
   const inn2 = match.innings.find((i) => i.inningsNumber === 2);
 
-  const battingTeam1 = inn1 ? (inn1.teamId === match.homeTeamId ? match.homeTeam : match.awayTeam) : null;
-  const battingTeam2 = inn2 ? (inn2.teamId === match.homeTeamId ? match.homeTeam : match.awayTeam) : null;
-
   const isLive = ["LIVE", "INNINGS_BREAK"].includes(match.status);
-  const canScore = ["SUPER_ADMIN", "LEAGUE_ADMIN", "SCORER"].includes("SCORER");
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -175,6 +172,11 @@ export default async function MatchDetailPage({ params }: { params: { id: string
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="space-y-6">
+            {/* Live Commentary - auto-refresh for live matches */}
+            {isLive && match.innings.length > 0 && (
+              <LiveCommentary matchId={match.id} initialInnings={match.innings} />
+            )}
+
             {match.innings.map((innings) => (
               <div key={innings.id} className="space-y-4">
                 <h2 className="text-xl font-bold text-gray-900">

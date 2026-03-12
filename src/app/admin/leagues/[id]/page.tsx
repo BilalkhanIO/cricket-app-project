@@ -50,9 +50,15 @@ export default async function AdminLeagueDetailPage({ params }: { params: { id: 
           <h1 className="text-2xl font-bold text-gray-900">{league.name}</h1>
           <StatusBadge status={league.status} />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link href={`/admin/matches/new?leagueId=${league.id}`} className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-blue-700">
             + Schedule Match
+          </Link>
+          <Link href={`/admin/leagues/${league.id}/awards`} className="bg-yellow-500 text-white px-3 py-2 rounded-lg text-sm hover:bg-yellow-600">
+            Awards
+          </Link>
+          <Link href={`/admin/leagues/${league.id}/sponsors`} className="bg-purple-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-purple-700">
+            Sponsors
           </Link>
           <Link href={`/leagues/${league.id}`} className="bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-sm hover:bg-gray-200">
             Public View →

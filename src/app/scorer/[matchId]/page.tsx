@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Input";
 import Link from "next/link";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +26,7 @@ interface Innings {
   totalBalls: number;
   totalOvers: number;
   extras: number;
+  targetRuns: number | null;
   isCompleted: boolean;
   overs: any[];
   battingScores: any[];
@@ -60,6 +62,9 @@ export default function ScorerPage({ params }: { params: { matchId: string } }) 
   const [showWicketModal, setShowWicketModal] = useState(false);
   const [recentBalls, setRecentBalls] = useState<any[]>([]);
   const [phase, setPhase] = useState<"toss" | "playing_xi" | "start_innings" | "scoring">("toss");
+  const [matchResult, setMatchResult] = useState<string | null>(null);
+  const [partnershipRuns, setPartnershipRuns] = useState(0);
+  const [partnershipBalls, setPartnershipBalls] = useState(0);
 
   const fetchMatch = useCallback(async () => {
     const res = await fetch(`/api/matches/${params.matchId}`);
@@ -144,6 +149,8 @@ export default function ScorerPage({ params }: { params: { matchId: string } }) 
       setCurrentOverId(data.over.id);
       setBallInOver(0);
       setRecentBalls([]);
+      setPartnershipRuns(0);
+      setPartnershipBalls(0);
     }
   };
 
@@ -179,14 +186,19 @@ export default function ScorerPage({ params }: { params: { matchId: string } }) 
       const newBall = { ...body, id: data.ball.id };
       setRecentBalls((prev) => [...prev, newBall]);
 
+      // Update partnership stats
       const isLegalBall = !extras || ["BYE", "LEG_BYE"].includes(extras.type || "");
+      if (isLegalBall) {
+        setPartnershipBalls((prev) => prev + 1);
+      }
+      setPartnershipRuns((prev) => prev + runs + (extras?.runs || 0));
+
       if (isLegalBall) {
         const newBallInOver = ballInOver + 1;
         if (newBallInOver >= 6) {
           setBallInOver(0);
           setCurrentOverId(null);
           setRecentBalls([]);
-          // Rotate striker/non-striker
           const temp = striker;
           setStriker(nonStriker);
           setNonStriker(temp);
@@ -198,6 +210,8 @@ export default function ScorerPage({ params }: { params: { matchId: string } }) 
       if (isWicket) {
         setShowWicketModal(false);
         setStriker("");
+        setPartnershipRuns(0);
+        setPartnershipBalls(0);
       }
 
       if (runs % 2 === 1) {
@@ -206,15 +220,40 @@ export default function ScorerPage({ params }: { params: { matchId: string } }) 
         setNonStriker(temp);
       }
 
+      // Check if match completed automatically
+      if (data.matchCompleted && data.result) {
+        setMatchResult(data.result);
+      }
+
       await fetchMatch();
     }
 
     setSubmitting(false);
   };
 
+  const undoLastBall = async () => {
+    if (!currentInnings) return;
+    setSubmitting(true);
+
+    const res = await fetch("/api/scoring/undo", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ inningsId: currentInnings.id }),
+    });
+
+    if (res.ok) {
+      setRecentBalls((prev) => prev.slice(0, -1));
+      if (ballInOver > 0) {
+        setBallInOver((prev) => prev - 1);
+      }
+      await fetchMatch();
+    }
+    setSubmitting(false);
+  };
+
   const completeMatch = async (winnerId: string, winMargin: number, winType: string) => {
-    const loser = winnerId === match?.homeTeam.id ? match?.awayTeam.id : match?.homeTeam.id;
-    const result = `${winnerId === match?.homeTeam.id ? match?.homeTeam.name : match?.awayTeam.name} won by ${winMargin} ${winType}`;
+    const winnerName = winnerId === match?.homeTeam.id ? match?.homeTeam.name : match?.awayTeam.name;
+    const result = `${winnerName} won by ${winMargin} ${winType}`;
 
     await fetch("/api/scoring/complete", {
       method: "POST",
@@ -267,6 +306,41 @@ export default function ScorerPage({ params }: { params: { matchId: string } }) 
     ...players.map((p) => ({ value: p.playerId, label: p.player.user.name })),
   ];
 
+  // Calculate run rates
+  const currentRunRate = currentInnings && currentInnings.totalBalls > 0
+    ? (currentInnings.totalRuns / currentInnings.totalBalls) * 6
+    : 0;
+
+  const firstInnings = match.innings.find((i) => i.inningsNumber === 1);
+  const maxBalls = match.overs * 6;
+
+  let requiredRunRate: number | null = null;
+  let runsNeeded = 0;
+  let ballsLeft = 0;
+
+  if (currentInnings && currentInnings.inningsNumber === 2 && firstInnings) {
+    const target = firstInnings.totalRuns + 1;
+    runsNeeded = target - currentInnings.totalRuns;
+    ballsLeft = maxBalls - currentInnings.totalBalls;
+    if (ballsLeft > 0 && runsNeeded > 0) {
+      requiredRunRate = (runsNeeded / ballsLeft) * 6;
+    }
+  }
+
+  // Projected score
+  const projectedScore = currentInnings && currentInnings.totalBalls > 0
+    ? Math.round((currentInnings.totalRuns / currentInnings.totalBalls) * maxBalls)
+    : 0;
+
+  // Over-by-over data for manhattan chart
+  const overData = currentInnings
+    ? currentInnings.overs.map((over: any) => ({
+        over: `O${over.overNumber}`,
+        runs: over.runs || 0,
+        wickets: over.wickets || 0,
+      }))
+    : [];
+
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       {/* Header */}
@@ -287,8 +361,22 @@ export default function ScorerPage({ params }: { params: { matchId: string } }) 
         </div>
       </div>
 
+      {/* Match Result Modal */}
+      {matchResult && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-2xl p-8 text-center max-w-sm mx-4">
+            <div className="text-5xl mb-4">🏆</div>
+            <h2 className="text-2xl font-bold mb-2">Match Complete!</h2>
+            <p className="text-green-400 text-lg mb-6">{matchResult}</p>
+            <Link href={`/matches/${match.id}`}>
+              <Button variant="primary" fullWidth>View Scorecard</Button>
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Match Completed */}
-      {match.status === "COMPLETED" && (
+      {match.status === "COMPLETED" && !matchResult && (
         <div className="max-w-2xl mx-auto px-4 py-12 text-center">
           <div className="text-5xl mb-4">🏆</div>
           <h2 className="text-2xl font-bold mb-3">Match Completed</h2>
@@ -325,7 +413,7 @@ export default function ScorerPage({ params }: { params: { matchId: string } }) 
       {phase === "playing_xi" && match.status !== "COMPLETED" && (
         <div className="max-w-2xl mx-auto px-4 py-10">
           <div className="text-center mb-6">
-            <h2 className="text-xl font-bold mb-2">Toss Recorded ✓</h2>
+            <h2 className="text-xl font-bold mb-2">Toss Recorded</h2>
             {match.tossWinnerId && (
               <p className="text-gray-400">
                 {match.tossWinnerId === match.homeTeam.id ? match.homeTeam.name : match.awayTeam.name} won toss and chose to {match.tossDecision}
@@ -335,7 +423,7 @@ export default function ScorerPage({ params }: { params: { matchId: string } }) 
           <div className="bg-gray-800 rounded-xl p-6 text-center">
             <p className="text-gray-300 mb-4">Set Playing XIs from Admin Panel, then start the innings.</p>
             <Button onClick={startInnings} size="lg">
-              🎯 Start 1st Innings
+              Start 1st Innings
             </Button>
           </div>
         </div>
@@ -353,7 +441,7 @@ export default function ScorerPage({ params }: { params: { matchId: string } }) 
             </div>
           )}
           <Button onClick={startInnings} size="lg">
-            🏏 Start {match.innings.length + 1}{match.innings.length === 0 ? "st" : "nd"} Innings
+            Start {match.innings.length + 1}{match.innings.length === 0 ? "st" : "nd"} Innings
           </Button>
         </div>
       )}
@@ -374,21 +462,47 @@ export default function ScorerPage({ params }: { params: { matchId: string } }) 
                   <span className="text-xl text-gray-400 ml-2">({currentInnings.totalOvers.toFixed(1)})</span>
                 </p>
               </div>
-              {currentInnings.inningsNumber === 2 && match.innings[0] && (
+              {currentInnings.inningsNumber === 2 && firstInnings && (
                 <div className="text-right">
                   <p className="text-sm text-gray-400">Target</p>
-                  <p className="text-2xl font-bold text-yellow-400">{match.innings[0].totalRuns + 1}</p>
+                  <p className="text-2xl font-bold text-yellow-400">{firstInnings.totalRuns + 1}</p>
                   <p className="text-xs text-gray-400">
-                    Need {match.innings[0].totalRuns + 1 - currentInnings.totalRuns} from{" "}
-                    {(match.overs * 6 - currentInnings.totalBalls)} balls
+                    Need {runsNeeded} from {ballsLeft} balls
                   </p>
                 </div>
               )}
             </div>
 
-            {/* Recent Balls */}
+            {/* Run Rate Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
+              <div className="bg-gray-700 rounded-lg p-2 text-center">
+                <p className="text-xs text-gray-400">Current RR</p>
+                <p className="font-bold text-green-400">{currentRunRate.toFixed(2)}</p>
+              </div>
+              {requiredRunRate !== null && (
+                <div className="bg-gray-700 rounded-lg p-2 text-center">
+                  <p className="text-xs text-gray-400">Required RR</p>
+                  <p className={`font-bold ${requiredRunRate > currentRunRate ? "text-red-400" : "text-green-400"}`}>
+                    {requiredRunRate.toFixed(2)}
+                  </p>
+                </div>
+              )}
+              {currentInnings.inningsNumber === 1 && projectedScore > 0 && (
+                <div className="bg-gray-700 rounded-lg p-2 text-center">
+                  <p className="text-xs text-gray-400">Projected</p>
+                  <p className="font-bold text-blue-400">{projectedScore}</p>
+                </div>
+              )}
+              <div className="bg-gray-700 rounded-lg p-2 text-center">
+                <p className="text-xs text-gray-400">Partnership</p>
+                <p className="font-bold text-purple-400">{partnershipRuns} ({partnershipBalls}b)</p>
+              </div>
+            </div>
+
+            {/* Last 6 Balls Visual */}
             <div className="flex gap-1.5 flex-wrap mt-3">
-              {recentBalls.map((ball, i) => (
+              <span className="text-xs text-gray-400 self-center">Last 6:</span>
+              {recentBalls.slice(-6).map((ball, i) => (
                 <span
                   key={i}
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
@@ -402,6 +516,32 @@ export default function ScorerPage({ params }: { params: { matchId: string } }) 
                   {ball.isWicket ? "W" : ball.isExtra ? (ball.extraType?.charAt(0) || "E") : ball.runs}
                 </span>
               ))}
+            </div>
+          </div>
+
+          {/* Wagon Wheel Placeholder */}
+          <div className="bg-gray-800 rounded-xl p-4">
+            <p className="text-xs text-gray-400 mb-3 font-medium uppercase tracking-wide">Wagon Wheel</p>
+            <div className="relative w-40 h-40 mx-auto">
+              <div className="absolute inset-0 rounded-full border-2 border-gray-600"></div>
+              <div className="absolute inset-4 rounded-full border-2 border-gray-600"></div>
+              <div className="absolute inset-8 rounded-full border-2 border-gray-600"></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="w-3 h-3 bg-gray-400 rounded-full"></span>
+              </div>
+              {/* Lines for directions */}
+              {[0, 45, 90, 135, 180, 225, 270, 315].map((angle) => (
+                <div
+                  key={angle}
+                  className="absolute inset-0 flex items-center justify-center"
+                  style={{ transform: `rotate(${angle}deg)` }}
+                >
+                  <div className="w-full h-px bg-gray-700"></div>
+                </div>
+              ))}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <p className="text-xs text-gray-500 text-center">Live data<br/>coming soon</p>
+              </div>
             </div>
           </div>
 
@@ -443,9 +583,22 @@ export default function ScorerPage({ params }: { params: { matchId: string } }) 
           {/* Scoring Buttons */}
           {currentOverId && striker && currentBowler && (
             <div className="bg-gray-800 rounded-xl p-4 space-y-3">
-              <p className="text-sm text-gray-400 text-center">
-                Over {Math.floor(currentInnings.totalBalls / 6) + 1}.{ballInOver} — {ballInOver}/6 balls
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-400">
+                  Over {Math.floor(currentInnings.totalBalls / 6) + 1}.{ballInOver} — {ballInOver}/6 balls
+                </p>
+                {/* Undo Last Ball */}
+                <button
+                  onClick={undoLastBall}
+                  disabled={submitting || recentBalls.length === 0}
+                  className="flex items-center gap-1.5 text-xs text-orange-400 hover:text-orange-300 disabled:opacity-30 bg-orange-900/20 px-3 py-1.5 rounded-lg border border-orange-700/50"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                  </svg>
+                  Undo
+                </button>
+              </div>
 
               {/* Runs */}
               <div>
@@ -499,7 +652,7 @@ export default function ScorerPage({ params }: { params: { matchId: string } }) 
                     onClick={() => setShowWicketModal(true)}
                     className="w-full bg-red-700 hover:bg-red-600 px-4 py-3 rounded-xl font-bold text-lg"
                   >
-                    🔴 WICKET
+                    WICKET
                   </button>
                 ) : (
                   <div className="bg-red-900/30 border border-red-700 rounded-xl p-3 space-y-3">
@@ -529,10 +682,61 @@ export default function ScorerPage({ params }: { params: { matchId: string } }) 
             </div>
           )}
 
+          {/* Manhattan Chart - Runs per Over */}
+          {overData.length > 0 && (
+            <div className="bg-gray-800 rounded-xl p-4">
+              <p className="text-xs text-gray-400 mb-3 font-medium uppercase tracking-wide">Manhattan — Runs Per Over</p>
+              <ResponsiveContainer width="100%" height={120}>
+                <BarChart data={overData} margin={{ top: 5, right: 5, left: -30, bottom: 5 }}>
+                  <XAxis dataKey="over" tick={{ fill: "#9ca3af", fontSize: 10 }} />
+                  <YAxis tick={{ fill: "#9ca3af", fontSize: 10 }} />
+                  <Tooltip
+                    contentStyle={{ background: "#1f2937", border: "none", borderRadius: 8, fontSize: 11 }}
+                    formatter={(v, n) => [v, n === "runs" ? "Runs" : "Wickets"]}
+                  />
+                  <Bar dataKey="runs" fill="#16a34a" radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {/* Over-by-over summary */}
+          {overData.length > 0 && (
+            <div className="bg-gray-800 rounded-xl p-4">
+              <p className="text-xs text-gray-400 mb-3 font-medium uppercase tracking-wide">Over Summary</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-gray-500 border-b border-gray-700">
+                      <th className="text-left py-1.5">Over</th>
+                      <th className="text-center py-1.5">Runs</th>
+                      <th className="text-center py-1.5">Wkts</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...overData].reverse().map((row) => (
+                      <tr key={row.over} className="border-b border-gray-700/50">
+                        <td className="py-1.5 text-gray-300">{row.over}</td>
+                        <td className="text-center py-1.5 font-medium text-white">{row.runs}</td>
+                        <td className="text-center py-1.5">
+                          {row.wickets > 0 ? (
+                            <span className="text-red-400 font-medium">{row.wickets}W</span>
+                          ) : (
+                            <span className="text-gray-500">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* Complete Match */}
           <div className="bg-gray-800 rounded-xl p-4">
-            <p className="text-sm text-gray-400 mb-3">Complete Match</p>
-            <div className="flex gap-3">
+            <p className="text-sm text-gray-400 mb-3">Manual Match Control</p>
+            <div className="flex flex-wrap gap-3">
               <Button
                 variant="success"
                 onClick={() => completeMatch(match.homeTeam.id, 10, "wickets")}
