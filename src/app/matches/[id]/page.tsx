@@ -7,6 +7,7 @@ import { formatDateTime } from "@/lib/utils";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import LiveCommentary from "./LiveCommentary";
+import MomCard from "./MomCard";
 
 export const dynamic = 'force-dynamic';
 
@@ -20,6 +21,25 @@ async function getMatch(id: string) {
       venue: true,
       scorer: { select: { name: true } },
       officials: true,
+      awards: {
+        where: { awardType: "MAN_OF_MATCH" },
+        include: {
+          player: {
+            include: {
+              user: { select: { name: true, profileImage: true, city: true } },
+              battingScores: {
+                where: { innings: { matchId: id } },
+                include: { innings: { select: { matchId: true } } },
+              },
+              bowlingScores: {
+                where: { innings: { matchId: id } },
+                include: { innings: { select: { matchId: true } } },
+              },
+            },
+          },
+        },
+        take: 1,
+      },
       playingXIs: {
         include: {
           player: {
@@ -448,6 +468,37 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
                 </div>
               );
             })}
+
+            {/* Man of the Match */}
+            {match.status === "COMPLETED" && match.awards && match.awards.length > 0 && (() => {
+              const momAward = match.awards[0];
+              const momPlayer = momAward.player;
+              if (!momPlayer) return null;
+
+              const batStats = momPlayer.battingScores[0];
+              const bowlStats = momPlayer.bowlingScores[0];
+
+              return (
+                <MomCard
+                  player={{
+                    id: momPlayer.id,
+                    user: momPlayer.user,
+                    role: momPlayer.role,
+                    jerseyNumber: momPlayer.jerseyNumber,
+                    battingStats: batStats
+                      ? { runs: batStats.runs, balls: batStats.balls, fours: batStats.fours, sixes: batStats.sixes }
+                      : null,
+                    bowlingStats: bowlStats
+                      ? { overs: bowlStats.overs, wickets: bowlStats.wickets, runs: bowlStats.runs }
+                      : null,
+                  }}
+                  matchTitle={`${match.homeTeam.shortName} vs ${match.awayTeam.shortName}`}
+                  result={match.result || ""}
+                  matchId={match.id}
+                  leagueName={match.league.name}
+                />
+              );
+            })()}
 
             {/* Match Info section */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

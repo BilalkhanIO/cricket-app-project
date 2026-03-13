@@ -169,6 +169,8 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
   const [extraMode, setExtraMode] = useState<string | null>(null);
   const [showScorecard, setShowScorecard] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showMomModal, setShowMomModal] = useState(false);
+  const [momPlayerId, setMomPlayerId] = useState("");
 
   const fetchMatch = useCallback(async () => {
     const res = await fetch(`/api/matches/${matchId}`);
@@ -347,6 +349,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
 
       if (data.matchCompleted && data.result) {
         setMatchResult(data.result);
+        setShowMomModal(true);
       }
 
       await fetchMatch();
@@ -380,9 +383,15 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
     await fetch("/api/scoring/complete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ matchId, result, winnerTeamId: winnerId, winMargin, winType }),
+      body: JSON.stringify({ matchId, result, winnerTeamId: winnerId, winMargin, winType, playerOfMatchId: momPlayerId || null }),
     });
+    setShowMomModal(false);
     fetchMatch();
+  };
+
+  const handleAutoComplete = (result: string) => {
+    setMatchResult(result);
+    setShowMomModal(true);
   };
 
   if (!session || !["SUPER_ADMIN", "LEAGUE_ADMIN", "SCORER"].includes(session.user.role)) {
@@ -494,16 +503,63 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
         </span>
       </div>
 
-      {/* Match Result Modal */}
-      {matchResult && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="bg-gray-800 rounded-2xl p-8 text-center max-w-sm mx-4">
-            <div className="text-5xl mb-4">🏆</div>
-            <h2 className="text-2xl font-bold mb-2">Match Complete!</h2>
-            <p className="text-green-400 text-lg mb-6">{matchResult}</p>
-            <Link href={`/matches/${match.id}`} className="block bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-3 rounded-lg">
-              View Scorecard
-            </Link>
+      {/* Man of the Match Modal */}
+      {showMomModal && matchResult && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-2xl p-6 max-w-md w-full mx-auto shadow-2xl">
+            <div className="text-center mb-5">
+              <div className="text-5xl mb-3">🏆</div>
+              <h2 className="text-2xl font-bold text-white mb-1">Match Complete!</h2>
+              <p className="text-green-400 font-medium">{matchResult}</p>
+            </div>
+
+            <div className="mb-5">
+              <label className="text-sm text-gray-300 font-medium block mb-2">
+                🏅 Select Man of the Match:
+              </label>
+              <select
+                value={momPlayerId}
+                onChange={(e) => setMomPlayerId(e.target.value)}
+                className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-yellow-500"
+              >
+                <option value="">-- Skip / Select later --</option>
+                {match.playingXIs.map((p) => (
+                  <option key={p.playerId} value={p.playerId}>
+                    {p.player.user.name} ({p.teamId === match.homeTeam.id ? match.homeTeam.shortName : match.awayTeam.shortName})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={async () => {
+                  // Save MoM via complete API if manually triggered, or just close
+                  if (momPlayerId) {
+                    await fetch("/api/scoring/complete", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        matchId,
+                        result: matchResult,
+                        winnerTeamId: null,
+                        playerOfMatchId: momPlayerId,
+                      }),
+                    }).catch(() => {});
+                  }
+                  setShowMomModal(false);
+                }}
+                className="flex-1 bg-yellow-600 hover:bg-yellow-500 text-white font-semibold py-3 rounded-lg transition-colors"
+              >
+                {momPlayerId ? "Save MoM & Continue" : "Skip MoM"}
+              </button>
+              <Link
+                href={`/matches/${match.id}`}
+                className="flex-1 bg-green-600 hover:bg-green-500 text-white font-semibold py-3 rounded-lg text-center transition-colors"
+              >
+                View Scorecard →
+              </Link>
+            </div>
           </div>
         </div>
       )}
