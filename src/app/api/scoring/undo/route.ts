@@ -38,7 +38,7 @@ export async function DELETE(req: NextRequest) {
     const totalBalls = remainingBalls.filter(
       (b) => !b.isExtra || b.extraType === "BYE" || b.extraType === "LEG_BYE"
     ).length;
-    const wides = remainingBalls.filter((b) => b.extraType === "WIDE").reduce((s, b) => s + b.extraRuns + 1, 0);
+    const wides = remainingBalls.filter((b) => b.extraType === "WIDE").reduce((s, b) => s + b.extraRuns, 0);
     const noBalls = remainingBalls.filter((b) => b.extraType === "NO_BALL").length;
     const byes = remainingBalls.filter((b) => b.extraType === "BYE").reduce((s, b) => s + b.extraRuns, 0);
     const legByes = remainingBalls.filter((b) => b.extraType === "LEG_BYE").reduce((s, b) => s + b.extraRuns, 0);

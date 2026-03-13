@@ -60,6 +60,7 @@ export default async function AdminMatchesPage() {
                       {["UPCOMING", "TOSS", "LIVE", "INNINGS_BREAK"].includes(m.status) && (
                         <Link href={`/scorer/${m.id}`} className="text-xs text-red-600 hover:underline">Score</Link>
                       )}
+                      <Link href={`/admin/matches/${m.id}/playing-xi`} className="text-xs text-green-600 hover:underline">Playing XI</Link>
                       <Link href={`/admin/matches/${m.id}/officials`} className="text-xs text-purple-600 hover:underline">Officials</Link>
                     </div>
                   </td>
