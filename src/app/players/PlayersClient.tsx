@@ -58,13 +58,13 @@ export default function PlayersClient({ players }: { players: Player[] }) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by player name..."
-            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-[#769FCD] focus:border-transparent"
           />
         </div>
         <select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value)}
-          className="px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 bg-white"
+          className="px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-[#769FCD] bg-white"
         >
           {ROLES.map((r) => (
             <option key={r} value={r}>{r === "ALL" ? "All Roles" : r.replace("_", " ")}</option>
@@ -73,7 +73,7 @@ export default function PlayersClient({ players }: { players: Player[] }) {
         <select
           value={teamFilter}
           onChange={(e) => setTeamFilter(e.target.value)}
-          className="px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 bg-white"
+          className="px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-[#769FCD] bg-white"
         >
           <option value="ALL">All Teams</option>
           {teams.map(([id, name]) => (
@@ -99,7 +99,7 @@ export default function PlayersClient({ players }: { players: Player[] }) {
                     <Card hoverable className="h-full">
                       <CardBody>
                         <div className="flex items-center gap-3 mb-3">
-                          <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center font-bold text-green-700 text-lg">
+                          <div className="w-12 h-12 rounded-full bg-[#D6E6F2] flex items-center justify-center font-bold text-[#1B3A5C] text-lg">
                             {player.user.name.charAt(0)}
                           </div>
                           <div>

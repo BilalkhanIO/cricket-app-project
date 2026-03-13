@@ -30,8 +30,9 @@ async function getLeagueWithAwards(id: string) {
   });
 }
 
-export default async function LeagueAwardsPage({ params }: { params: { id: string } }) {
-  const league = await getLeagueWithAwards(params.id);
+export default async function LeagueAwardsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const league = await getLeagueWithAwards(id);
   if (!league) notFound();
 
   const allPlayers = league.teams.flatMap((tl) =>
@@ -41,7 +42,7 @@ export default async function LeagueAwardsPage({ params }: { params: { id: strin
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Link href={`/admin/leagues/${params.id}`} className="text-gray-500 text-sm hover:text-gray-700">
+        <Link href={`/admin/leagues/${id}`} className="text-gray-500 text-sm hover:text-gray-700">
           ← {league.name}
         </Link>
         <h1 className="text-2xl font-bold text-gray-900">Awards Management</h1>
@@ -54,7 +55,7 @@ export default async function LeagueAwardsPage({ params }: { params: { id: strin
             <h2 className="font-bold text-gray-900">Create Award</h2>
           </CardHeader>
           <CardBody>
-            <AwardFormClient leagueId={params.id} players={allPlayers} />
+            <AwardFormClient leagueId={id} players={allPlayers} />
           </CardBody>
         </Card>
 
@@ -96,10 +97,10 @@ export default async function LeagueAwardsPage({ params }: { params: { id: strin
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
         <p className="text-blue-800 text-sm font-medium">Admin Links</p>
         <div className="flex gap-4 mt-2">
-          <Link href={`/admin/leagues/${params.id}/sponsors`} className="text-blue-600 text-sm hover:underline">
+          <Link href={`/admin/leagues/${id}/sponsors`} className="text-blue-600 text-sm hover:underline">
             Manage Sponsors →
           </Link>
-          <Link href={`/admin/leagues/${params.id}`} className="text-blue-600 text-sm hover:underline">
+          <Link href={`/admin/leagues/${id}`} className="text-blue-600 text-sm hover:underline">
             League Dashboard →
           </Link>
         </div>

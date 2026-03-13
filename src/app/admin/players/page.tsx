@@ -51,7 +51,7 @@ export default async function AdminPlayersPage() {
                   <td className="px-3 py-3">
                     <div className="flex gap-2">
                       <Link href={`/players/${p.id}`} className="text-xs text-blue-600 hover:underline">View</Link>
-                      <Link href={`/admin/players/${p.id}/edit`} className="text-xs text-green-600 hover:underline">Edit</Link>
+                      <Link href={`/admin/players/${p.id}/edit`} className="text-xs text-[#769FCD] hover:underline">Edit</Link>
                     </div>
                   </td>
                 </tr>

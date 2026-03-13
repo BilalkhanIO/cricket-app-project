@@ -66,13 +66,13 @@ export default function MatchesClient({ allMatches }: { allMatches: Match[] }) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by team or league name..."
-            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-[#769FCD] focus:border-transparent"
           />
         </div>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 bg-white"
+          className="px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-[#769FCD] bg-white"
         >
           {STATUS_OPTIONS.map((s) => (
             <option key={s} value={s}>{s === "ALL" ? "All Statuses" : s}</option>
@@ -105,7 +105,7 @@ export default function MatchesClient({ allMatches }: { allMatches: Match[] }) {
                       <Card hoverable className="h-full">
                         <div className={`px-4 py-2 flex items-center justify-between border-b ${
                           match.status === "LIVE" ? "bg-red-50 border-red-100" :
-                          match.status === "COMPLETED" ? "bg-green-50 border-green-100" :
+                          match.status === "COMPLETED" ? "bg-[#F7FBFC] border-[#D6E6F2]" :
                           "bg-gray-50 border-gray-100"
                         }`}>
                           <span className="text-xs text-gray-500">{match.league.name}</span>
@@ -138,7 +138,7 @@ export default function MatchesClient({ allMatches }: { allMatches: Match[] }) {
                           </div>
 
                           {match.result ? (
-                            <div className="bg-green-50 rounded-lg px-3 py-2 text-xs font-medium text-green-800">
+                            <div className="bg-[#F7FBFC] rounded-lg px-3 py-2 text-xs font-medium text-[#1B3A5C]">
                               {match.result}
                             </div>
                           ) : (

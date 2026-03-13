@@ -58,8 +58,9 @@ async function getPlayer(id: string) {
   });
 }
 
-export default async function PlayerDetailPage({ params }: { params: { id: string } }) {
-  const player = await getPlayer(params.id);
+export default async function PlayerDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const player = await getPlayer(id);
   if (!player) notFound();
 
   const careerStats = player.playerStats[0];
@@ -79,7 +80,7 @@ export default async function PlayerDetailPage({ params }: { params: { id: strin
       <Navbar />
       <main className="flex-1">
         {/* Player Header */}
-        <div className="bg-gradient-to-br from-green-800 to-emerald-700 text-white py-10">
+        <div className="bg-gradient-to-br from-[#1B3A5C] to-[#2D5484] text-white py-10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
               {player.user.profileImage ? (
@@ -137,7 +138,7 @@ export default async function PlayerDetailPage({ params }: { params: { id: strin
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 mb-4">
                 {[
                   { label: "Matches", value: careerStats.matchesPlayed, color: "bg-blue-50 border-blue-100" },
-                  { label: "Runs", value: careerStats.runs, color: "bg-green-50 border-green-100" },
+                  { label: "Runs", value: careerStats.runs, color: "bg-[#F7FBFC] border-[#D6E6F2]" },
                   { label: "Average", value: careerStats.average.toFixed(1), color: "bg-yellow-50 border-yellow-100" },
                   { label: "Strike Rate", value: careerStats.strikeRate.toFixed(1), color: "bg-orange-50 border-orange-100" },
                   { label: "Wickets", value: careerStats.wickets, color: "bg-red-50 border-red-100" },
@@ -226,7 +227,7 @@ export default async function PlayerDetailPage({ params }: { params: { id: strin
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-gray-900">{award.awardType.replace(/_/g, " ")}</p>
-                      <Link href={`/leagues/${award.league.id}`} className="text-xs text-green-700 hover:underline">
+                      <Link href={`/leagues/${award.league.id}`} className="text-xs text-[#769FCD] hover:underline">
                         {award.league.name}
                       </Link>
                     </div>
@@ -258,7 +259,7 @@ export default async function PlayerDetailPage({ params }: { params: { id: strin
                       {player.battingScores.map((bat) => (
                         <tr key={bat.id} className="border-b border-gray-50 hover:bg-gray-50">
                           <td className="px-4 py-2 text-xs">
-                            <Link href={`/matches/${bat.innings.matchId}`} className="text-green-700 hover:underline">
+                            <Link href={`/matches/${bat.innings.matchId}`} className="text-[#769FCD] hover:underline">
                               {bat.innings.match.homeTeam.shortName} vs {bat.innings.match.awayTeam.shortName}
                             </Link>
                           </td>
@@ -302,7 +303,7 @@ export default async function PlayerDetailPage({ params }: { params: { id: strin
                       {player.bowlingScores.map((bowl) => (
                         <tr key={bowl.id} className="border-b border-gray-50 hover:bg-gray-50">
                           <td className="px-4 py-2 text-xs">
-                            <Link href={`/matches/${bowl.innings.matchId}`} className="text-green-700 hover:underline">
+                            <Link href={`/matches/${bowl.innings.matchId}`} className="text-[#769FCD] hover:underline">
                               {bowl.innings.match.homeTeam.shortName} vs {bowl.innings.match.awayTeam.shortName}
                             </Link>
                           </td>

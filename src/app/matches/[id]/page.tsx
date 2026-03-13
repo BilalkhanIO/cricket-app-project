@@ -53,8 +53,9 @@ async function getMatch(id: string) {
   });
 }
 
-export default async function MatchDetailPage({ params }: { params: { id: string } }) {
-  const match = await getMatch(params.id);
+export default async function MatchDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const match = await getMatch(id);
   if (!match) notFound();
 
   const inn1 = match.innings.find((i) => i.inningsNumber === 1);
@@ -67,7 +68,7 @@ export default async function MatchDetailPage({ params }: { params: { id: string
       <Navbar />
       <main className="flex-1">
         {/* Match Header */}
-        <div className={`py-8 text-white ${isLive ? "bg-gradient-to-br from-red-700 to-red-600" : "bg-gradient-to-br from-green-800 to-emerald-700"}`}>
+        <div className={`py-8 text-white ${isLive ? "bg-gradient-to-br from-red-700 to-red-600" : "bg-gradient-to-br from-[#1B3A5C] to-[#2D5484]"}`}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-2 mb-3">
               <Link href={`/leagues/${match.league.id}`} className="text-sm text-white/70 hover:text-white">
@@ -181,7 +182,7 @@ export default async function MatchDetailPage({ params }: { params: { id: string
               <div key={innings.id} className="space-y-4">
                 <h2 className="text-xl font-bold text-gray-900">
                   {innings.inningsNumber === 1 ? "1st" : "2nd"} Innings — {innings.team.name}
-                  <span className="ml-2 text-lg font-semibold text-green-700">
+                  <span className="ml-2 text-lg font-semibold text-[#1B3A5C]">
                     {innings.totalRuns}/{innings.totalWickets} ({innings.totalOvers.toFixed(1)} ov)
                   </span>
                 </h2>
@@ -212,7 +213,7 @@ export default async function MatchDetailPage({ params }: { params: { id: string
                                 {bat.isOut ? (
                                   <p className="text-xs text-gray-400">{bat.wicketType?.replace("_", " ").toLowerCase()}</p>
                                 ) : (
-                                  <p className="text-xs text-green-600 font-medium">not out</p>
+                                  <p className="text-xs text-[#769FCD] font-medium">not out</p>
                                 )}
                               </td>
                               <td className="px-2 py-2 text-center font-bold">{bat.runs}</td>
@@ -295,7 +296,7 @@ export default async function MatchDetailPage({ params }: { params: { id: string
                                     ball.isBoundary ? "bg-blue-500 text-white" :
                                     ball.isExtra ? "bg-yellow-400 text-white" :
                                     ball.runs === 0 ? "bg-gray-200 text-gray-600" :
-                                    "bg-green-500 text-white"
+                                    "bg-[#F7FBFC]0 text-white"
                                   }`}
                                 >
                                   {ball.isWicket ? "W" : ball.isExtra ? (ball.extraType?.charAt(0) || "E") : ball.runs}
@@ -368,12 +369,12 @@ export default async function MatchDetailPage({ params }: { params: { id: string
 
             {/* Open Scoring Link */}
             {match.status === "UPCOMING" || match.status === "TOSS" ? (
-              <Card className="border-green-200 bg-green-50">
+              <Card className="border-[#B9D7EA] bg-[#F7FBFC]">
                 <CardBody className="text-center py-6">
-                  <p className="text-green-800 font-medium mb-3">Match is ready to start scoring</p>
+                  <p className="text-[#1B3A5C] font-medium mb-3">Match is ready to start scoring</p>
                   <Link
                     href={`/scorer/${match.id}`}
-                    className="bg-green-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-green-700 transition-colors"
+                    className="bg-[#769FCD] text-white px-6 py-2.5 rounded-lg font-medium hover:bg-[#5A8BBE] transition-colors"
                   >
                     🎯 Go to Scoring Panel
                   </Link>

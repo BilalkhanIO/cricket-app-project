@@ -18,7 +18,7 @@ export default async function AdminVenuesPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Venues ({venues.length})</h1>
-        <Link href="/admin/venues/new" className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700">
+        <Link href="/admin/venues/new" className="bg-[#769FCD] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#5A8BBE]">
           + Add Venue
         </Link>
       </div>
@@ -28,7 +28,7 @@ export default async function AdminVenuesPage() {
           <Card key={venue.id}>
             <div className="p-5">
               <div className="flex items-start gap-3 mb-3">
-                <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center text-xl">🏟️</div>
+                <div className="w-10 h-10 bg-[#D6E6F2] rounded-xl flex items-center justify-center text-xl">🏟️</div>
                 <div>
                   <h3 className="font-bold text-gray-900">{venue.name}</h3>
                   <p className="text-sm text-gray-500">📍 {venue.city}</p>
@@ -50,7 +50,7 @@ export default async function AdminVenuesPage() {
           <div className="text-center py-12">
             <div className="text-4xl mb-3">🏟️</div>
             <h3 className="font-semibold text-gray-700 mb-2">No Venues</h3>
-            <Link href="/admin/venues/new" className="text-green-600 hover:underline text-sm">Add your first venue →</Link>
+            <Link href="/admin/venues/new" className="text-[#769FCD] hover:underline text-sm">Add your first venue →</Link>
           </div>
         </Card>
       )}

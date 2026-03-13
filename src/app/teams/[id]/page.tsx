@@ -35,8 +35,9 @@ async function getTeam(id: string) {
   });
 }
 
-export default async function TeamDetailPage({ params }: { params: { id: string } }) {
-  const team = await getTeam(params.id);
+export default async function TeamDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const team = await getTeam(id);
   if (!team) notFound();
 
   return (
@@ -76,7 +77,7 @@ export default async function TeamDetailPage({ params }: { params: { id: string 
                   <Link key={player.id} href={`/players/${player.id}`}>
                     <Card hoverable>
                       <CardBody className="flex items-center gap-3 py-3">
-                        <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center font-bold text-green-700">
+                        <div className="w-10 h-10 bg-[#D6E6F2] rounded-full flex items-center justify-center font-bold text-[#1B3A5C]">
                           {player.jerseyNumber || "?"}
                         </div>
                         <div className="flex-1 min-w-0">

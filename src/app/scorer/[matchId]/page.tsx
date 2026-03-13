@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, use } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
@@ -46,7 +46,8 @@ interface Match {
   playingXIs: { playerId: string; teamId: string; battingOrder: number; player: Player }[];
 }
 
-export default function ScorerPage({ params }: { params: { matchId: string } }) {
+export default function ScorerPage({ params }: { params: Promise<{ matchId: string }> }) {
+  const { matchId } = use(params);
   const { data: session } = useSession();
   const router = useRouter();
   const [match, setMatch] = useState<Match | null>(null);
@@ -67,14 +68,14 @@ export default function ScorerPage({ params }: { params: { matchId: string } }) 
   const [partnershipBalls, setPartnershipBalls] = useState(0);
 
   const fetchMatch = useCallback(async () => {
-    const res = await fetch(`/api/matches/${params.matchId}`);
+    const res = await fetch(`/api/matches/${matchId}`);
     const data = await res.json();
     if (data.match) {
       setMatch(data.match);
       determinePhase(data.match);
     }
     setLoading(false);
-  }, [params.matchId]);
+  }, [matchId]);
 
   const determinePhase = (m: Match) => {
     if (!m.tossWinnerId) { setPhase("toss"); return; }
@@ -102,7 +103,7 @@ export default function ScorerPage({ params }: { params: { matchId: string } }) 
   }, [fetchMatch]);
 
   const recordToss = async (winnerId: string, decision: string) => {
-    const res = await fetch(`/api/matches/${params.matchId}/toss`, {
+    const res = await fetch(`/api/matches/${matchId}/toss`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tossWinnerId: winnerId, tossDecision: decision }),
@@ -119,7 +120,7 @@ export default function ScorerPage({ params }: { params: { matchId: string } }) 
 
     const target = match.innings.length === 1 ? match.innings[0].totalRuns + 1 : null;
 
-    const res = await fetch(`/api/matches/${params.matchId}/innings`, {
+    const res = await fetch(`/api/matches/${matchId}/innings`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -258,7 +259,7 @@ export default function ScorerPage({ params }: { params: { matchId: string } }) 
     await fetch("/api/scoring/complete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ matchId: params.matchId, result, winnerTeamId: winnerId, winMargin, winType }),
+      body: JSON.stringify({ matchId: matchId, result, winnerTeamId: winnerId, winMargin, winType }),
     });
     fetchMatch();
   };

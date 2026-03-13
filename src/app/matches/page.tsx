@@ -25,10 +25,10 @@ export default async function MatchesPage() {
     <div className="flex flex-col min-h-screen">
       <Navbar />
       <main className="flex-1">
-        <div className="bg-green-800 text-white py-10">
+        <div className="bg-[#1B3A5C] text-white py-10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <h1 className="text-3xl font-bold mb-2">Matches</h1>
-            <p className="text-green-200">Live scores, fixtures and results</p>
+            <p className="text-[#B9D7EA]">Live scores, fixtures and results</p>
           </div>
         </div>
         <MatchesClient allMatches={allMatches} />

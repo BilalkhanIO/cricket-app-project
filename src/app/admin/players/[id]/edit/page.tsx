@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
@@ -19,7 +19,8 @@ const BOWLING_TYPES = [
   "LEFT_ARM_SPIN",
 ];
 
-export default function EditPlayerPage({ params }: { params: { id: string } }) {
+export default function EditPlayerPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const router = useRouter();
   const [player, setPlayer] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -39,7 +40,7 @@ export default function EditPlayerPage({ params }: { params: { id: string } }) {
   const [isWicketkeeper, setIsWicketkeeper] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/players/${params.id}`)
+    fetch(`/api/players/${id}`)
       .then((r) => r.json())
       .then((d) => {
         if (d.player) {
@@ -58,7 +59,7 @@ export default function EditPlayerPage({ params }: { params: { id: string } }) {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [params.id]);
+  }, [id]);
 
   const validate = () => {
     const errs: Record<string, string> = {};
@@ -92,7 +93,7 @@ export default function EditPlayerPage({ params }: { params: { id: string } }) {
       isWicketkeeper,
     };
 
-    const res = await fetch(`/api/players/${params.id}`, {
+    const res = await fetch(`/api/players/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -102,7 +103,7 @@ export default function EditPlayerPage({ params }: { params: { id: string } }) {
 
     if (res.ok) {
       setMessage("Player updated successfully!");
-      setTimeout(() => router.push(`/players/${params.id}`), 1500);
+      setTimeout(() => router.push(`/players/${id}`), 1500);
     } else {
       setMessage(result.error || "Failed to update player");
     }
@@ -112,7 +113,7 @@ export default function EditPlayerPage({ params }: { params: { id: string } }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="animate-spin w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full"></div>
+        <div className="animate-spin w-8 h-8 border-4 border-[#769FCD] border-t-transparent rounded-full"></div>
       </div>
     );
   }
@@ -121,7 +122,7 @@ export default function EditPlayerPage({ params }: { params: { id: string } }) {
     return (
       <div className="text-center py-20">
         <p className="text-gray-500">Player not found</p>
-        <Link href="/admin/players" className="text-green-600 hover:underline mt-2 block">
+        <Link href="/admin/players" className="text-[#769FCD] hover:underline mt-2 block">
           Back to Players
         </Link>
       </div>
@@ -132,7 +133,7 @@ export default function EditPlayerPage({ params }: { params: { id: string } }) {
     <div className="space-y-6 max-w-2xl">
       <div className="flex items-center gap-3">
         <Link href="/admin/players" className="text-gray-500 text-sm hover:text-gray-700">← Players</Link>
-        <Link href={`/players/${params.id}`} className="text-gray-500 text-sm hover:text-gray-700">
+        <Link href={`/players/${id}`} className="text-gray-500 text-sm hover:text-gray-700">
           {player.user?.name}
         </Link>
         <h1 className="text-2xl font-bold text-gray-900">Edit Player</h1>
@@ -141,7 +142,7 @@ export default function EditPlayerPage({ params }: { params: { id: string } }) {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center font-bold text-green-700 text-lg">
+            <div className="w-12 h-12 bg-[#D6E6F2] rounded-full flex items-center justify-center font-bold text-[#1B3A5C] text-lg">
               {player.user?.name?.charAt(0)}
             </div>
             <div>
@@ -159,7 +160,7 @@ export default function EditPlayerPage({ params }: { params: { id: string } }) {
                 <select
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD]"
                 >
                   {ROLES.map((r) => (
                     <option key={r} value={r}>{r.replace("_", " ")}</option>
@@ -173,7 +174,7 @@ export default function EditPlayerPage({ params }: { params: { id: string } }) {
                 <select
                   value={battingHand}
                   onChange={(e) => setBattingHand(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD]"
                 >
                   {BATTING_HANDS.map((h) => (
                     <option key={h} value={h}>{h}</option>
@@ -189,7 +190,7 @@ export default function EditPlayerPage({ params }: { params: { id: string } }) {
               <select
                 value={bowlingType}
                 onChange={(e) => setBowlingType(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD]"
               >
                 <option value="">None / Unknown</option>
                 {BOWLING_TYPES.map((t) => (
@@ -207,7 +208,7 @@ export default function EditPlayerPage({ params }: { params: { id: string } }) {
                 max={999}
                 value={jerseyNumber}
                 onChange={(e) => setJerseyNumber(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD]"
                 placeholder="e.g. 10"
               />
               {errors.jerseyNumber && <p className="text-red-500 text-xs mt-1">{errors.jerseyNumber}</p>}
@@ -220,7 +221,7 @@ export default function EditPlayerPage({ params }: { params: { id: string } }) {
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
                 rows={3}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD]"
                 placeholder="Short player bio..."
               />
             </div>
@@ -232,7 +233,7 @@ export default function EditPlayerPage({ params }: { params: { id: string } }) {
                 type="url"
                 value={profileImage}
                 onChange={(e) => setProfileImage(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD]"
                 placeholder="https://example.com/photo.jpg"
               />
               {errors.profileImage && <p className="text-red-500 text-xs mt-1">{errors.profileImage}</p>}
@@ -245,7 +246,7 @@ export default function EditPlayerPage({ params }: { params: { id: string } }) {
                   type="checkbox"
                   checked={isCaptain}
                   onChange={(e) => setIsCaptain(e.target.checked)}
-                  className="w-4 h-4 text-green-600 border-gray-300 rounded"
+                  className="w-4 h-4 text-[#769FCD] border-gray-300 rounded"
                 />
                 <span className="text-sm text-gray-700">Captain</span>
               </label>
@@ -254,7 +255,7 @@ export default function EditPlayerPage({ params }: { params: { id: string } }) {
                   type="checkbox"
                   checked={isViceCaptain}
                   onChange={(e) => setIsViceCaptain(e.target.checked)}
-                  className="w-4 h-4 text-green-600 border-gray-300 rounded"
+                  className="w-4 h-4 text-[#769FCD] border-gray-300 rounded"
                 />
                 <span className="text-sm text-gray-700">Vice Captain</span>
               </label>
@@ -263,14 +264,14 @@ export default function EditPlayerPage({ params }: { params: { id: string } }) {
                   type="checkbox"
                   checked={isWicketkeeper}
                   onChange={(e) => setIsWicketkeeper(e.target.checked)}
-                  className="w-4 h-4 text-green-600 border-gray-300 rounded"
+                  className="w-4 h-4 text-[#769FCD] border-gray-300 rounded"
                 />
                 <span className="text-sm text-gray-700">Wicketkeeper</span>
               </label>
             </div>
 
             {message && (
-              <div className={`p-3 rounded-lg text-sm ${message.includes("success") ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+              <div className={`p-3 rounded-lg text-sm ${message.includes("success") ? "bg-[#D6E6F2] text-[#1B3A5C]" : "bg-red-50 text-red-700"}`}>
                 {message}
               </div>
             )}

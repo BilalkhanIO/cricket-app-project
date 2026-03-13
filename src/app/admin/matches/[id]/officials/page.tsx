@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
@@ -16,7 +16,8 @@ const OFFICIAL_ROLES = [
   "Scorer",
 ];
 
-export default function MatchOfficialsPage({ params }: { params: { id: string } }) {
+export default function MatchOfficialsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const [officials, setOfficials] = useState<any[]>([]);
   const [match, setMatch] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -26,14 +27,14 @@ export default function MatchOfficialsPage({ params }: { params: { id: string } 
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    fetch(`/api/matches/${params.id}`)
+    fetch(`/api/matches/${id}`)
       .then((r) => r.json())
       .then((d) => setMatch(d.match));
     fetchOfficials();
-  }, [params.id]);
+  }, [id]);
 
   const fetchOfficials = async () => {
-    const res = await fetch(`/api/matches/${params.id}/officials`);
+    const res = await fetch(`/api/matches/${id}/officials`);
     const data = await res.json();
     setOfficials(data.officials || []);
     setLoading(false);
@@ -44,7 +45,7 @@ export default function MatchOfficialsPage({ params }: { params: { id: string } 
     setSubmitting(true);
     setMessage("");
 
-    const res = await fetch(`/api/matches/${params.id}/officials`, {
+    const res = await fetch(`/api/matches/${id}/officials`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, role }),
@@ -68,7 +69,7 @@ export default function MatchOfficialsPage({ params }: { params: { id: string } 
           ← Matches
         </Link>
         {match && (
-          <Link href={`/matches/${params.id}`} className="text-gray-500 text-sm hover:text-gray-700">
+          <Link href={`/matches/${id}`} className="text-gray-500 text-sm hover:text-gray-700">
             {match.homeTeam?.shortName} vs {match.awayTeam?.shortName}
           </Link>
         )}
@@ -95,7 +96,7 @@ export default function MatchOfficialsPage({ params }: { params: { id: string } 
                 <select
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD] focus:border-transparent"
                 >
                   {OFFICIAL_ROLES.map((r) => (
                     <option key={r} value={r}>{r}</option>
@@ -109,14 +110,14 @@ export default function MatchOfficialsPage({ params }: { params: { id: string } 
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD] focus:border-transparent"
                   placeholder="e.g. John Smith"
                   required
                 />
               </div>
 
               {message && (
-                <p className={`text-sm ${message.includes("success") ? "text-green-600" : "text-red-600"}`}>
+                <p className={`text-sm ${message.includes("success") ? "text-[#769FCD]" : "text-red-600"}`}>
                   {message}
                 </p>
               )}

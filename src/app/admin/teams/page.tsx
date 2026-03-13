@@ -26,7 +26,7 @@ export default async function AdminTeamsPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Teams ({teams.length})</h1>
-        <Link href="/admin/teams/new" className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700">
+        <Link href="/admin/teams/new" className="bg-[#769FCD] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#5A8BBE]">
           + Create Team
         </Link>
       </div>
