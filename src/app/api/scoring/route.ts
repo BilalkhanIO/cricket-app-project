@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       inningsUpdate.totalWickets = { increment: 1 };
     }
 
-    if (extraType === "WIDE") inningsUpdate.wides = { increment: (extraRuns || 0) + 1 };
+    if (extraType === "WIDE") inningsUpdate.wides = { increment: extraRuns || 0 };
     if (extraType === "NO_BALL") inningsUpdate.noBalls = { increment: 1 };
     if (extraType === "BYE") inningsUpdate.byes = { increment: extraRuns || 0 };
     if (extraType === "LEG_BYE") inningsUpdate.legByes = { increment: extraRuns || 0 };
