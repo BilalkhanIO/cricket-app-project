@@ -63,10 +63,10 @@ export default async function StatsPage() {
     <div className="flex flex-col min-h-screen">
       <Navbar />
       <main className="flex-1">
-        <div className="bg-green-800 text-white py-10">
+        <div className="bg-[#1B3A5C] text-white py-10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <h1 className="text-3xl font-bold mb-2">Statistics & Leaderboards</h1>
-            <p className="text-green-200">Top performers across all leagues</p>
+            <p className="text-[#B9D7EA]">Top performers across all leagues</p>
           </div>
         </div>
 
@@ -193,7 +193,7 @@ export default async function StatsPage() {
               <h2 className="text-2xl font-bold text-gray-900">League Standings</h2>
               {leagues.map((league) => (
                 <div key={league.id}>
-                  <Link href={`/leagues/${league.id}`} className="text-green-700 hover:text-green-800 font-semibold text-lg mb-2 block">
+                  <Link href={`/leagues/${league.id}`} className="text-[#1B3A5C] hover:text-[#1B3A5C] font-semibold text-lg mb-2 block">
                     {league.name} →
                   </Link>
                 </div>

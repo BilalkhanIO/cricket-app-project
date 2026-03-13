@@ -58,13 +58,13 @@ export default function LeaguesClient({ leagues }: { leagues: League[] }) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search leagues by name..."
-            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-[#769FCD] focus:border-transparent"
           />
         </div>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 bg-white"
+          className="px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-[#769FCD] bg-white"
         >
           {STATUS_OPTIONS.map((s) => (
             <option key={s} value={s}>{s === "ALL" ? "All Statuses" : s}</option>
@@ -73,7 +73,7 @@ export default function LeaguesClient({ leagues }: { leagues: League[] }) {
         <select
           value={formatFilter}
           onChange={(e) => setFormatFilter(e.target.value)}
-          className="px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 bg-white"
+          className="px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-[#769FCD] bg-white"
         >
           {FORMAT_OPTIONS.map((f) => (
             <option key={f} value={f}>{f === "ALL" ? "All Formats" : f}</option>
@@ -109,7 +109,7 @@ export default function LeaguesClient({ leagues }: { leagues: League[] }) {
                       <Card hoverable className="h-full">
                         <CardBody>
                           <div className="flex items-start justify-between mb-3">
-                            <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-2xl">
+                            <div className="w-12 h-12 bg-[#D6E6F2] rounded-xl flex items-center justify-center text-2xl">
                               🏆
                             </div>
                             <StatusBadge status={league.status} />

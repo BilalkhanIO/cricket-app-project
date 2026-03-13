@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
@@ -16,7 +16,8 @@ const TIER_COLORS: Record<string, string> = {
   BRONZE: "bg-orange-100 text-orange-800",
 };
 
-export default function SponsorsPage({ params }: { params: { id: string } }) {
+export default function SponsorsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const [sponsors, setSponsors] = useState<any[]>([]);
   const [leagueName, setLeagueName] = useState("");
   const [loading, setLoading] = useState(true);
@@ -28,16 +29,16 @@ export default function SponsorsPage({ params }: { params: { id: string } }) {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    fetch(`/api/leagues/${params.id}`)
+    fetch(`/api/leagues/${id}`)
       .then((r) => r.json())
       .then((d) => {
         setLeagueName(d.league?.name || "League");
       });
     fetchSponsors();
-  }, [params.id]);
+  }, [id]);
 
   const fetchSponsors = async () => {
-    const res = await fetch(`/api/leagues/${params.id}/sponsors`);
+    const res = await fetch(`/api/leagues/${id}/sponsors`);
     const data = await res.json();
     setSponsors(data.sponsors || []);
     setLoading(false);
@@ -48,7 +49,7 @@ export default function SponsorsPage({ params }: { params: { id: string } }) {
     setSubmitting(true);
     setMessage("");
 
-    const res = await fetch(`/api/leagues/${params.id}/sponsors`, {
+    const res = await fetch(`/api/leagues/${id}/sponsors`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, logo, website, tier }),
@@ -71,7 +72,7 @@ export default function SponsorsPage({ params }: { params: { id: string } }) {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Link href={`/admin/leagues/${params.id}`} className="text-gray-500 text-sm hover:text-gray-700">
+        <Link href={`/admin/leagues/${id}`} className="text-gray-500 text-sm hover:text-gray-700">
           ← {leagueName}
         </Link>
         <h1 className="text-2xl font-bold text-gray-900">Sponsors Management</h1>
@@ -91,7 +92,7 @@ export default function SponsorsPage({ params }: { params: { id: string } }) {
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD] focus:border-transparent"
                   placeholder="e.g. Acme Corporation"
                   required
                 />
@@ -102,7 +103,7 @@ export default function SponsorsPage({ params }: { params: { id: string } }) {
                 <select
                   value={tier}
                   onChange={(e) => setTier(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD] focus:border-transparent"
                 >
                   {TIERS.map((t) => (
                     <option key={t} value={t}>{t}</option>
@@ -116,7 +117,7 @@ export default function SponsorsPage({ params }: { params: { id: string } }) {
                   type="url"
                   value={logo}
                   onChange={(e) => setLogo(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD] focus:border-transparent"
                   placeholder="https://example.com/logo.png"
                 />
               </div>
@@ -127,13 +128,13 @@ export default function SponsorsPage({ params }: { params: { id: string } }) {
                   type="url"
                   value={website}
                   onChange={(e) => setWebsite(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD] focus:border-transparent"
                   placeholder="https://example.com"
                 />
               </div>
 
               {message && (
-                <p className={`text-sm ${message.includes("success") ? "text-green-600" : "text-red-600"}`}>
+                <p className={`text-sm ${message.includes("success") ? "text-[#769FCD]" : "text-red-600"}`}>
                   {message}
                 </p>
               )}

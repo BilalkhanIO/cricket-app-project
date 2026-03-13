@@ -23,7 +23,7 @@ export default async function AdminLeaguesPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Leagues</h1>
-        <Link href="/admin/leagues/new" className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700">
+        <Link href="/admin/leagues/new" className="bg-[#769FCD] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#5A8BBE]">
           + Create League
         </Link>
       </div>
@@ -33,7 +33,7 @@ export default async function AdminLeaguesPage() {
           <div className="text-center py-16">
             <div className="text-5xl mb-4">🏆</div>
             <h3 className="text-xl font-semibold text-gray-700 mb-2">No Leagues</h3>
-            <Link href="/admin/leagues/new" className="text-green-600 hover:underline">Create your first league →</Link>
+            <Link href="/admin/leagues/new" className="text-[#769FCD] hover:underline">Create your first league →</Link>
           </div>
         </Card>
       ) : (
@@ -43,7 +43,7 @@ export default async function AdminLeaguesPage() {
               <Card hoverable className="h-full">
                 <div className="p-5">
                   <div className="flex items-start justify-between mb-3">
-                    <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-2xl">🏆</div>
+                    <div className="w-12 h-12 bg-[#D6E6F2] rounded-xl flex items-center justify-center text-2xl">🏆</div>
                     <StatusBadge status={league.status} />
                   </div>
                   <h3 className="font-bold text-gray-900 mb-1">{league.name}</h3>

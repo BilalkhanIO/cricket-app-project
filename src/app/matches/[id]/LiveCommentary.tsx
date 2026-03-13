@@ -116,7 +116,7 @@ export default function LiveCommentary({ matchId, initialInnings }: { matchId: s
                   ball.isBoundary ? "bg-blue-500 text-white" :
                   ball.isExtra ? "bg-yellow-400 text-gray-900" :
                   ball.runs === 0 ? "bg-gray-200 text-gray-600" :
-                  "bg-green-500 text-white"
+                  "bg-[#769FCD] text-white"
                 }`}
               >
                 {ball.isWicket ? "W" : ball.isExtra ? (ball.extraType?.charAt(0) || "E") : ball.runs}

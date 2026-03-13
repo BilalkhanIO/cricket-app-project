@@ -59,7 +59,7 @@ export default function AwardFormClient({ leagueId, players }: { leagueId: strin
         <select
           value={awardType}
           onChange={(e) => setAwardType(e.target.value)}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD] focus:border-transparent"
           required
         >
           <option value="">Select award type...</option>
@@ -76,7 +76,7 @@ export default function AwardFormClient({ leagueId, players }: { leagueId: strin
         <select
           value={playerId}
           onChange={(e) => setPlayerId(e.target.value)}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD] focus:border-transparent"
         >
           <option value="">Select player...</option>
           {players.map((p) => (
@@ -93,13 +93,13 @@ export default function AwardFormClient({ leagueId, players }: { leagueId: strin
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={3}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD] focus:border-transparent"
           placeholder="Optional description..."
         />
       </div>
 
       {message && (
-        <p className={`text-sm ${message.includes("success") ? "text-green-600" : "text-red-600"}`}>
+        <p className={`text-sm ${message.includes("success") ? "text-[#769FCD]" : "text-red-600"}`}>
           {message}
         </p>
       )}

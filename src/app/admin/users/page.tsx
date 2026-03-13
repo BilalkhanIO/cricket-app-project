@@ -49,7 +49,7 @@ export default async function AdminUsersPage() {
                 <tr key={user.id} className="border-b border-gray-50 hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">
                     <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 bg-green-100 rounded-full flex items-center justify-center text-xs font-bold text-green-700">
+                      <div className="w-7 h-7 bg-[#D6E6F2] rounded-full flex items-center justify-center text-xs font-bold text-[#1B3A5C]">
                         {user.name.charAt(0)}
                       </div>
                       {user.name}
@@ -63,7 +63,7 @@ export default async function AdminUsersPage() {
                   </td>
                   <td className="px-3 py-3 text-gray-600 text-xs">{user.city || "-"}</td>
                   <td className="px-3 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${user.isActive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${user.isActive ? "bg-[#D6E6F2] text-[#1B3A5C]" : "bg-red-100 text-red-700"}`}>
                       {user.isActive ? "Active" : "Inactive"}
                     </span>
                   </td>

@@ -38,8 +38,9 @@ async function getLeague(id: string) {
   });
 }
 
-export default async function AdminLeagueDetailPage({ params }: { params: { id: string } }) {
-  const league = await getLeague(params.id);
+export default async function AdminLeagueDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const league = await getLeague(id);
   if (!league) notFound();
 
   return (
@@ -96,7 +97,7 @@ export default async function AdminLeagueDetailPage({ params }: { params: { id: 
               league.teams.map((tl) => (
                 <div key={tl.id} className="flex items-center justify-between px-4 py-3 border-b border-gray-50 last:border-0">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center text-xs font-bold text-green-700">
+                    <div className="w-8 h-8 bg-[#D6E6F2] rounded-full flex items-center justify-center text-xs font-bold text-[#2D5484]">
                       {tl.team.shortName?.charAt(0)}
                     </div>
                     <div>
@@ -143,10 +144,10 @@ export default async function AdminLeagueDetailPage({ params }: { params: { id: 
                         </div>
                       </td>
                       <td className="px-2 py-2 text-center">{pt.matchesPlayed}</td>
-                      <td className="px-2 py-2 text-center text-green-700">{pt.wins}</td>
+                      <td className="px-2 py-2 text-center text-[#2D5484]">{pt.wins}</td>
                       <td className="px-2 py-2 text-center text-red-600">{pt.losses}</td>
                       <td className="px-2 py-2 text-center font-bold">{pt.points}</td>
-                      <td className={`px-2 py-2 text-center font-medium ${pt.netRunRate >= 0 ? "text-green-700" : "text-red-600"}`}>
+                      <td className={`px-2 py-2 text-center font-medium ${pt.netRunRate >= 0 ? "text-[#2D5484]" : "text-red-600"}`}>
                         {pt.netRunRate > 0 ? "+" : ""}{pt.netRunRate.toFixed(3)}
                       </td>
                     </tr>
@@ -163,7 +164,7 @@ export default async function AdminLeagueDetailPage({ params }: { params: { id: 
         <CardHeader>
           <div className="flex items-center justify-between">
             <h2 className="font-bold text-gray-900">Fixtures ({league.matches.length})</h2>
-            <Link href={`/admin/matches/new?leagueId=${league.id}`} className="text-green-600 text-sm hover:underline">+ Add Match</Link>
+            <Link href={`/admin/matches/new?leagueId=${league.id}`} className="text-[#769FCD] text-sm hover:underline">+ Add Match</Link>
           </div>
         </CardHeader>
         <div className="overflow-x-auto">

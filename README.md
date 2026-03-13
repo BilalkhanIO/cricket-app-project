@@ -50,7 +50,8 @@ A full-stack cricket league management platform built with **Next.js 15**, **Tai
 npm install
 
 # 2. Set up environment
-# Edit .env if needed (DATABASE_URL and NEXTAUTH_SECRET are pre-configured)
+cp .env.example .env.local
+# Then edit .env.local (set DATABASE_URL, DIRECT_URL, NEXTAUTH_SECRET)
 
 # 3. Run database migrations
 npx prisma migrate dev
@@ -60,6 +61,10 @@ npm run dev
 ```
 
 Open http://localhost:3000
+
+## Vercel Deployment Note
+
+This repo is configured to run `prisma db push` during Vercel builds (`npm run vercel-build`) so production tables are created/updated before the app starts.
 
 ## Seed Demo Data
 

@@ -1,29 +1,121 @@
 @import "tailwindcss";
 
+@theme {
+  --color-primary: #769FCD;
+  --color-primary-light: #B9D7EA;
+  --color-primary-lighter: #D6E6F2;
+  --color-primary-lightest: #F7FBFC;
+  --color-navy: #1B3A5C;
+  --color-navy-mid: #2D5484;
+  --color-navy-light: #4A7098;
+}
+
 :root {
-  --background: #f9fafb;
-  --foreground: #111827;
+  --background: #F7FBFC;
+  --foreground: #1B3A5C;
+  --card-bg: #ffffff;
+  --border-color: #B9D7EA;
+  --primary: #769FCD;
+  --primary-dark: #1B3A5C;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
+  font-family: system-ui, -apple-system, sans-serif;
 }
 
 * {
   box-sizing: border-box;
 }
 
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #D6E6F2; }
+::-webkit-scrollbar-thumb { background: #769FCD; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #2D5484; }
+
+/* Text clamp utilities */
+.line-clamp-1 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
 .line-clamp-2 {
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
-
 .line-clamp-3 {
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
+}
+
+/* Ticker animation */
+@keyframes ticker {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.ticker-track {
+  display: flex;
+  animation: ticker 30s linear infinite;
+  width: max-content;
+}
+.ticker-track:hover { animation-play-state: paused; }
+
+/* Pulse live indicator */
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.6; transform: scale(1.15); }
+}
+.live-dot { animation: live-pulse 1.5s ease-in-out infinite; }
+
+/* Card hover lift */
+.card-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(118, 159, 205, 0.18);
+}
+
+/* Glass effect for hero stats */
+.glass-card {
+  background: rgba(255,255,255,0.12);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+/* Score card team strip */
+.team-strip {
+  border-left: 4px solid;
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #769FCD, #1B3A5C);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Section title underline */
+.section-title {
+  position: relative;
+  display: inline-block;
+}
+.section-title::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 40px;
+  height: 3px;
+  background: #769FCD;
+  border-radius: 2px;
 }
