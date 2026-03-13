@@ -1,8 +1,14 @@
 import Link from "next/link";
 import prisma from "@/lib/prisma";
 import { Card, CardBody } from "@/components/ui/Card";
+import AdminDashboardCharts from "./AdminDashboardCharts";
+
+export const dynamic = 'force-dynamic';
 
 async function getDashboardStats() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   const [
     leaguesCount,
     teamsCount,
@@ -14,6 +20,8 @@ async function getDashboardStats() {
     pendingTeams,
     usersCount,
     recentAnnouncements,
+    recentAuditLogs,
+    todayBallEvents,
   ] = await Promise.all([
     prisma.league.count(),
     prisma.team.count(),
@@ -37,7 +45,65 @@ async function getDashboardStats() {
       include: { author: { select: { name: true } } },
       take: 5,
     }),
+    prisma.auditLog.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    }).catch(() => []),
+    prisma.ballEvent.findMany({
+      where: { createdAt: { gte: today } },
+      select: { runs: true, isWicket: true, extraRuns: true },
+    }).catch(() => []),
   ]);
+
+  // Match completion rate by month (last 6 months)
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
+  sixMonthsAgo.setDate(1);
+  sixMonthsAgo.setHours(0, 0, 0, 0);
+
+  const recentMatches = await prisma.match.findMany({
+    where: { matchDate: { gte: sixMonthsAgo } },
+    select: { matchDate: true, status: true },
+  });
+
+  // Player registration trend (last 6 months)
+  const recentPlayers = await prisma.player.findMany({
+    where: { createdAt: { gte: sixMonthsAgo } },
+    select: { createdAt: true },
+  });
+
+  // Calculate today's stats
+  const todayRuns = todayBallEvents.reduce((s, b) => s + b.runs + b.extraRuns, 0);
+  const todayWickets = todayBallEvents.filter((b) => b.isWicket).length;
+
+  // Prepare monthly data
+  const monthlyData: Record<string, { month: string; total: number; completed: number; players: number }> = {};
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date();
+    d.setMonth(d.getMonth() - i);
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    const label = d.toLocaleDateString("en-US", { month: "short" });
+    monthlyData[key] = { month: label, total: 0, completed: 0, players: 0 };
+  }
+
+  recentMatches.forEach((m) => {
+    const d = new Date(m.matchDate);
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    if (monthlyData[key]) {
+      monthlyData[key].total++;
+      if (m.status === "COMPLETED") monthlyData[key].completed++;
+    }
+  });
+
+  recentPlayers.forEach((p) => {
+    const d = new Date(p.createdAt);
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    if (monthlyData[key]) {
+      monthlyData[key].players++;
+    }
+  });
+
+  const chartData = Object.values(monthlyData);
 
   return {
     leaguesCount,
@@ -50,6 +116,10 @@ async function getDashboardStats() {
     pendingTeams,
     usersCount,
     recentAnnouncements,
+    recentAuditLogs,
+    todayRuns,
+    todayWickets,
+    chartData,
   };
 }
 
@@ -82,6 +152,22 @@ export default async function AdminDashboard() {
         </div>
       </div>
 
+      {/* Today's Quick Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {[
+          { label: "Runs Scored Today", value: stats.todayRuns, icon: "🏏", color: "bg-green-50 border-green-200" },
+          { label: "Wickets Today", value: stats.todayWickets, icon: "🎳", color: "bg-red-50 border-red-200" },
+          { label: "Live Matches", value: stats.liveMatches.length, icon: "⚡", color: "bg-orange-50 border-orange-200" },
+          { label: "Pending Approvals", value: stats.pendingTeams, icon: "⏳", color: "bg-yellow-50 border-yellow-200" },
+        ].map((s) => (
+          <div key={s.label} className={`rounded-xl border p-4 ${s.color}`}>
+            <div className="text-2xl mb-1">{s.icon}</div>
+            <div className="text-3xl font-bold text-gray-900">{s.value}</div>
+            <div className="text-xs text-gray-600 mt-1">{s.label}</div>
+          </div>
+        ))}
+      </div>
+
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {statCards.map((stat) => (
@@ -94,6 +180,9 @@ export default async function AdminDashboard() {
           </Link>
         ))}
       </div>
+
+      {/* Charts */}
+      <AdminDashboardCharts chartData={stats.chartData} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Live Matches */}
@@ -131,7 +220,7 @@ export default async function AdminDashboard() {
         {/* Recent Announcements */}
         <Card>
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="font-bold text-gray-900">📢 Announcements</h2>
+            <h2 className="font-bold text-gray-900">Announcements</h2>
             <Link href="/admin/announcements" className="text-green-600 text-sm hover:underline">Manage</Link>
           </div>
           <CardBody className="p-0">
@@ -153,6 +242,37 @@ export default async function AdminDashboard() {
           </CardBody>
         </Card>
       </div>
+
+      {/* Recent Audit Logs */}
+      {stats.recentAuditLogs.length > 0 && (
+        <Card>
+          <div className="px-6 py-4 border-b border-gray-100">
+            <h2 className="font-bold text-gray-900">Recent Activity Log</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b">
+                  <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">Action</th>
+                  <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">Entity</th>
+                  <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.recentAuditLogs.map((log) => (
+                  <tr key={log.id} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="px-4 py-2 font-medium text-gray-900">{log.action}</td>
+                    <td className="px-4 py-2 text-gray-600">{log.entity}</td>
+                    <td className="px-4 py-2 text-xs text-gray-400">
+                      {new Date(log.createdAt).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
 
       {/* Quick Actions */}
       <Card>
@@ -184,7 +304,7 @@ export default async function AdminDashboard() {
 
       {/* Seed Data Notice */}
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-        <p className="text-blue-800 text-sm font-medium mb-1">🌱 Demo Data</p>
+        <p className="text-blue-800 text-sm font-medium mb-1">Demo Data</p>
         <p className="text-blue-600 text-xs">
           No data yet? Run the seeder to populate with sample data:{" "}
           <code className="bg-blue-100 px-2 py-0.5 rounded text-blue-700">POST /api/seed</code>

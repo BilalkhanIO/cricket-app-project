@@ -8,6 +8,8 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 
+export const dynamic = 'force-dynamic';
+
 export default function ProfilePage() {
   const { data: session } = useSession();
   const [saving, setSaving] = useState(false);

@@ -4,6 +4,9 @@ import prisma from "@/lib/prisma";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import PlayerStatsCharts from "./PlayerStatsCharts";
+
+export const dynamic = 'force-dynamic';
 
 async function getPlayer(id: string) {
   return prisma.player.findUnique({
@@ -45,6 +48,12 @@ async function getPlayer(id: string) {
         orderBy: { innings: { createdAt: "desc" } },
         take: 10,
       },
+      awards: {
+        include: {
+          league: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      },
     },
   });
 }
@@ -55,6 +64,16 @@ export default async function PlayerDetailPage({ params }: { params: { id: strin
 
   const careerStats = player.playerStats[0];
 
+  // Prepare chart data
+  const battingChartData = player.battingScores.slice().reverse().map((bat, i) => ({
+    match: `M${i + 1}`,
+    runs: bat.runs,
+  }));
+  const bowlingChartData = player.bowlingScores.slice().reverse().map((bowl, i) => ({
+    match: `M${i + 1}`,
+    wickets: bowl.wickets,
+  }));
+
   return (
     <div className="flex flex-col min-h-screen">
       <Navbar />
@@ -63,9 +82,17 @@ export default async function PlayerDetailPage({ params }: { params: { id: strin
         <div className="bg-gradient-to-br from-green-800 to-emerald-700 text-white py-10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
-              <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center text-3xl font-bold">
-                {player.user.name.charAt(0)}
-              </div>
+              {player.user.profileImage ? (
+                <img
+                  src={player.user.profileImage}
+                  alt={player.user.name}
+                  className="w-20 h-20 rounded-full object-cover border-4 border-white/30"
+                />
+              ) : (
+                <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center text-3xl font-bold">
+                  {player.user.name.charAt(0)}
+                </div>
+              )}
               <div>
                 <div className="flex items-center gap-3 flex-wrap">
                   <h1 className="text-3xl font-bold">{player.user.name}</h1>
@@ -105,6 +132,24 @@ export default async function PlayerDetailPage({ params }: { params: { id: strin
           {careerStats && (
             <section>
               <h2 className="text-xl font-bold text-gray-900 mb-4">Career Statistics</h2>
+
+              {/* Summary Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 mb-4">
+                {[
+                  { label: "Matches", value: careerStats.matchesPlayed, color: "bg-blue-50 border-blue-100" },
+                  { label: "Runs", value: careerStats.runs, color: "bg-green-50 border-green-100" },
+                  { label: "Average", value: careerStats.average.toFixed(1), color: "bg-yellow-50 border-yellow-100" },
+                  { label: "Strike Rate", value: careerStats.strikeRate.toFixed(1), color: "bg-orange-50 border-orange-100" },
+                  { label: "Wickets", value: careerStats.wickets, color: "bg-red-50 border-red-100" },
+                  { label: "Economy", value: careerStats.economy.toFixed(2), color: "bg-purple-50 border-purple-100" },
+                ].map((s) => (
+                  <div key={s.label} className={`border rounded-xl p-3 text-center ${s.color}`}>
+                    <div className="text-2xl font-bold text-gray-900">{s.value}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{s.label}</div>
+                  </div>
+                ))}
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Card>
                   <CardHeader>
@@ -157,6 +202,36 @@ export default async function PlayerDetailPage({ params }: { params: { id: strin
                     </div>
                   </CardBody>
                 </Card>
+              </div>
+            </section>
+          )}
+
+          {/* Charts */}
+          {(battingChartData.length > 1 || bowlingChartData.length > 1) && (
+            <PlayerStatsCharts battingData={battingChartData} bowlingData={bowlingChartData} />
+          )}
+
+          {/* Awards */}
+          {player.awards.length > 0 && (
+            <section>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Awards & Recognition</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {player.awards.map((award) => (
+                  <div key={award.id} className="flex items-center gap-3 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl p-3">
+                    <div className="text-2xl">
+                      {award.awardType === "MAN_OF_MATCH" ? "🏅" :
+                       award.awardType === "BEST_BATSMAN" ? "🏏" :
+                       award.awardType === "BEST_BOWLER" ? "🎳" :
+                       award.awardType === "PLAYER_OF_TOURNAMENT" ? "🏆" : "⭐"}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">{award.awardType.replace(/_/g, " ")}</p>
+                      <Link href={`/leagues/${award.league.id}`} className="text-xs text-green-700 hover:underline">
+                        {award.league.name}
+                      </Link>
+                    </div>
+                  </div>
+                ))}
               </div>
             </section>
           )}
