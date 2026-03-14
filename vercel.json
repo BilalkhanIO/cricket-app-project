@@ -1,1 +1,1 @@
-{"buildCommand":"npm run vercel-build","env":{"NEXTAUTH_SECRET":"@nextauth_secret","DATABASE_URL":"@database_url","DIRECT_URL":"@direct_url"}}
+{"buildCommand":"npm run build"}
