@@ -54,16 +54,76 @@ export async function POST(req: NextRequest) {
     if (!canCreate) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const data = await req.json();
+    const matchDate = new Date(data.matchDate);
+    if (Number.isNaN(matchDate.getTime())) {
+      return NextResponse.json({ error: "Invalid match date" }, { status: 400 });
+    }
+    if (data.homeTeamId === data.awayTeamId) {
+      return NextResponse.json({ error: "A team cannot play against itself" }, { status: 400 });
+    }
+
+    const [teamConflict, venueConflict] = await Promise.all([
+      prisma.match.findFirst({
+        where: {
+          matchDate,
+          status: { notIn: ["CANCELED", "COMPLETED"] },
+          OR: [
+            { homeTeamId: data.homeTeamId },
+            { awayTeamId: data.homeTeamId },
+            { homeTeamId: data.awayTeamId },
+            { awayTeamId: data.awayTeamId },
+          ],
+        },
+        select: { id: true },
+      }),
+      data.venueId
+        ? prisma.match.findFirst({
+            where: {
+              matchDate,
+              venueId: data.venueId,
+              status: { notIn: ["CANCELED", "COMPLETED"] },
+            },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
+    ]);
+
+    if (teamConflict) {
+      return NextResponse.json(
+        { error: "Fixture conflict: one team is already scheduled at this time" },
+        { status: 400 }
+      );
+    }
+    if (venueConflict) {
+      return NextResponse.json(
+        { error: "Fixture conflict: venue is already occupied at this time" },
+        { status: 400 }
+      );
+    }
+
     const match = await prisma.match.create({
       data: {
         ...data,
-        matchDate: new Date(data.matchDate),
+        matchDate,
       },
       include: {
-        homeTeam: { select: { name: true } },
-        awayTeam: { select: { name: true } },
+        homeTeam: { select: { shortName: true } },
+        awayTeam: { select: { shortName: true } },
       },
     });
+
+    // Notify assigned scorer
+    if (data.scorerId) {
+      await prisma.notification.create({
+        data: {
+          userId: data.scorerId,
+          matchId: match.id,
+          type: "MATCH_REMINDER",
+          title: "You have been assigned as scorer",
+          message: `You are the scorer for ${(match as any).homeTeam.shortName} vs ${(match as any).awayTeam.shortName} on ${match.matchDate.toLocaleDateString("en-GB")}.`,
+        },
+      }).catch(() => {}); // non-fatal
+    }
 
     return NextResponse.json({ match }, { status: 201 });
   } catch (error) {

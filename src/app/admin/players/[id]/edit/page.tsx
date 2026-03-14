@@ -38,6 +38,9 @@ export default function EditPlayerPage({ params }: { params: Promise<{ id: strin
   const [isCaptain, setIsCaptain] = useState(false);
   const [isViceCaptain, setIsViceCaptain] = useState(false);
   const [isWicketkeeper, setIsWicketkeeper] = useState(false);
+  const [medicalStatus, setMedicalStatus] = useState("");
+  const [availabilityStatus, setAvailabilityStatus] = useState("AVAILABLE");
+  const [photoUrl, setPhotoUrl] = useState("");
 
   useEffect(() => {
     fetch(`/api/players/${id}`)
@@ -55,6 +58,9 @@ export default function EditPlayerPage({ params }: { params: Promise<{ id: strin
           setIsCaptain(p.isCaptain || false);
           setIsViceCaptain(p.isViceCaptain || false);
           setIsWicketkeeper(p.isWicketkeeper || false);
+          setMedicalStatus(p.medicalStatus || "");
+          setAvailabilityStatus(p.availabilityStatus || "AVAILABLE");
+          setPhotoUrl(p.photoUrl || "");
         }
         setLoading(false);
       })
@@ -91,6 +97,9 @@ export default function EditPlayerPage({ params }: { params: Promise<{ id: strin
       isCaptain,
       isViceCaptain,
       isWicketkeeper,
+      medicalStatus: medicalStatus || null,
+      availabilityStatus,
+      photoUrl: photoUrl || null,
     };
 
     const res = await fetch(`/api/players/${id}`, {
@@ -237,6 +246,44 @@ export default function EditPlayerPage({ params }: { params: Promise<{ id: strin
                 placeholder="https://example.com/photo.jpg"
               />
               {errors.profileImage && <p className="text-red-500 text-xs mt-1">{errors.profileImage}</p>}
+            </div>
+
+            {/* Photo URL (player-specific, separate from user profile image) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Player Photo URL</label>
+              <input
+                type="url"
+                value={photoUrl}
+                onChange={(e) => setPhotoUrl(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD]"
+                placeholder="https://example.com/player.jpg"
+              />
+            </div>
+
+            {/* Availability & Medical */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Availability</label>
+                <select
+                  value={availabilityStatus}
+                  onChange={(e) => setAvailabilityStatus(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD]"
+                >
+                  {["AVAILABLE", "UNAVAILABLE", "INJURED", "SUSPENDED", "ON_TOUR"].map((s) => (
+                    <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Medical / Fitness Status</label>
+                <input
+                  type="text"
+                  value={medicalStatus}
+                  onChange={(e) => setMedicalStatus(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD]"
+                  placeholder="e.g. Fit, Hamstring strain..."
+                />
+              </div>
             </div>
 
             {/* Flags */}

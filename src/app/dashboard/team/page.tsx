@@ -6,6 +6,7 @@ import Link from "next/link";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { StatusBadge } from "@/components/ui/Badge";
+import { OVERALL_LEAGUE_KEY } from "@/lib/constants";
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,11 @@ async function getTeamManagerData(userId: string) {
       players: {
         include: {
           user: { select: { name: true, profileImage: true, city: true } },
-          playerStats: { orderBy: { updatedAt: "desc" }, take: 1 },
+          playerStats: {
+            where: { leagueId: OVERALL_LEAGUE_KEY },
+            orderBy: { updatedAt: "desc" },
+            take: 1,
+          },
         },
         orderBy: [{ isCaptain: "desc" }, { isViceCaptain: "desc" }],
       },
@@ -284,7 +289,7 @@ export default async function TeamDashboard() {
                             <p className="text-sm font-medium text-gray-900">{tl.league.name}</p>
                             <div className="flex items-center gap-2 mt-0.5">
                               <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                                tl.status === "ACTIVE" ? "bg-green-100 text-green-700" :
+                                tl.status === "ACTIVE" ? "bg-[#D6E6F2] text-[#769FCD]" :
                                 tl.status === "PENDING" ? "bg-yellow-100 text-yellow-700" :
                                 "bg-gray-100 text-gray-600"
                               }`}>{tl.status}</span>

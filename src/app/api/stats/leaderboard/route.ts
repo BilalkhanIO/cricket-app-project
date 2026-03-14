@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { OVERALL_LEAGUE_KEY } from "@/lib/constants";
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +12,7 @@ export async function GET(req: NextRequest) {
 
     if (type === "batting") {
       const batters = await prisma.playerStats.findMany({
-        where: { ...(leagueId && { leagueId }) },
+        where: leagueId ? { leagueId } : { leagueId: OVERALL_LEAGUE_KEY },
         include: {
           player: {
             include: {
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
     if (type === "bowling") {
       const bowlers = await prisma.playerStats.findMany({
         where: {
-          ...(leagueId && { leagueId }),
+          ...(leagueId ? { leagueId } : { leagueId: OVERALL_LEAGUE_KEY }),
           wickets: { gt: 0 },
         },
         include: {

@@ -38,12 +38,40 @@ export async function POST(req: NextRequest) {
     if (!canCreate) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const data = await req.json();
+    const startDate = new Date(data.startDate);
+    const endDate = new Date(data.endDate);
+    const oversPerInnings = Number(data.oversPerInnings ?? 20);
+    const powerplayOvers = Number(data.powerplayOvers ?? 6);
+
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      return NextResponse.json({ error: "Invalid start/end date" }, { status: 400 });
+    }
+    if (startDate >= endDate) {
+      return NextResponse.json({ error: "End date must be after start date" }, { status: 400 });
+    }
+    if (oversPerInnings <= 0 || powerplayOvers < 0 || powerplayOvers > oversPerInnings) {
+      return NextResponse.json({ error: "Invalid overs configuration" }, { status: 400 });
+    }
+
+    let registrationOpenDate: Date | undefined;
+    let registrationCloseDate: Date | undefined;
+    if (data.registrationOpenDate) registrationOpenDate = new Date(data.registrationOpenDate);
+    if (data.registrationCloseDate) registrationCloseDate = new Date(data.registrationCloseDate);
+    if (registrationOpenDate && registrationCloseDate && registrationOpenDate > registrationCloseDate) {
+      return NextResponse.json({ error: "Registration close date must be after open date" }, { status: 400 });
+    }
+    if (registrationCloseDate && registrationCloseDate > startDate) {
+      return NextResponse.json({ error: "Registration close date must be before league start date" }, { status: 400 });
+    }
+
     const league = await prisma.league.create({
       data: {
         ...data,
         adminId: session.user.id,
-        startDate: new Date(data.startDate),
-        endDate: new Date(data.endDate),
+        startDate,
+        endDate,
+        ...(registrationOpenDate && { registrationOpenDate }),
+        ...(registrationCloseDate && { registrationCloseDate }),
       },
     });
 

@@ -3,13 +3,14 @@ import prisma from "@/lib/prisma";
 import { Card, CardHeader } from "@/components/ui/Card";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import { OVERALL_LEAGUE_KEY } from "@/lib/constants";
 
 export const dynamic = 'force-dynamic';
 
 async function getStats() {
   const [topBatters, topBowlers, topSixers, leagues] = await Promise.all([
     prisma.playerStats.findMany({
-      where: { runs: { gt: 0 } },
+      where: { leagueId: OVERALL_LEAGUE_KEY, runs: { gt: 0 } },
       include: {
         player: {
           include: {
@@ -22,7 +23,7 @@ async function getStats() {
       take: 10,
     }),
     prisma.playerStats.findMany({
-      where: { wickets: { gt: 0 } },
+      where: { leagueId: OVERALL_LEAGUE_KEY, wickets: { gt: 0 } },
       include: {
         player: {
           include: {
@@ -35,7 +36,7 @@ async function getStats() {
       take: 10,
     }),
     prisma.playerStats.findMany({
-      where: { sixes: { gt: 0 } },
+      where: { leagueId: OVERALL_LEAGUE_KEY, sixes: { gt: 0 } },
       include: {
         player: {
           include: {

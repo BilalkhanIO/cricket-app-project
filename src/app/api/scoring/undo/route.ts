@@ -15,6 +15,16 @@ export async function DELETE(req: NextRequest) {
 
     const { inningsId } = await req.json();
 
+    // Verify SCORER is assigned to this match
+    if (session.user.role === "SCORER") {
+      const innings = await prisma.innings.findUnique({ where: { id: inningsId }, select: { matchId: true } });
+      if (!innings) return NextResponse.json({ error: "Innings not found" }, { status: 404 });
+      const match = await prisma.match.findUnique({ where: { id: innings.matchId }, select: { scorerId: true } });
+      if (match?.scorerId !== session.user.id) {
+        return NextResponse.json({ error: "You are not the assigned scorer for this match" }, { status: 403 });
+      }
+    }
+
     // Find the last ball event for this innings
     const lastBall = await prisma.ballEvent.findFirst({
       where: { inningsId },
@@ -34,7 +44,7 @@ export async function DELETE(req: NextRequest) {
     });
 
     const totalRuns = remainingBalls.reduce((sum, b) => sum + b.runs + b.extraRuns, 0);
-    const totalWickets = remainingBalls.filter((b) => b.isWicket).length;
+    const totalWickets = remainingBalls.filter((b) => b.isWicket && b.wicketType !== "RETIRED_HURT").length;
     const totalBalls = remainingBalls.filter(
       (b) => !b.isExtra || b.extraType === "BYE" || b.extraType === "LEG_BYE"
     ).length;
@@ -64,7 +74,7 @@ export async function DELETE(req: NextRequest) {
     const over = await prisma.over.findUnique({ where: { id: lastBall.overId }, include: { balls: true } });
     if (over) {
       const overRuns = over.balls.reduce((s, b) => s + b.runs + b.extraRuns, 0);
-      const overWickets = over.balls.filter((b) => b.isWicket).length;
+      const overWickets = over.balls.filter((b) => b.isWicket && b.wicketType !== "RETIRED_HURT").length;
       const overLegalBalls = over.balls.filter(
         (b) => !b.isExtra || b.extraType === "BYE" || b.extraType === "LEG_BYE"
       ).length;
@@ -90,7 +100,7 @@ export async function DELETE(req: NextRequest) {
       ).length;
       const batFours = batsmanBalls.filter((b) => b.isBoundary && !b.isSix).length;
       const batSixes = batsmanBalls.filter((b) => b.isSix).length;
-      const isOut = batsmanBalls.some((b) => b.isWicket);
+      const isOut = batsmanBalls.some((b) => b.isWicket && b.wicketType !== "RETIRED_HURT");
 
       const existingBatting = await prisma.battingScorecard.findFirst({
         where: { inningsId, playerId: lastBall.batsmanId },
@@ -108,7 +118,9 @@ export async function DELETE(req: NextRequest) {
     if (lastBall.bowlerId) {
       const bowlerBalls = remainingBalls.filter((b) => b.bowlerId === lastBall.bowlerId);
       const bowlRuns = bowlerBalls.reduce((s, b) => s + b.runs + b.extraRuns, 0);
-      const bowlWickets = bowlerBalls.filter((b) => b.isWicket).length;
+      const bowlWickets = bowlerBalls.filter(
+        (b) => b.isWicket && !["RUN_OUT", "RETIRED_OUT", "RETIRED_HURT"].includes(b.wicketType || "")
+      ).length;
       const bowlWides = bowlerBalls.filter((b) => b.extraType === "WIDE").length;
       const bowlNoBalls = bowlerBalls.filter((b) => b.extraType === "NO_BALL").length;
 

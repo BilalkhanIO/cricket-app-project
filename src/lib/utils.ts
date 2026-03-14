@@ -43,6 +43,25 @@ export function calcEconomy(runs: number, overs: number): number {
   return Math.round((runs / overs) * 100) / 100;
 }
 
+// Convert cricket overs notation (e.g. 3.2 = 3 overs + 2 balls) into balls.
+export function oversNotationToBalls(oversNotation: number): number {
+  const wholeOvers = Math.trunc(oversNotation);
+  const ballsPart = Math.round((oversNotation - wholeOvers) * 10 + Number.EPSILON);
+  const legalBallsPart = Math.max(0, Math.min(5, ballsPart));
+  return wholeOvers * 6 + legalBallsPart;
+}
+
+// Convert total legal balls into cricket overs notation (e.g. 20 balls => 3.2 overs).
+export function ballsToOversNotation(balls: number): number {
+  const safeBalls = Math.max(0, Math.trunc(balls));
+  return Math.floor(safeBalls / 6) + (safeBalls % 6) / 10;
+}
+
+export function calcEconomyFromBalls(runsConceded: number, ballsBowled: number): number {
+  if (ballsBowled === 0) return 0;
+  return Math.round(((runsConceded * 6) / ballsBowled) * 100) / 100;
+}
+
 export function calcAverage(runs: number, dismissals: number): number {
   if (dismissals === 0) return runs;
   return Math.round((runs / dismissals) * 100) / 100;
@@ -79,7 +98,7 @@ export const LEAGUE_STATUS = {
 export const statusColors: Record<string, string> = {
   LIVE: "bg-red-500",
   UPCOMING: "bg-blue-500",
-  COMPLETED: "bg-green-500",
+  COMPLETED: "bg-[#769FCD]",
   INNINGS_BREAK: "bg-yellow-500",
   ABANDONED: "bg-gray-500",
   DELAYED: "bg-orange-500",
@@ -91,7 +110,7 @@ export const roleColors: Record<string, string> = {
   SUPER_ADMIN: "bg-red-100 text-red-800",
   LEAGUE_ADMIN: "bg-purple-100 text-purple-800",
   TEAM_MANAGER: "bg-blue-100 text-blue-800",
-  SCORER: "bg-green-100 text-green-800",
+  SCORER: "bg-[#D6E6F2] text-[#1B3A5C]",
   PLAYER: "bg-yellow-100 text-yellow-800",
   FAN: "bg-gray-100 text-gray-800",
 };

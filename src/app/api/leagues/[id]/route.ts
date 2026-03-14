@@ -40,6 +40,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           take: 5,
         },
         sponsors: true,
+        playerRegistrations: {
+          include: {
+            player: {
+              include: {
+                user: { select: { id: true, name: true, email: true, profileImage: true } },
+                team: { select: { id: true, name: true, shortName: true, logo: true } },
+              },
+            },
+            team: { select: { id: true, name: true, shortName: true, logo: true } },
+          },
+          orderBy: { registeredAt: "desc" },
+        },
       },
     });
 
@@ -65,12 +77,53 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!canEdit) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const data = await req.json();
+    const nextStartDate = data.startDate ? new Date(data.startDate) : league.startDate;
+    const nextEndDate = data.endDate ? new Date(data.endDate) : league.endDate;
+    const nextOvers = Number(data.oversPerInnings ?? league.oversPerInnings);
+    const nextPowerplay = Number(data.powerplayOvers ?? league.powerplayOvers);
+
+    if (Number.isNaN(nextStartDate.getTime()) || Number.isNaN(nextEndDate.getTime())) {
+      return NextResponse.json({ error: "Invalid start/end date" }, { status: 400 });
+    }
+    if (nextStartDate >= nextEndDate) {
+      return NextResponse.json({ error: "End date must be after start date" }, { status: 400 });
+    }
+    if (nextOvers <= 0 || nextPowerplay < 0 || nextPowerplay > nextOvers) {
+      return NextResponse.json({ error: "Invalid overs configuration" }, { status: 400 });
+    }
+
+    const nextRegistrationOpen = data.registrationOpenDate
+      ? new Date(data.registrationOpenDate)
+      : league.registrationOpenDate;
+    const nextRegistrationClose = data.registrationCloseDate
+      ? new Date(data.registrationCloseDate)
+      : league.registrationCloseDate;
+
+    if (
+      nextRegistrationOpen &&
+      nextRegistrationClose &&
+      nextRegistrationOpen > nextRegistrationClose
+    ) {
+      return NextResponse.json(
+        { error: "Registration close date must be after open date" },
+        { status: 400 }
+      );
+    }
+    if (nextRegistrationClose && nextRegistrationClose > nextStartDate) {
+      return NextResponse.json(
+        { error: "Registration close date must be before league start date" },
+        { status: 400 }
+      );
+    }
+
     const updated = await prisma.league.update({
       where: { id },
       data: {
         ...data,
         ...(data.startDate && { startDate: new Date(data.startDate) }),
         ...(data.endDate && { endDate: new Date(data.endDate) }),
+        ...(data.registrationOpenDate && { registrationOpenDate: new Date(data.registrationOpenDate) }),
+        ...(data.registrationCloseDate && { registrationCloseDate: new Date(data.registrationCloseDate) }),
       },
     });
 

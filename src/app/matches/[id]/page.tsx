@@ -82,7 +82,7 @@ function BallDot({ ball }: { ball: { runs: number; isWicket: boolean; isBoundary
     ball.isBoundary ? "bg-blue-500 text-white" :
     ball.isExtra ? "bg-yellow-400 text-gray-900" :
     ball.runs === 0 ? "bg-gray-200 text-gray-600" :
-    "bg-green-500 text-white"
+    "bg-[#769FCD] text-white"
   }`;
   return <span className={className}>{label}</span>;
 }
@@ -179,7 +179,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
                   <div className="mt-2 text-xs text-white/80 space-y-0.5">
                     <p>CRR: <span className="font-bold">{currentRR.toFixed(2)}</span></p>
                     {requiredRR !== null && (
-                      <p>RRR: <span className={`font-bold ${requiredRR > currentRR ? "text-red-300" : "text-green-300"}`}>
+                      <p>RRR: <span className={`font-bold ${requiredRR > currentRR ? "text-red-300" : "text-[#B9D7EA]"}`}>
                         {requiredRR.toFixed(2)}
                       </span></p>
                     )}
@@ -309,13 +309,13 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
                           <tbody>
                             {innings.battingScores.map((bat) => (
                               <tr key={bat.id} className={`border-b border-gray-50 hover:bg-gray-50 ${
-                                !bat.isOut && isLive ? "bg-green-50" : ""
+                                !bat.isOut && isLive ? "bg-[#F7FBFC]" : ""
                               }`}>
                                 <td className="px-4 py-2.5">
                                   <p className="font-medium text-gray-900">
                                     {bat.player.user.name}
                                     {!bat.isOut && isLive && (
-                                      <span className="ml-1.5 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-normal">
+                                      <span className="ml-1.5 text-xs bg-[#D6E6F2] text-[#769FCD] px-1.5 py-0.5 rounded font-normal">
                                         batting
                                       </span>
                                     )}
@@ -323,7 +323,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
                                   {bat.isOut ? (
                                     <p className="text-xs text-gray-400">{bat.wicketType?.replace(/_/g, " ").toLowerCase()}</p>
                                   ) : (
-                                    <p className="text-xs text-green-600 font-medium">not out</p>
+                                    <p className="text-xs text-[#769FCD] font-medium">not out</p>
                                   )}
                                 </td>
                                 <td className="px-2 py-2.5 text-center font-bold text-gray-900">{bat.runs}</td>

@@ -5,6 +5,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import PlayerStatsCharts from "./PlayerStatsCharts";
+import { OVERALL_LEAGUE_KEY } from "@/lib/constants";
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,7 @@ async function getPlayer(id: string) {
     include: {
       user: { select: { name: true, email: true, profileImage: true, city: true, dateOfBirth: true, battingStyle: true, bowlingStyle: true } },
       team: { select: { id: true, name: true, shortName: true, jerseyColor: true } },
-      playerStats: true,
+      playerStats: { orderBy: { updatedAt: "desc" } },
       battingScores: {
         include: {
           innings: {
@@ -58,12 +59,28 @@ async function getPlayer(id: string) {
   });
 }
 
+async function getLeagueNames(leagueIds: string[]) {
+  if (leagueIds.length === 0) return new Map<string, string>();
+  const leagues = await prisma.league.findMany({
+    where: { id: { in: leagueIds } },
+    select: { id: true, name: true },
+  });
+  return new Map(leagues.map((l) => [l.id, l.name]));
+}
+
 export default async function PlayerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const player = await getPlayer(id);
   if (!player) notFound();
 
-  const careerStats = player.playerStats[0];
+  const careerStats =
+    player.playerStats.find((s) => s.leagueId === OVERALL_LEAGUE_KEY) || player.playerStats[0];
+  const leagueStats = player.playerStats.filter(
+    (s) => s.leagueId && s.leagueId !== OVERALL_LEAGUE_KEY
+  );
+  const leagueNames = await getLeagueNames(
+    Array.from(new Set(leagueStats.map((s) => s.leagueId!).filter(Boolean)))
+  );
 
   // Prepare chart data
   const battingChartData = player.battingScores.slice().reverse().map((bat, i) => ({
@@ -163,6 +180,7 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
                         { label: "Innings", value: careerStats.innings },
                         { label: "Runs", value: careerStats.runs },
                         { label: "HS", value: careerStats.highestScore },
+                        { label: "Not Outs", value: careerStats.notOuts },
                         { label: "Average", value: careerStats.average.toFixed(1) },
                         { label: "SR", value: careerStats.strikeRate.toFixed(1) },
                         { label: "Fours", value: careerStats.fours },
@@ -188,6 +206,8 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
                         { label: "Wickets", value: careerStats.wickets },
                         { label: "Overs", value: careerStats.oversBowled.toFixed(1) },
                         { label: "Economy", value: careerStats.economy.toFixed(2) },
+                        { label: "Bowl Avg", value: careerStats.bowlingAverage.toFixed(2) },
+                        { label: "Bowl SR", value: careerStats.bowlingStrikeRate.toFixed(2) },
                         { label: "Maidens", value: careerStats.maidens },
                         { label: "Runs Conc.", value: careerStats.runsConceded },
                         { label: "Best", value: careerStats.bestBowling || "-" },
@@ -204,6 +224,53 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
                   </CardBody>
                 </Card>
               </div>
+            </section>
+          )}
+
+          {leagueStats.length > 0 && (
+            <section>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">League-wise Statistics</h2>
+              <Card>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b">
+                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">League</th>
+                        <th className="px-3 py-3 text-xs font-medium text-gray-500">M</th>
+                        <th className="px-3 py-3 text-xs font-medium text-gray-500">R</th>
+                        <th className="px-3 py-3 text-xs font-medium text-gray-500">Avg</th>
+                        <th className="px-3 py-3 text-xs font-medium text-gray-500">SR</th>
+                        <th className="px-3 py-3 text-xs font-medium text-gray-500">W</th>
+                        <th className="px-3 py-3 text-xs font-medium text-gray-500">Eco</th>
+                        <th className="px-3 py-3 text-xs font-medium text-gray-500">B Avg</th>
+                        <th className="px-3 py-3 text-xs font-medium text-gray-500">B SR</th>
+                        <th className="px-3 py-3 text-xs font-medium text-gray-500">Best</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {leagueStats
+                        .slice()
+                        .sort((a, b) => b.runs - a.runs || b.wickets - a.wickets)
+                        .map((s) => (
+                          <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50">
+                            <td className="px-4 py-2 text-xs font-medium text-gray-800">
+                              {leagueNames.get(s.leagueId || "") || "Unknown League"}
+                            </td>
+                            <td className="px-3 py-2 text-center">{s.matchesPlayed}</td>
+                            <td className="px-3 py-2 text-center">{s.runs}</td>
+                            <td className="px-3 py-2 text-center">{s.average.toFixed(2)}</td>
+                            <td className="px-3 py-2 text-center">{s.strikeRate.toFixed(2)}</td>
+                            <td className="px-3 py-2 text-center">{s.wickets}</td>
+                            <td className="px-3 py-2 text-center">{s.economy.toFixed(2)}</td>
+                            <td className="px-3 py-2 text-center">{s.bowlingAverage.toFixed(2)}</td>
+                            <td className="px-3 py-2 text-center">{s.bowlingStrikeRate.toFixed(2)}</td>
+                            <td className="px-3 py-2 text-center">{s.bestBowling || "-"}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
             </section>
           )}
 

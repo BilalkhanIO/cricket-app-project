@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, use } from "react";
+import { useState, useEffect, useCallback, use, useMemo, useRef } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 interface Player {
   id: string;
-  user: { name: string };
+  user: { name: string; profileImage?: string | null };
   isCaptain: boolean;
   isWicketkeeper: boolean;
 }
@@ -56,10 +56,19 @@ interface BallEvent {
 interface Over {
   id: string;
   overNumber: number;
+  bowlerId?: string | null;
   runs: number;
   wickets: number;
   isCompleted: boolean;
   balls: BallEvent[];
+}
+
+interface TeamView {
+  id: string;
+  name: string;
+  shortName: string;
+  jerseyColor: string | null;
+  players: Player[];
 }
 
 interface Innings {
@@ -86,8 +95,9 @@ interface Match {
   id: string;
   status: string;
   overs: number;
-  homeTeam: { id: string; name: string; shortName: string; jerseyColor: string };
-  awayTeam: { id: string; name: string; shortName: string; jerseyColor: string };
+  scorerId: string | null;
+  homeTeam: TeamView;
+  awayTeam: TeamView;
   tossWinnerId: string | null;
   tossDecision: string | null;
   league: { oversPerInnings: number };
@@ -95,7 +105,14 @@ interface Match {
   playingXIs: { playerId: string; teamId: string; battingOrder: number; player: Player }[];
 }
 
-const WICKET_TYPES = ["BOWLED", "CAUGHT", "LBW", "RUN_OUT", "STUMPED", "HIT_WICKET", "RETIRED_HURT"];
+interface ScoringPlayerOption {
+  playerId: string;
+  player: Player;
+  battingOrder: number;
+  teamId?: string;
+}
+
+const WICKET_TYPES = ["BOWLED", "CAUGHT", "LBW", "RUN_OUT", "STUMPED", "HIT_WICKET", "RETIRED_HURT", "RETIRED_OUT"];
 const FIELDER_REQUIRED = ["CAUGHT", "RUN_OUT", "STUMPED"];
 
 // extraRuns = total runs from this extra delivery (for WIDE: 1=simple wide, 5=wide+4)
@@ -125,6 +142,12 @@ const EXTRA_OPTIONS: Record<string, { label: string; runs: number; extraRuns: nu
     { label: "4", runs: 0, extraRuns: 4 },
   ],
 };
+
+function oversNotationToBalls(overs: number) {
+  const whole = Math.trunc(overs);
+  const balls = Math.round((overs - whole) * 10 + Number.EPSILON);
+  return whole * 6 + Math.max(0, Math.min(5, balls));
+}
 
 function BallDot({ ball }: { ball: BallEvent }) {
   const label = ball.isWicket ? "W" : ball.isExtra ? (ball.extraType?.charAt(0) || "E") : ball.runs;
@@ -171,6 +194,46 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
   const [error, setError] = useState<string | null>(null);
   const [showMomModal, setShowMomModal] = useState(false);
   const [momPlayerId, setMomPlayerId] = useState("");
+  const autoStartingOverRef = useRef(false);
+
+  const getTeamPlayerPool = useCallback(
+    (teamId: string | null): ScoringPlayerOption[] => {
+      if (!match || !teamId) return [];
+      const xiPlayers = match.playingXIs
+        .filter((p) => p.teamId === teamId)
+        .sort((a, b) => (a.battingOrder || 99) - (b.battingOrder || 99));
+      if (xiPlayers.length > 0) return xiPlayers;
+
+      const team = teamId === match.homeTeam.id ? match.homeTeam : match.awayTeam;
+      return [...(team.players || [])]
+        .sort((a, b) => a.user.name.localeCompare(b.user.name))
+        .map((p, idx) => ({
+          playerId: p.id,
+          player: p,
+          battingOrder: idx + 1,
+          teamId,
+        }));
+    },
+    [match]
+  );
+
+  const battingTeamPlayers = useMemo(
+    () => getTeamPlayerPool(currentInnings?.teamId || null),
+    [getTeamPlayerPool, currentInnings?.teamId]
+  );
+  const bowlingTeamId = useMemo(
+    () =>
+      currentInnings
+        ? currentInnings.teamId === match?.homeTeam.id
+          ? match?.awayTeam.id || null
+          : match?.homeTeam.id || null
+        : null,
+    [currentInnings, match]
+  );
+  const bowlingTeamPlayers = useMemo(
+    () => getTeamPlayerPool(bowlingTeamId),
+    [getTeamPlayerPool, bowlingTeamId]
+  );
 
   const fetchMatch = useCallback(async () => {
     const res = await fetch(`/api/matches/${matchId}`);
@@ -237,22 +300,97 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
     if (res.ok) fetchMatch();
   };
 
-  const startOver = async () => {
-    if (!currentInnings || !currentBowler) return;
+  const selectNextBowler = useCallback(() => {
+    if (!currentInnings || bowlingTeamPlayers.length === 0) return "";
+    const lastCompletedOver = [...currentInnings.overs]
+      .filter((o) => o.isCompleted)
+      .sort((a, b) => b.overNumber - a.overNumber)[0];
+    const previousBowlerId = lastCompletedOver?.bowlerId || null;
+
+    const candidates = bowlingTeamPlayers
+      .filter((p) => p.playerId !== previousBowlerId)
+      .map((p) => {
+        const s = currentInnings.bowlingScores.find((b) => b.playerId === p.playerId);
+        return {
+          ...p,
+          balls: s ? oversNotationToBalls(s.overs) : 0,
+          runs: s?.runs ?? 0,
+        };
+      })
+      .sort((a, b) => a.balls - b.balls || a.runs - b.runs || a.player.user.name.localeCompare(b.player.user.name));
+
+    return candidates[0]?.playerId || bowlingTeamPlayers[0]?.playerId || "";
+  }, [bowlingTeamPlayers, currentInnings]);
+
+  const startOver = useCallback(async (forcedBowlerId?: string) => {
+    const bowlerId = forcedBowlerId || currentBowler;
+    if (!currentInnings || !bowlerId) return;
     const overNum = Math.floor(currentInnings.totalBalls / 6) + 1;
 
     const res = await fetch("/api/scoring/over", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inningsId: currentInnings.id, overNumber: overNum, bowlerId: currentBowler }),
+      body: JSON.stringify({ inningsId: currentInnings.id, overNumber: overNum, bowlerId }),
     });
     const data = await res.json();
     if (data.over) {
       setCurrentOverId(data.over.id);
       setBallInOver(0);
       setRecentBalls([]);
+      setCurrentBowler(bowlerId);
+      return true;
     }
-  };
+    if (!res.ok) setError(data.error || "Failed to start over");
+    return false;
+  }, [currentBowler, currentInnings]);
+
+  const getNextBatter = useCallback(
+    (exclude: string[] = []) => {
+      if (!currentInnings) return "";
+      const dismissed = new Set(currentInnings.battingScores.filter((b) => b.isOut).map((b) => b.playerId));
+      for (const pid of exclude) dismissed.add(pid);
+      const next = battingTeamPlayers.find((p) => !dismissed.has(p.playerId));
+      return next?.playerId || "";
+    },
+    [battingTeamPlayers, currentInnings]
+  );
+
+  useEffect(() => {
+    if (!match || !currentInnings || phase !== "scoring" || match.status === "COMPLETED") return;
+
+    if (!striker || !nonStriker || striker === nonStriker) {
+      const first = striker || getNextBatter([nonStriker]);
+      const second = nonStriker || getNextBatter([first]);
+      if (first && first !== striker) setStriker(first);
+      if (second && second !== nonStriker && second !== first) setNonStriker(second);
+    }
+
+    if (!currentBowler && bowlingTeamPlayers.length > 0) {
+      const nextBowler = selectNextBowler();
+      if (nextBowler) setCurrentBowler(nextBowler);
+    }
+
+    if (!currentOverId && !autoStartingOverRef.current) {
+      const nextBowler = currentBowler || selectNextBowler();
+      if (!nextBowler) return;
+      autoStartingOverRef.current = true;
+      startOver(nextBowler).finally(() => {
+        autoStartingOverRef.current = false;
+      });
+    }
+  }, [
+    bowlingTeamPlayers,
+    currentBowler,
+    currentInnings,
+    currentOverId,
+    getNextBatter,
+    match,
+    nonStriker,
+    phase,
+    selectNextBowler,
+    startOver,
+    striker,
+  ]);
 
   const addBall = async (
     runs: number,
@@ -322,6 +460,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
         if (newBallInOver >= 6) {
           setBallInOver(0);
           setCurrentOverId(null);
+          setCurrentBowler("");
           setRecentBalls([]);
           // Swap batsmen at end of over
           const temp = striker;
@@ -338,13 +477,18 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
         setShowWicketModal(false);
         setSelectedWicketType("");
         setFielder("");
-        setStriker("");
+        const nextBatter = getNextBatter([striker, nonStriker]);
+        setStriker(nextBatter);
         setPartnershipRuns(0);
         setPartnershipBalls(0);
-      } else if (isLegalBall && runs % 2 === 1) {
-        const temp = striker;
-        setStriker(nonStriker);
-        setNonStriker(temp);
+      } else {
+        const strikeRuns =
+          extras && ["BYE", "LEG_BYE"].includes(extras.type) ? extras.runs : runs;
+        if (isLegalBall && strikeRuns % 2 === 1) {
+          const temp = striker;
+          setStriker(nonStriker);
+          setNonStriker(temp);
+        }
       }
 
       if (data.matchCompleted && data.result) {
@@ -400,7 +544,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
         <div className="text-center">
           <h2 className="text-2xl font-bold mb-3">Access Denied</h2>
           <p className="text-gray-400">Only scorers can access this panel.</p>
-          <Link href="/login" className="text-green-400 mt-4 block">Login as Scorer</Link>
+          <Link href="/login" className="text-[#769FCD] mt-4 block">Login as Scorer</Link>
         </div>
       </div>
     );
@@ -422,20 +566,39 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
     );
   }
 
-  const battingTeamPlayers = currentInnings
-    ? match.playingXIs.filter((p) => p.teamId === currentInnings.teamId)
-    : [];
-  const bowlingTeamId = currentInnings
-    ? (currentInnings.teamId === match.homeTeam.id ? match.awayTeam.id : match.homeTeam.id)
-    : null;
-  const bowlingTeamPlayers = bowlingTeamId
-    ? match.playingXIs.filter((p) => p.teamId === bowlingTeamId)
-    : [];
+  // Only the assigned scorer (or admin) can access this panel
+  const isAdmin = session.user.role === "SUPER_ADMIN" || session.user.role === "LEAGUE_ADMIN";
+  const isAssignedScorer = match.scorerId === session.user.id;
+  if (!isAdmin && !isAssignedScorer) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
+        <div className="text-center max-w-sm">
+          <div className="text-5xl mb-4">🔒</div>
+          <h2 className="text-2xl font-bold mb-3">Not Your Match</h2>
+          <p className="text-gray-400 mb-4">
+            You are not the assigned scorer for this match. Contact the league admin if this is a mistake.
+          </p>
+          <Link href="/dashboard/scorer" className="text-[#769FCD] hover:underline">
+            ← Back to Dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
-  const playerOptions = (players: typeof battingTeamPlayers) => [
+  const playerOptions = (players: ScoringPlayerOption[]) => [
     { value: "", label: "Select player..." },
     ...players.map((p) => ({ value: p.playerId, label: p.player.user.name })),
   ];
+  const hasBothXIs =
+    match.playingXIs.some((p) => p.teamId === match.homeTeam.id) &&
+    match.playingXIs.some((p) => p.teamId === match.awayTeam.id);
+  const allMatchPlayers: ScoringPlayerOption[] = hasBothXIs
+    ? match.playingXIs
+    : [
+        ...match.homeTeam.players.map((p, idx) => ({ playerId: p.id, player: p, battingOrder: idx + 1, teamId: match.homeTeam.id })),
+        ...match.awayTeam.players.map((p, idx) => ({ playerId: p.id, player: p, battingOrder: idx + 1, teamId: match.awayTeam.id })),
+      ];
 
   const firstInnings = match.innings.find((i) => i.inningsNumber === 1);
   const maxBalls = match.overs * 6;
@@ -486,16 +649,19 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
   const dismissedBatters = currentInnings?.battingScores.filter((b) => b.isOut) || [];
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-950 text-white">
       {/* Header */}
-      <div className="bg-gray-800 px-4 py-3 flex items-center justify-between border-b border-gray-700 sticky top-0 z-10">
-        <div className="flex items-center gap-3">
-          <Link href={`/matches/${match.id}`} className="text-gray-400 hover:text-white text-sm">← Back</Link>
-          <span className="text-white font-semibold text-sm">
-            {match.homeTeam.shortName} vs {match.awayTeam.shortName}
-          </span>
+      <div className="bg-gray-900/95 backdrop-blur px-3 sm:px-4 py-3 flex items-center justify-between border-b border-gray-800 sticky top-0 z-20">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <Link href={`/matches/${match.id}`} className="text-gray-400 hover:text-white text-sm shrink-0">← Back</Link>
+          <div className="min-w-0">
+            <p className="text-white font-semibold text-sm truncate">
+              {match.homeTeam.shortName} vs {match.awayTeam.shortName}
+            </p>
+            <p className="text-[11px] text-gray-400 truncate">{match.league.oversPerInnings || match.overs} overs</p>
+          </div>
         </div>
-        <span className={`text-xs px-2 py-1 rounded font-medium ${
+        <span className={`text-[11px] px-2 py-1 rounded font-semibold tracking-wide ${
           match.status === "LIVE" ? "bg-red-500 animate-pulse" :
           match.status === "COMPLETED" ? "bg-green-600" : "bg-gray-600"
         }`}>
@@ -523,9 +689,9 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
                 className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-yellow-500"
               >
                 <option value="">-- Skip / Select later --</option>
-                {match.playingXIs.map((p) => (
+                {allMatchPlayers.map((p) => (
                   <option key={p.playerId} value={p.playerId}>
-                    {p.player.user.name} ({p.teamId === match.homeTeam.id ? match.homeTeam.shortName : match.awayTeam.shortName})
+                    {p.player.user.name} ({p.teamId === match.homeTeam.id ? match.homeTeam.shortName : p.teamId === match.awayTeam.id ? match.awayTeam.shortName : "TEAM"})
                   </option>
                 ))}
               </select>
@@ -642,9 +808,9 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
           ) : (
             <div className="bg-yellow-900/20 border border-yellow-700/50 rounded-xl p-4 mb-5 text-center">
               <p className="text-yellow-300 text-sm">Playing XIs not set yet.</p>
-              <Link href={`/admin/matches`} className="text-yellow-400 underline text-xs mt-1 block">
-                Go to Admin → Matches to set Playing XIs
-              </Link>
+              <p className="text-yellow-400 text-xs mt-1">
+                Scoring will continue using full active team rosters automatically.
+              </p>
             </div>
           )}
 
@@ -683,13 +849,19 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
 
       {/* Scoring Phase */}
       {phase === "scoring" && currentInnings && match.status !== "COMPLETED" && (
-        <div className="max-w-4xl mx-auto px-4 py-4 space-y-3">
+        <div className="max-w-5xl mx-auto px-3 sm:px-4 py-3 sm:py-4 space-y-3 sm:space-y-4 pb-20">
 
           {/* Error banner */}
           {error && (
             <div className="bg-red-900/50 border border-red-700 rounded-lg px-4 py-2 text-red-300 text-sm flex justify-between">
               <span>{error}</span>
               <button onClick={() => setError(null)} className="text-red-400 hover:text-red-200">✕</button>
+            </div>
+          )}
+
+          {!hasBothXIs && (
+            <div className="bg-yellow-900/30 border border-yellow-700/50 rounded-lg px-4 py-2 text-yellow-300 text-xs">
+              XI not finalized for one/both teams. Auto scoring is using full team rosters.
             </div>
           )}
 
@@ -703,7 +875,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
                     {currentInnings.teamId === match.homeTeam.id ? match.homeTeam.name : match.awayTeam.name}
                   </span>
                 </p>
-                <p className="text-4xl font-bold text-green-400 leading-none">
+                <p className="text-3xl sm:text-4xl font-bold text-green-400 leading-none">
                   {currentInnings.totalRuns}/{currentInnings.totalWickets}
                 </p>
                 <p className="text-gray-400 text-sm mt-1">
@@ -711,7 +883,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
                 </p>
               </div>
               {currentInnings.inningsNumber === 2 && firstInnings && (
-                <div className="text-right bg-yellow-900/30 border border-yellow-700/50 rounded-lg p-3">
+                <div className="text-right bg-yellow-900/30 border border-yellow-700/50 rounded-lg p-2.5 sm:p-3">
                   <p className="text-xs text-gray-400">Target</p>
                   <p className="text-2xl font-bold text-yellow-400">{firstInnings.totalRuns + 1}</p>
                   <p className="text-xs text-red-400 font-medium">
@@ -722,7 +894,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
             </div>
 
             {/* Stats row */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               <div className="bg-gray-700 rounded-lg p-2 text-center">
                 <p className="text-xs text-gray-400">CRR</p>
                 <p className="font-bold text-green-400 text-sm">{currentRunRate.toFixed(2)}</p>
@@ -762,7 +934,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
           {(strikerScore || nonStrikerScore || striker || nonStriker) && (
             <div className="bg-gray-800 rounded-xl p-3">
               <p className="text-xs text-gray-400 mb-2 font-medium uppercase tracking-wide">At The Crease</p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {[
                   { id: striker, score: strikerScore, label: "* (Striker)" },
                   { id: nonStriker, score: nonStrikerScore, label: "(Non-striker)" },
@@ -820,10 +992,10 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
           {/* Player Selection */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="text-xs text-gray-400 mb-1 block">Striker *</label>
+              <label className="text-xs text-gray-400 mb-1 block">Striker (Auto)</label>
               <select
                 value={striker}
-                onChange={(e) => setStriker(e.target.value)}
+                disabled
                 className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500"
               >
                 {playerOptions(battingTeamPlayers).map((o) => (
@@ -832,10 +1004,10 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-400 mb-1 block">Non-Striker</label>
+              <label className="text-xs text-gray-400 mb-1 block">Non-Striker (Auto)</label>
               <select
                 value={nonStriker}
-                onChange={(e) => setNonStriker(e.target.value)}
+                disabled
                 className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500"
               >
                 {playerOptions(battingTeamPlayers).map((o) => (
@@ -844,10 +1016,10 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-400 mb-1 block">Bowler *</label>
+              <label className="text-xs text-gray-400 mb-1 block">Bowler (Auto)</label>
               <select
                 value={currentBowler}
-                onChange={(e) => setCurrentBowler(e.target.value)}
+                disabled
                 className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500"
               >
                 {playerOptions(bowlingTeamPlayers).map((o) => (
@@ -861,14 +1033,14 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
           {!currentOverId && (
             <div className="bg-yellow-900/20 border border-yellow-700/50 rounded-xl p-4 text-center">
               <p className="text-yellow-300 text-sm mb-3">
-                Select bowler and start Over {Math.floor(currentInnings.totalBalls / 6) + 1}
+                Auto-selecting bowler and starting Over {Math.floor(currentInnings.totalBalls / 6) + 1}...
               </p>
               <button
-                onClick={startOver}
-                disabled={!currentBowler || submitting}
+                onClick={() => startOver()}
+                disabled
                 className="bg-green-700 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed px-6 py-2.5 rounded-lg font-semibold transition-colors"
               >
-                Start Over {Math.floor(currentInnings.totalBalls / 6) + 1}
+                Starting...
               </button>
             </div>
           )}
@@ -894,13 +1066,13 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
               {/* Runs */}
               <div>
                 <p className="text-xs text-gray-400 mb-2 font-medium">RUNS</p>
-                <div className="grid grid-cols-7 gap-2">
+                <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
                   {[0, 1, 2, 3, 4, 5, 6].map((r) => (
                     <button
                       key={r}
                       onClick={() => addBall(r)}
                       disabled={submitting || !!extraMode}
-                      className={`h-14 rounded-xl font-bold text-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                      className={`h-12 sm:h-14 rounded-xl font-bold text-lg sm:text-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
                         r === 4 ? "bg-blue-600 hover:bg-blue-500" :
                         r === 6 ? "bg-purple-600 hover:bg-purple-500" :
                         r === 0 ? "bg-gray-700 hover:bg-gray-600" :
@@ -917,13 +1089,13 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
               <div>
                 <p className="text-xs text-gray-400 mb-2 font-medium">EXTRAS</p>
                 {!extraMode ? (
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {["WIDE", "NO_BALL", "BYE", "LEG_BYE"].map((type) => (
                       <button
                         key={type}
                         onClick={() => setExtraMode(type)}
                         disabled={submitting}
-                        className="bg-yellow-700 hover:bg-yellow-600 disabled:opacity-50 px-2 py-3 rounded-lg text-xs font-semibold transition-colors"
+                        className="bg-yellow-700 hover:bg-yellow-600 disabled:opacity-50 px-2 py-3 rounded-lg text-xs font-semibold transition-colors min-h-11"
                       >
                         {type.replace("_", " ")}
                       </button>
@@ -942,13 +1114,13 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
                         Cancel
                       </button>
                     </div>
-                    <div className="grid grid-cols-4 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {EXTRA_OPTIONS[extraMode]?.map((opt) => (
                         <button
                           key={opt.label}
                           onClick={() => addBall(opt.runs, { type: extraMode, runs: opt.extraRuns })}
                           disabled={submitting}
-                          className="bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 py-3 rounded-lg text-xs font-bold transition-colors"
+                          className="bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 py-3 rounded-lg text-xs font-bold transition-colors min-h-11"
                         >
                           {opt.label}
                         </button>
@@ -1171,7 +1343,8 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
                   <YAxis tick={{ fill: "#9ca3af", fontSize: 9 }} />
                   <Tooltip
                     contentStyle={{ background: "#1f2937", border: "none", borderRadius: 8, fontSize: 11 }}
-                    formatter={(v: unknown, n: string) => [v, n === "runs" ? "Runs" : "Wickets"]}
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    formatter={(v: any) => [`${v}`, ""] as any}
                   />
                   <Bar dataKey="runs" fill="#16a34a" radius={[3, 3, 0, 0]} />
                 </BarChart>

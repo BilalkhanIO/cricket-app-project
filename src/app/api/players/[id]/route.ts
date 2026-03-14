@@ -78,7 +78,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!canEdit) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const data = await req.json();
-    const updated = await prisma.player.update({ where: { id: id }, data });
+    const updated = await prisma.player.update({
+      where: { id: id },
+      data: {
+        ...data,
+        ...(data.fitnessUpdatedAt && { fitnessUpdatedAt: new Date(data.fitnessUpdatedAt) }),
+      },
+    });
     return NextResponse.json({ player: updated });
   } catch (error) {
     return NextResponse.json({ error: "Failed to update player" }, { status: 500 });

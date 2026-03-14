@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { calcNRR } from "@/lib/utils";
+import { updatePlayerStatsForMatchScopes } from "@/lib/player-stats";
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +16,23 @@ export async function POST(req: NextRequest) {
     if (!canScore) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const { matchId, result, winnerTeamId, winMargin, winType, playerOfMatchId } = await req.json();
+
+    // Verify SCORER is assigned to this match
+    if (session.user.role === "SCORER") {
+      const match = await prisma.match.findUnique({ where: { id: matchId }, select: { scorerId: true } });
+      if (match?.scorerId !== session.user.id) {
+        return NextResponse.json({ error: "You are not the assigned scorer for this match" }, { status: 403 });
+      }
+    }
+
+    const existingMatch = await prisma.match.findUnique({
+      where: { id: matchId },
+      select: { status: true },
+    });
+    if (!existingMatch) {
+      return NextResponse.json({ error: "Match not found" }, { status: 404 });
+    }
+    const wasAlreadyCompleted = existingMatch.status === "COMPLETED";
 
     // Complete any incomplete innings
     await prisma.innings.updateMany({
@@ -44,23 +62,37 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Create Man of the Match award if playerOfMatchId provided
+    // Create or update Man of the Match award if playerOfMatchId provided
     if (playerOfMatchId && match.leagueId) {
-      // Find the player record
-      await prisma.award.create({
-        data: {
-          leagueId: match.leagueId,
-          matchId,
-          playerId: playerOfMatchId,
-          awardType: "MAN_OF_MATCH",
-          description: `Man of the Match – ${result || ""}`,
-          isAutoCalc: false,
-        },
-      }).catch(() => {}); // don't fail if award already exists
+      const existingMom = await prisma.award.findFirst({
+        where: { matchId, awardType: "MAN_OF_MATCH" },
+        select: { id: true },
+      });
+      if (existingMom) {
+        await prisma.award.update({
+          where: { id: existingMom.id },
+          data: {
+            playerId: playerOfMatchId,
+            description: `Man of the Match – ${result || ""}`,
+            isAutoCalc: false,
+          },
+        });
+      } else {
+        await prisma.award.create({
+          data: {
+            leagueId: match.leagueId,
+            matchId,
+            playerId: playerOfMatchId,
+            awardType: "MAN_OF_MATCH",
+            description: `Man of the Match – ${result || ""}`,
+            isAutoCalc: false,
+          },
+        });
+      }
     }
 
-    // Update points table
-    if (winnerTeamId && match.leagueId) {
+    // Update standings and stats only once per match completion
+    if (!wasAlreadyCompleted && winnerTeamId && match.leagueId) {
       const loserTeamId =
         match.homeTeamId === winnerTeamId ? match.awayTeamId : match.homeTeamId;
 
@@ -119,118 +151,27 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Auto-update PlayerStats for all players in this match
-    await updateAllPlayerStats(match.innings, match.leagueId);
+    if (!wasAlreadyCompleted) {
+      // Auto-update PlayerStats for all players in this match
+      await updatePlayerStatsForMatchScopes(match.innings, match.leagueId);
+    }
 
     // Notification
-    await prisma.notification.create({
-      data: {
-        userId: session.user.id,
-        matchId,
-        type: "RESULT_DECLARED",
-        title: "Match Completed",
-        message: result || "Match completed",
-      },
-    }).catch(() => {});
+    if (!wasAlreadyCompleted) {
+      await prisma.notification.create({
+        data: {
+          userId: session.user.id,
+          matchId,
+          type: "RESULT_DECLARED",
+          title: "Match Completed",
+          message: result || "Match completed",
+        },
+      }).catch(() => {});
+    }
 
-    return NextResponse.json({ match });
+    return NextResponse.json({ match, alreadyCompleted: wasAlreadyCompleted });
   } catch (error) {
     console.error("Complete match error:", error);
     return NextResponse.json({ error: "Failed to complete match" }, { status: 500 });
-  }
-}
-
-async function updateAllPlayerStats(
-  innings: Array<{
-    teamId: string;
-    battingScores: Array<{
-      playerId: string; runs: number; balls: number; fours: number; sixes: number;
-      isOut: boolean;
-    }>;
-    bowlingScores: Array<{
-      playerId: string; overs: number; maidens: number; runs: number;
-      wickets: number; wides: number; noBalls: number;
-    }>;
-  }>,
-  leagueId: string
-) {
-  const playerMap = new Map<string, {
-    runs: number; balls: number; fours: number; sixes: number; isOut: boolean;
-    wickets: number; oversBowled: number; runsConceded: number; maidens: number;
-    batted: boolean;
-  }>();
-
-  const ensure = (pid: string) => {
-    if (!playerMap.has(pid)) {
-      playerMap.set(pid, {
-        runs: 0, balls: 0, fours: 0, sixes: 0, isOut: false,
-        wickets: 0, oversBowled: 0, runsConceded: 0, maidens: 0,
-        batted: false,
-      });
-    }
-    return playerMap.get(pid)!;
-  };
-
-  for (const inn of innings) {
-    for (const bat of inn.battingScores) {
-      const p = ensure(bat.playerId);
-      p.runs += bat.runs;
-      p.balls += bat.balls;
-      p.fours += bat.fours;
-      p.sixes += bat.sixes;
-      if (bat.isOut) p.isOut = true;
-      p.batted = true;
-    }
-    for (const bowl of inn.bowlingScores) {
-      const p = ensure(bowl.playerId);
-      p.wickets += bowl.wickets;
-      p.oversBowled += bowl.overs;
-      p.runsConceded += bowl.runs;
-      p.maidens += bowl.maidens;
-    }
-  }
-
-  for (const [playerId, stats] of playerMap) {
-    const sr = stats.balls > 0 ? parseFloat(((stats.runs / stats.balls) * 100).toFixed(2)) : 0;
-    const eco = stats.oversBowled > 0 ? parseFloat((stats.runsConceded / stats.oversBowled).toFixed(2)) : 0;
-
-    try {
-      await prisma.playerStats.upsert({
-        where: { playerId_leagueId: { playerId, leagueId } },
-        update: {
-          matchesPlayed: { increment: 1 },
-          innings: { increment: stats.batted ? 1 : 0 },
-          runs: { increment: stats.runs },
-          ballsFaced: { increment: stats.balls },
-          fours: { increment: stats.fours },
-          sixes: { increment: stats.sixes },
-          wickets: { increment: stats.wickets },
-          oversBowled: { increment: stats.oversBowled },
-          runsConceded: { increment: stats.runsConceded },
-          maidens: { increment: stats.maidens },
-          strikeRate: sr,
-          economy: eco,
-          updatedAt: new Date(),
-        },
-        create: {
-          playerId,
-          leagueId,
-          matchesPlayed: 1,
-          innings: stats.batted ? 1 : 0,
-          runs: stats.runs,
-          ballsFaced: stats.balls,
-          fours: stats.fours,
-          sixes: stats.sixes,
-          highestScore: stats.runs,
-          strikeRate: sr,
-          wickets: stats.wickets,
-          oversBowled: stats.oversBowled,
-          runsConceded: stats.runsConceded,
-          maidens: stats.maidens,
-          economy: eco,
-          updatedAt: new Date(),
-        },
-      });
-    } catch (_) { /* skip individual errors */ }
   }
 }

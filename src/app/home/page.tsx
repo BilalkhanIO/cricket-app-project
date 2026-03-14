@@ -2,12 +2,14 @@ import Link from "next/link";
 import prisma from "@/lib/prisma";
 import { StatusBadge } from "@/components/ui/Badge";
 import { formatDate, formatDateTime } from "@/lib/utils";
+import { OVERALL_LEAGUE_KEY } from "@/lib/constants";
 
 export const dynamic = 'force-dynamic';
 
 async function getHomeData() {
-  const [liveMatches, upcomingMatches, activeLeagues, announcements, recentResults, topBatters, topBowlers] =
-    await Promise.all([
+  try {
+    const [liveMatches, upcomingMatches, activeLeagues, announcements, recentResults, topBatters, topBowlers] =
+      await Promise.all([
       prisma.match.findMany({
         where: { status: "LIVE" },
         include: {
@@ -54,7 +56,7 @@ async function getHomeData() {
         take: 4,
       }),
       prisma.playerStats.findMany({
-        where: { runs: { gt: 0 } },
+        where: { leagueId: OVERALL_LEAGUE_KEY, runs: { gt: 0 } },
         orderBy: { runs: "desc" },
         take: 5,
         include: {
@@ -67,7 +69,7 @@ async function getHomeData() {
         },
       }),
       prisma.playerStats.findMany({
-        where: { wickets: { gt: 0 } },
+        where: { leagueId: OVERALL_LEAGUE_KEY, wickets: { gt: 0 } },
         orderBy: { wickets: "desc" },
         take: 5,
         include: {
@@ -79,9 +81,21 @@ async function getHomeData() {
           },
         },
       }),
-    ]);
+      ]);
 
-  return { liveMatches, upcomingMatches, activeLeagues, announcements, recentResults, topBatters, topBowlers };
+    return { liveMatches, upcomingMatches, activeLeagues, announcements, recentResults, topBatters, topBowlers };
+  } catch (error) {
+    console.error("Home data load failed:", error);
+    return {
+      liveMatches: [],
+      upcomingMatches: [],
+      activeLeagues: [],
+      announcements: [],
+      recentResults: [],
+      topBatters: [],
+      topBowlers: [],
+    };
+  }
 }
 
 function ScoreRow({ match, teamKey }: { match: any; teamKey: "homeTeam" | "awayTeam" }) {

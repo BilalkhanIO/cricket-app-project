@@ -56,7 +56,7 @@ export default async function ScorerDashboard() {
           {[
             { label: "Live Now", value: live.length, color: "bg-red-50 border-red-200 text-red-700", dot: true },
             { label: "Upcoming", value: upcoming.length, color: "bg-blue-50 border-blue-200 text-blue-700", dot: false },
-            { label: "Completed", value: completed.length, color: "bg-green-50 border-green-200 text-green-700", dot: false },
+            { label: "Completed", value: completed.length, color: "bg-[#F7FBFC] border-[#B9D7EA] text-[#769FCD]", dot: false },
           ].map((s) => (
             <div key={s.label} className={`border rounded-xl p-4 text-center ${s.color}`}>
               <div className="flex items-center justify-center gap-2 mb-1">
@@ -179,7 +179,7 @@ function MatchCard({ match, highlight = false }: { match: any; highlight?: boole
           {match.status === "UPCOMING" && (
             <Link
               href={`/admin/matches/${match.id}/playing-xi`}
-              className="px-4 py-2 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm font-medium hover:bg-green-100 text-center transition-colors"
+              className="px-4 py-2 bg-[#F7FBFC] border border-[#B9D7EA] text-[#769FCD] rounded-lg text-sm font-medium hover:bg-[#D6E6F2] text-center transition-colors"
             >
               Set Playing XI
             </Link>

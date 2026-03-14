@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
+const OVERALL_LEAGUE_KEY = "__OVERALL__";
 
 async function main() {
   console.log("🌱 Seeding database...");
@@ -209,7 +210,7 @@ async function main() {
   const team1Players = playerUsers.slice(0, 11);
   const team2Players = playerUsers.slice(11, 22);
 
-  await Promise.all(
+  const team1Roster = await Promise.all(
     team1Players.map((u, i) =>
       prisma.player.upsert({
         where: { userId: u.id },
@@ -230,7 +231,7 @@ async function main() {
     )
   );
 
-  await Promise.all(
+  const team2Roster = await Promise.all(
     team2Players.map((u, i) =>
       prisma.player.upsert({
         where: { userId: u.id },
@@ -364,6 +365,71 @@ async function main() {
       winType: "WICKETS",
     },
   });
+
+  // ── Player Stats (league + overall) ───────────────────────────────────────
+  const seededStats = [...team1Roster, ...team2Roster].map((player, idx) => {
+    const isPrimaryBowler = idx % 3 === 0;
+    const matchesPlayed = 5 - (idx % 2);
+    const innings = matchesPlayed;
+    const runs = 210 - idx * 6;
+    const dismissals = Math.max(1, innings - 1);
+    const notOuts = Math.max(0, innings - dismissals);
+    const ballsFaced = Math.max(20, runs + 35);
+    const wickets = isPrimaryBowler ? 8 - (idx % 4) : idx % 2;
+    const ballsBowled = isPrimaryBowler ? 84 - (idx % 3) * 6 : (idx % 2) * 12;
+    const oversBowled = Math.floor(ballsBowled / 6) + (ballsBowled % 6) / 10;
+    const runsConceded = isPrimaryBowler ? 92 - idx : 18 + idx;
+    const strikeRate = Number(((runs / ballsFaced) * 100).toFixed(2));
+    const average = Number((runs / dismissals).toFixed(2));
+    const economy = ballsBowled > 0 ? Number(((runsConceded * 6) / ballsBowled).toFixed(2)) : 0;
+    const bowlingAverage = wickets > 0 ? Number((runsConceded / wickets).toFixed(2)) : 0;
+    const bowlingStrikeRate = wickets > 0 ? Number((ballsBowled / wickets).toFixed(2)) : 0;
+
+    return {
+      playerId: player.id,
+      matchesPlayed,
+      innings,
+      dismissals,
+      notOuts,
+      runs,
+      ballsFaced,
+      fours: Math.max(8, Math.floor(runs / 15)),
+      sixes: Math.max(2, Math.floor(runs / 35)),
+      thirties: runs >= 30 ? 2 : 0,
+      fifties: runs >= 50 ? 1 : 0,
+      hundreds: runs >= 100 ? 1 : 0,
+      strikeRate,
+      average,
+      highestScore: Math.min(runs, 101 - (idx % 9)),
+      wickets,
+      oversBowled,
+      ballsBowled,
+      maidens: isPrimaryBowler ? 1 + (idx % 2) : 0,
+      runsConceded,
+      economy,
+      bowlingAverage,
+      bowlingStrikeRate,
+      bestBowling: wickets > 0 ? `${Math.min(wickets, 4)}/${Math.max(8, Math.floor(runsConceded / 2))}` : null,
+      catches: idx % 3,
+      runOuts: idx % 2,
+      stumpings: idx === 1 || idx === 12 ? 2 : 0,
+    };
+  });
+
+  await Promise.all(
+    seededStats.flatMap((stats) => [
+      prisma.playerStats.upsert({
+        where: { playerId_leagueId: { playerId: stats.playerId, leagueId: league.id } },
+        update: stats,
+        create: { ...stats, leagueId: league.id },
+      }),
+      prisma.playerStats.upsert({
+        where: { playerId_leagueId: { playerId: stats.playerId, leagueId: OVERALL_LEAGUE_KEY } },
+        update: stats,
+        create: { ...stats, leagueId: OVERALL_LEAGUE_KEY },
+      }),
+    ])
+  );
 
   await prisma.match.upsert({
     where: { id: "match-kk-vs-iu-upcoming" },

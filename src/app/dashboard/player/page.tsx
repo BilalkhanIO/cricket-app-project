@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma";
 import Link from "next/link";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import { OVERALL_LEAGUE_KEY } from "@/lib/constants";
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,7 @@ async function getPlayerData(userId: string) {
     include: {
       user: { select: { name: true, profileImage: true, city: true } },
       team: { select: { id: true, name: true, shortName: true, jerseyColor: true } },
-      playerStats: { orderBy: { updatedAt: "desc" } },
+      playerStats: { where: { leagueId: OVERALL_LEAGUE_KEY }, orderBy: { updatedAt: "desc" }, take: 1 },
       battingScores: {
         include: {
           innings: {

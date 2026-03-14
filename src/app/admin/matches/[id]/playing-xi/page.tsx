@@ -119,7 +119,7 @@ export default function PlayingXIPage({ params }: { params: Promise<{ id: string
         >
           <span>{team.name}</span>
           <span className="text-sm font-normal opacity-80">
-            {xi.length}/{xiiLimit} selected
+            {xi.length}/{xiLimit} selected
           </span>
         </div>
 
@@ -136,15 +136,15 @@ export default function PlayingXIPage({ params }: { params: Promise<{ id: string
                 <label
                   key={player.id}
                   className={`flex items-center gap-3 px-5 py-3 cursor-pointer transition-colors ${
-                    isSelected ? "bg-green-50" : "hover:bg-gray-50"
+                    isSelected ? "bg-[#F7FBFC]" : "hover:bg-gray-50"
                   }`}
                 >
                   <input
                     type="checkbox"
                     checked={isSelected}
                     onChange={() => togglePlayer(team.id === match.homeTeamId ? "home" : "away", player.id, xi, setXI)}
-                    className="w-4 h-4 accent-green-600"
-                    disabled={!isSelected && xi.length >= xiiLimit}
+                    className="w-4 h-4 accent-[#769FCD]"
+                    disabled={!isSelected && xi.length >= xiLimit}
                   />
                   <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-600">
                     {player.jerseyNumber || "?"}
@@ -159,7 +159,7 @@ export default function PlayingXIPage({ params }: { params: Promise<{ id: string
                     <p className="text-xs text-gray-400">{player.role.replace(/_/g, " ")}</p>
                   </div>
                   {isSelected && (
-                    <span className="text-xs font-bold text-green-600">
+                    <span className="text-xs font-bold text-[#769FCD]">
                       #{xi.findIndex((p) => p.playerId === player.id) + 1}
                     </span>
                   )}
@@ -266,7 +266,7 @@ function PlayingXIClient({
         style={{ backgroundColor: team.jerseyColor || "#1B3A5C" }}
       >
         <span>{team.name}</span>
-        <span className={`text-sm font-normal opacity-90 ${xi.length === xiiLimit ? "text-green-200 font-bold" : ""}`}>
+        <span className={`text-sm font-normal opacity-90 ${xi.length === xiiLimit ? "text-[#B9D7EA] font-bold" : ""}`}>
           {xi.length}/{xiiLimit} selected
         </span>
       </div>
@@ -286,14 +286,14 @@ function PlayingXIClient({
               <label
                 key={player.id}
                 className={`flex items-center gap-3 px-5 py-3 cursor-pointer transition-colors ${
-                  isSelected ? "bg-green-50 border-l-4 border-green-500" : "hover:bg-gray-50"
+                  isSelected ? "bg-[#F7FBFC] border-l-4 border-[#769FCD]" : "hover:bg-gray-50"
                 }`}
               >
                 <input
                   type="checkbox"
                   checked={isSelected}
                   onChange={() => togglePlayer(player.id, xi, setXI)}
-                  className="w-4 h-4 accent-green-600"
+                  className="w-4 h-4 accent-[#769FCD]"
                   disabled={!isSelected && xi.length >= xiiLimit}
                 />
                 <div
@@ -315,7 +315,7 @@ function PlayingXIClient({
                   <p className="text-xs text-gray-400">{player.role.replace(/_/g, " ")}</p>
                 </div>
                 {isSelected && (
-                  <span className="text-sm font-bold text-green-600 w-6 text-center">#{order}</span>
+                  <span className="text-sm font-bold text-[#769FCD] w-6 text-center">#{order}</span>
                 )}
               </label>
             );
@@ -338,7 +338,7 @@ function PlayingXIClient({
         </div>
         <div className="flex items-center gap-3">
           {saved && (
-            <span className="text-sm text-green-600 font-medium bg-green-50 px-3 py-1.5 rounded-lg border border-green-200">
+            <span className="text-sm text-[#769FCD] font-medium bg-[#F7FBFC] px-3 py-1.5 rounded-lg border border-[#B9D7EA]">
               ✓ Saved!
             </span>
           )}
@@ -365,7 +365,7 @@ function PlayingXIClient({
           </div>
         )}
         {homeXI.length === xiiLimit && awayXI.length === xiiLimit && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded-lg font-medium">
+          <div className="bg-[#F7FBFC] border border-[#B9D7EA] text-[#769FCD] px-3 py-2 rounded-lg font-medium">
             ✓ Both Playing XIs complete. Ready to start!
           </div>
         )}
@@ -382,7 +382,7 @@ function PlayingXIClient({
         <button
           onClick={saveXI}
           disabled={saving || (homeXI.length !== xiiLimit || awayXI.length !== xiiLimit)}
-          className="bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+          className="bg-[#769FCD] hover:bg-[#1B3A5C] disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-semibold transition-colors"
         >
           {saving ? "Saving..." : `Save & Confirm Playing XIs`}
         </button>

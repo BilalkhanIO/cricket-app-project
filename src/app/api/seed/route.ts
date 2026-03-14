@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
+const OVERALL_LEAGUE_KEY = "__OVERALL__";
 
 export async function POST() {
   try {
@@ -201,25 +202,84 @@ export async function POST() {
     // Create Players for Teams
     const roles = ["BATSMAN", "BOWLER", "ALL_ROUNDER", "WICKETKEEPER"];
     for (let i = 0; i < 12; i++) {
-      const existingPlayer = await prisma.player.findUnique({
+      await prisma.player.upsert({
         where: { userId: playerUsers[i].id },
+        update: {},
+        create: {
+          userId: playerUsers[i].id,
+          teamId: i < 6 ? team1.id : team2.id,
+          jerseyNumber: i + 1,
+          role: roles[i % 4],
+          battingHand: i % 3 === 0 ? "LEFT" : "RIGHT",
+          age: 22 + (i % 10),
+          isCaptain: i === 0 || i === 6,
+          isViceCaptain: i === 1 || i === 7,
+          isWicketkeeper: i === 2 || i === 8,
+        },
       });
-      if (!existingPlayer) {
-        await prisma.player.create({
-          data: {
-            userId: playerUsers[i].id,
-            teamId: i < 6 ? team1.id : team2.id,
-            jerseyNumber: i + 1,
-            role: roles[i % 4],
-            battingHand: i % 3 === 0 ? "LEFT" : "RIGHT",
-            age: 22 + (i % 10),
-            isCaptain: i === 0 || i === 6,
-            isViceCaptain: i === 1 || i === 7,
-            isWicketkeeper: i === 2 || i === 8,
-          },
-        });
-      }
     }
+
+    const seededPlayers = await prisma.player.findMany({
+      where: { teamId: { in: [team1.id, team2.id] } },
+      orderBy: { jerseyNumber: "asc" },
+      take: 12,
+      select: { id: true },
+    });
+
+    const seededStats = seededPlayers.map((p, idx) => {
+      const isBowler = idx % 2 === 0;
+      const runs = 150 - idx * 5;
+      const ballsFaced = Math.max(20, runs + 25);
+      const dismissals = 3;
+      const wickets = isBowler ? 7 - (idx % 3) : idx % 2;
+      const ballsBowled = isBowler ? 72 - (idx % 2) * 6 : 12;
+      const oversBowled = Math.floor(ballsBowled / 6) + (ballsBowled % 6) / 10;
+      const runsConceded = isBowler ? 78 - idx : 24 + idx;
+      return {
+        playerId: p.id,
+        matchesPlayed: 4,
+        innings: 4,
+        dismissals,
+        notOuts: 1,
+        runs,
+        ballsFaced,
+        fours: Math.max(6, Math.floor(runs / 18)),
+        sixes: Math.max(1, Math.floor(runs / 40)),
+        thirties: runs >= 30 ? 1 : 0,
+        fifties: runs >= 50 ? 1 : 0,
+        hundreds: runs >= 100 ? 1 : 0,
+        strikeRate: Number(((runs / ballsFaced) * 100).toFixed(2)),
+        average: Number((runs / dismissals).toFixed(2)),
+        highestScore: Math.min(runs, 92),
+        wickets,
+        oversBowled,
+        ballsBowled,
+        maidens: isBowler ? 1 : 0,
+        runsConceded,
+        economy: Number((((runsConceded * 6) / Math.max(1, ballsBowled))).toFixed(2)),
+        bowlingAverage: wickets > 0 ? Number((runsConceded / wickets).toFixed(2)) : 0,
+        bowlingStrikeRate: wickets > 0 ? Number((ballsBowled / wickets).toFixed(2)) : 0,
+        bestBowling: wickets > 0 ? `${Math.min(4, wickets)}/${Math.max(10, Math.floor(runsConceded / 2))}` : null,
+        catches: idx % 2,
+        runOuts: idx % 3 === 0 ? 1 : 0,
+        stumpings: idx === 2 || idx === 8 ? 1 : 0,
+      };
+    });
+
+    await Promise.all(
+      seededStats.flatMap((s) => [
+        prisma.playerStats.upsert({
+          where: { playerId_leagueId: { playerId: s.playerId, leagueId: league.id } },
+          update: s,
+          create: { ...s, leagueId: league.id },
+        }),
+        prisma.playerStats.upsert({
+          where: { playerId_leagueId: { playerId: s.playerId, leagueId: OVERALL_LEAGUE_KEY } },
+          update: s,
+          create: { ...s, leagueId: OVERALL_LEAGUE_KEY },
+        }),
+      ])
+    );
 
     // Create Points Table entries
     await prisma.pointsTable.upsert({
