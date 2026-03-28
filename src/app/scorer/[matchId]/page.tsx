@@ -541,6 +541,10 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
 
   const getManualOutcome = useCallback(
     (winnerId: string) => {
+      if (!match) {
+        return { winMargin: 0, winType: "runs" };
+      }
+
       const firstInningsLocal = match.innings.find((innings) => innings.inningsNumber === 1);
 
       if (!currentInnings || !firstInningsLocal) {
