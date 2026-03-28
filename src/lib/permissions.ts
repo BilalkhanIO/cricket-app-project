@@ -1,5 +1,9 @@
 import { ROLE, isAdminRole, isLeagueOpsRole } from "@/lib/roles";
 
+function hasRole(role: string | null | undefined, allowedRoles: readonly string[]) {
+  return !!role && allowedRoles.includes(role);
+}
+
 export function canAccessAdminArea(role?: string | null) {
   return isLeagueOpsRole(role);
 }
@@ -17,9 +21,13 @@ export function canGenerateFixtures(role?: string | null) {
 }
 
 export function canCreateTeam(role?: string | null) {
-  return [ROLE.SUPER_ADMIN, ROLE.LEAGUE_ADMIN, ROLE.LEAGUE_STAFF, ROLE.TEAM_OWNER, ROLE.TEAM_MANAGER].includes(
-    role as string
-  );
+  return hasRole(role, [
+    ROLE.SUPER_ADMIN,
+    ROLE.LEAGUE_ADMIN,
+    ROLE.LEAGUE_STAFF,
+    ROLE.TEAM_OWNER,
+    ROLE.TEAM_MANAGER,
+  ]);
 }
 
 export function canManageTeamRegistrations(role?: string | null) {
@@ -27,7 +35,7 @@ export function canManageTeamRegistrations(role?: string | null) {
 }
 
 export function canManageLeaguePlayers(role?: string | null) {
-  return isLeagueOpsRole(role) || [ROLE.TEAM_OWNER, ROLE.TEAM_MANAGER].includes(role as string);
+  return isLeagueOpsRole(role) || hasRole(role, [ROLE.TEAM_OWNER, ROLE.TEAM_MANAGER]);
 }
 
 export function canAccessPlayerDashboard(role?: string | null) {
@@ -39,7 +47,7 @@ export function canAccessTeamManagerDashboard(role?: string | null) {
 }
 
 export function canAccessTeamStaffDashboard(role?: string | null) {
-  return [ROLE.TEAM_OWNER, ROLE.COACH, ROLE.SELECTOR, ROLE.ANALYST].includes(role as string) || isAdminRole(role);
+  return hasRole(role, [ROLE.TEAM_OWNER, ROLE.COACH, ROLE.SELECTOR, ROLE.ANALYST]) || isAdminRole(role);
 }
 
 export function canAccessLeagueStaffDashboard(role?: string | null) {
@@ -47,11 +55,11 @@ export function canAccessLeagueStaffDashboard(role?: string | null) {
 }
 
 export function canAccessOfficialDashboard(role?: string | null) {
-  return [ROLE.UMPIRE, ROLE.MATCH_REFEREE].includes(role as string) || isAdminRole(role);
+  return hasRole(role, [ROLE.UMPIRE, ROLE.MATCH_REFEREE]) || isAdminRole(role);
 }
 
 export function canScoreMatch(role?: string | null) {
-  return [ROLE.SUPER_ADMIN, ROLE.LEAGUE_ADMIN, ROLE.LEAGUE_STAFF, ROLE.SCORER].includes(role as string);
+  return hasRole(role, [ROLE.SUPER_ADMIN, ROLE.LEAGUE_ADMIN, ROLE.LEAGUE_STAFF, ROLE.SCORER]);
 }
 
 export function canManageMatchOfficials(role?: string | null) {
