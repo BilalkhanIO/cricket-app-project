@@ -68,3 +68,68 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Failed to start over" }, { status: 500 });
   }
 }
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    if (!canScoreMatch(session.user.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const { overId, bowlerId } = await req.json();
+    if (!overId || !bowlerId) {
+      return NextResponse.json({ error: "overId and bowlerId are required" }, { status: 400 });
+    }
+
+    const over = await prisma.over.findUnique({
+      where: { id: overId },
+      include: {
+        balls: { select: { id: true } },
+        innings: { select: { id: true, matchId: true } },
+      },
+    });
+
+    if (!over) {
+      return NextResponse.json({ error: "Over not found" }, { status: 404 });
+    }
+
+    if (session.user.role === ROLE.SCORER) {
+      const match = await prisma.match.findUnique({
+        where: { id: over.innings.matchId },
+        select: { scorerId: true },
+      });
+      if (match?.scorerId !== session.user.id) {
+        return NextResponse.json({ error: "You are not the assigned scorer for this match" }, { status: 403 });
+      }
+    }
+
+    if (over.balls.length > 0) {
+      return NextResponse.json(
+        { error: "Bowler can only be changed before the first ball of the over" },
+        { status: 400 }
+      );
+    }
+
+    const previousOver = await prisma.over.findFirst({
+      where: { inningsId: over.inningsId, overNumber: over.overNumber - 1 },
+      select: { bowlerId: true },
+    });
+    if (previousOver?.bowlerId && previousOver.bowlerId === bowlerId) {
+      return NextResponse.json(
+        { error: "Same bowler cannot bowl consecutive overs" },
+        { status: 400 }
+      );
+    }
+
+    const updatedOver = await prisma.over.update({
+      where: { id: over.id },
+      data: { bowlerId },
+    });
+
+    return NextResponse.json({ over: updatedOver }, { status: 200 });
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to update over" }, { status: 500 });
+  }
+}

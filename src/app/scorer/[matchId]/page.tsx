@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, use, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { useToast } from "@/components/ui/ToastProvider";
 
 export const dynamic = 'force-dynamic';
 
@@ -172,6 +173,7 @@ function BallDot({ ball }: { ball: BallEvent }) {
 export default function ScorerPage({ params }: { params: Promise<{ matchId: string }> }) {
   const { matchId } = use(params);
   const { data: session } = useSession();
+  const { showToast } = useToast();
   const [match, setMatch] = useState<Match | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -325,11 +327,15 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
     const bowlerId = forcedBowlerId || currentBowler;
     if (!currentInnings || !bowlerId) return;
     if (!striker || !nonStriker) {
-      setError("Select both batters before starting the over");
+      const message = "Select both batters before starting the over";
+      setError(message);
+      showToast(message, "error");
       return;
     }
     if (striker === nonStriker) {
-      setError("Striker and non-striker must be different players");
+      const message = "Striker and non-striker must be different players";
+      setError(message);
+      showToast(message, "error");
       return;
     }
     setError(null);
@@ -346,11 +352,54 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
       setBallInOver(0);
       setRecentBalls([]);
       setCurrentBowler(bowlerId);
+      showToast(`Over ${overNum} started`, "success");
       return true;
     }
-    if (!res.ok) setError(data.error || "Failed to start over");
+    if (!res.ok) {
+      const message = data.error || "Failed to start over";
+      setError(message);
+      showToast(message, "error");
+    }
     return false;
-  }, [currentBowler, currentInnings, nonStriker, striker]);
+  }, [currentBowler, currentInnings, nonStriker, showToast, striker]);
+
+  const updateCurrentOverBowler = useCallback(async (bowlerId: string) => {
+    if (!currentOverId) {
+      setCurrentBowler(bowlerId);
+      setError(null);
+      return;
+    }
+
+    if (ballInOver > 0) {
+      const message = "Bowler can only be changed before the first ball of the over";
+      setError(message);
+      showToast(message, "error");
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    const res = await fetch("/api/scoring/over", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ overId: currentOverId, bowlerId }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      const message = data.error || "Failed to update bowler";
+      setError(message);
+      showToast(message, "error");
+      setSubmitting(false);
+      return;
+    }
+
+    setCurrentBowler(bowlerId);
+    await fetchMatch();
+    showToast("Bowler updated", "success");
+    setSubmitting(false);
+  }, [ballInOver, currentOverId, fetchMatch, showToast]);
 
   const getNextBatter = useCallback(
     (exclude: string[] = []) => {
@@ -399,10 +448,10 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
     fielderParam?: string,
   ) => {
     if (!currentInnings || !currentOverId) return;
-    if (!striker) { setError("Select striker before recording a ball"); return; }
-    if (!nonStriker) { setError("Select non-striker before recording a ball"); return; }
-    if (striker === nonStriker) { setError("Striker and non-striker must be different players"); return; }
-    if (!currentBowler) { setError("Select bowler before recording a ball"); return; }
+    if (!striker) { const message = "Select striker before recording a ball"; setError(message); showToast(message, "error"); return; }
+    if (!nonStriker) { const message = "Select non-striker before recording a ball"; setError(message); showToast(message, "error"); return; }
+    if (striker === nonStriker) { const message = "Striker and non-striker must be different players"; setError(message); showToast(message, "error"); return; }
+    if (!currentBowler) { const message = "Select bowler before recording a ball"; setError(message); showToast(message, "error"); return; }
     setError(null);
     setSubmitting(true);
     setExtraMode(null);
@@ -433,7 +482,9 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
 
     const data = await res.json();
     if (!res.ok) {
-      setError(data.error || "Failed to record ball");
+      const message = data.error || "Failed to record ball";
+      setError(message);
+      showToast(message, "error");
       setSubmitting(false);
       return;
     }
@@ -495,6 +546,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
       if (data.matchCompleted && data.result) {
         setMatchResult(data.result);
         setShowMomModal(true);
+        showToast("Match result is ready to finalize", "success");
       }
 
       await fetchMatch();
@@ -531,6 +583,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
       body: JSON.stringify({ matchId, result, winnerTeamId: winnerId, winMargin, winType, playerOfMatchId: momPlayerId || null }),
     });
     setShowMomModal(false);
+    showToast("Match completed", "success");
     fetchMatch();
   };
 
@@ -644,7 +697,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
     ? (currentInnings.totalRuns / currentInnings.totalBalls) * 6
     : 0;
   const canEditBatters = !currentOverId || ballInOver === 0;
-  const canEditBowler = !currentOverId;
+  const canEditBowler = !currentOverId || ballInOver === 0;
   const selectionError =
     striker && nonStriker && striker === nonStriker
       ? "Striker and non-striker must be different players."
@@ -694,6 +747,9 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
   const activeBatters = currentInnings?.battingScores.filter((b) => !b.isOut) || [];
   const strikerScore = activeBatters.find((b) => b.playerId === striker);
   const nonStrikerScore = activeBatters.find((b) => b.playerId === nonStriker);
+  const fieldSelectClass =
+    "w-full appearance-none border border-white/10 bg-[#00142b] px-3 py-3 text-sm font-medium text-white outline-none transition focus:border-[#4ae183] disabled:cursor-not-allowed disabled:opacity-60";
+  const setupCardClass = "border border-white/10 bg-[#001c3a] p-4 sm:p-5";
 
   // Fall of wickets
   const dismissedBatters = currentInnings?.battingScores.filter((b) => b.isOut) || [];
@@ -748,7 +804,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
               <select
                 value={momPlayerId}
                 onChange={(e) => setMomPlayerId(e.target.value)}
-                className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-yellow-500"
+                className={fieldSelectClass}
               >
                 <option value="">-- Skip / Select later --</option>
                 {allMatchPlayers.map((p) => (
@@ -1000,29 +1056,34 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
 
           {/* Current batters at crease */}
           {(strikerScore || nonStrikerScore || striker || nonStriker) && (
-            <div className="border border-white/10 bg-[#001c3a] p-3">
-              <p className="text-xs text-gray-400 mb-2 font-medium uppercase tracking-wide">At The Crease</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className={setupCardClass}>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">Batters in</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#7f9abd]">`*` on strike</p>
+              </div>
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {[
-                  { id: striker, score: strikerScore, label: "* (Striker)" },
-                  { id: nonStriker, score: nonStrikerScore, label: "(Non-striker)" },
-                ].map(({ id, score, label }) => {
+                  { id: striker, score: strikerScore, isStriker: true },
+                  { id: nonStriker, score: nonStrikerScore, isStriker: false },
+                ].map(({ id, score, isStriker }) => {
                   const playerName = battingTeamPlayers.find((p) => p.playerId === id)?.player.user.name || "—";
                   return (
-                    <div key={label} className="bg-[#00142b] border border-white/10 p-2">
-                      <div className="flex items-center gap-1 mb-1">
-                        <span className="text-green-400 text-xs font-medium">{label}</span>
+                    <div key={`${id || "empty"}-${isStriker ? "striker" : "non-striker"}`} className="border border-white/10 bg-[#00142b] px-3 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="truncate text-sm font-semibold text-white">
+                          {isStriker && id ? "* " : ""}
+                          {id ? playerName : "Select batter"}
+                        </p>
+                        <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#7f9abd]">
+                          {isStriker ? "Striker" : "Non-striker"}
+                        </span>
                       </div>
-                      <p className="font-semibold text-sm text-white">{id ? playerName : "—"}</p>
                       {score ? (
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {score.runs} ({score.balls}b) · {score.fours}×4 · {score.sixes}×6
-                          {score.balls > 0 && (
-                            <span className="ml-1">· SR: {((score.runs / score.balls) * 100).toFixed(0)}</span>
-                          )}
+                        <p className="mt-1 text-xs text-[#9bb2d1]">
+                          {score.runs} ({score.balls}b) · {score.fours}x4 · {score.sixes}x6
                         </p>
                       ) : id ? (
-                        <p className="text-xs text-gray-500">0 (0b)</p>
+                        <p className="mt-1 text-xs text-[#7f9abd]">0 (0b)</p>
                       ) : null}
                     </div>
                   );
@@ -1057,91 +1118,90 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
             </div>
           )}
 
-          {/* Player Selection */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="text-xs text-gray-400 mb-1 block">
-                Striker {canEditBatters ? "(Editable)" : "(Locked after ball 1)"}
-              </label>
-              <select
-                value={striker}
-                onChange={(e) => {
-                  setStriker(e.target.value);
-                  setError(null);
-                }}
-                disabled={!canEditBatters}
-                className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500"
-              >
-                {playerOptions(battingTeamPlayers).map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
+          {/* Over setup */}
+          <div className={setupCardClass}>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
+                  {currentOverId ? `Over ${Math.floor(currentInnings.totalBalls / 6) + 1} live setup` : `Start over ${Math.floor(currentInnings.totalBalls / 6) + 1}`}
+                </p>
+                <p className="mt-1 text-xs text-[#7f9abd]">
+                  Batters stay editable until the first ball. Bowler locks after the first ball.
+                </p>
+              </div>
+              {!currentOverId && (
+                <button
+                  onClick={() => startOver()}
+                  disabled={!canStartOver}
+                  className="shrink-0 bg-[#4ae183] px-4 py-3 text-xs font-black uppercase tracking-[0.16em] text-[#003919] transition hover:bg-[#6bfe9c] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {submitting ? "Starting..." : "Start over"}
+                </button>
+              )}
             </div>
-            <div>
-              <label className="text-xs text-gray-400 mb-1 block">
-                Non-Striker {canEditBatters ? "(Editable)" : "(Locked after ball 1)"}
-              </label>
-              <select
-                value={nonStriker}
-                onChange={(e) => {
-                  setNonStriker(e.target.value);
-                  setError(null);
-                }}
-                disabled={!canEditBatters}
-                className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500"
-              >
-                {playerOptions(battingTeamPlayers).map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+              <div>
+                <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-[#9bb2d1]">
+                  Striker
+                </label>
+                <select
+                  value={striker}
+                  onChange={(e) => {
+                    setStriker(e.target.value);
+                    setError(null);
+                  }}
+                  disabled={!canEditBatters}
+                  className={fieldSelectClass}
+                >
+                  {playerOptions(battingTeamPlayers).map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-[#9bb2d1]">
+                  Non-striker
+                </label>
+                <select
+                  value={nonStriker}
+                  onChange={(e) => {
+                    setNonStriker(e.target.value);
+                    setError(null);
+                  }}
+                  disabled={!canEditBatters}
+                  className={fieldSelectClass}
+                >
+                  {playerOptions(battingTeamPlayers).map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-[#9bb2d1]">
+                  Bowler
+                </label>
+                <select
+                  value={currentBowler}
+                  onChange={(e) => {
+                    void updateCurrentOverBowler(e.target.value);
+                  }}
+                  disabled={!canEditBowler || submitting}
+                  className={fieldSelectClass}
+                >
+                  {playerOptions(bowlingTeamPlayers).map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="text-xs text-gray-400 mb-1 block">
-                Bowler {canEditBowler ? "(Editable)" : "(Locked for current over)"}
-              </label>
-              <select
-                value={currentBowler}
-                onChange={(e) => {
-                  setCurrentBowler(e.target.value);
-                  setError(null);
-                }}
-                disabled={!canEditBowler}
-                className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500"
-              >
-                {playerOptions(bowlingTeamPlayers).map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </div>
+
+            {selectionError && (
+              <div className="mt-3 border border-red-500/40 bg-red-950/40 px-3 py-2 text-xs text-red-200">
+                {selectionError}
+              </div>
+            )}
           </div>
-
-          {!currentOverId && (
-            <div className="border border-white/10 bg-[#00142b] px-3 py-2 text-xs text-[#9bb2d1]">
-              Auto-selection still happens, but you can now change both batters and the bowler before starting the next over.
-            </div>
-          )}
-
-          {selectionError && (
-            <div className="border border-red-500/40 bg-red-950/40 px-3 py-2 text-xs text-red-200">
-              {selectionError}
-            </div>
-          )}
-
-          {/* Start Over */}
-          {!currentOverId && (
-            <div className="bg-yellow-900/20 border border-yellow-700/50 p-4 text-center">
-              <p className="text-yellow-300 text-sm mb-3">
-                Review the auto-selected players, then start Over {Math.floor(currentInnings.totalBalls / 6) + 1}.
-              </p>
-              <button
-                onClick={() => startOver()}
-                disabled={!canStartOver}
-                className="bg-green-700 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed px-6 py-2.5 rounded-lg font-semibold transition-colors"
-              >
-                {submitting ? "Starting..." : `Start Over ${Math.floor(currentInnings.totalBalls / 6) + 1}`}
-              </button>
-            </div>
-          )}
 
           {/* Scoring Buttons */}
           {currentOverId && (
@@ -1269,7 +1329,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
                         <select
                           value={fielder}
                           onChange={(e) => setFielder(e.target.value)}
-                          className="w-full bg-[#00142b] border border-white/10 text-white px-3 py-2 text-sm"
+                          className={fieldSelectClass}
                         >
                           <option value="">Select fielder...</option>
                           {bowlingTeamPlayers.map((p) => (
