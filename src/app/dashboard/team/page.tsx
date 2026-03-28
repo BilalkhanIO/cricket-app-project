@@ -7,6 +7,7 @@ import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { StatusBadge } from "@/components/ui/Badge";
 import { OVERALL_LEAGUE_KEY } from "@/lib/constants";
+import { canAccessTeamManagerDashboard } from "@/lib/permissions";
 
 export const dynamic = 'force-dynamic';
 
@@ -64,7 +65,7 @@ async function getTeamManagerData(userId: string) {
 
 export default async function TeamDashboard() {
   const session = await getServerSession(authOptions);
-  if (!session || !["SUPER_ADMIN", "LEAGUE_ADMIN", "TEAM_MANAGER"].includes(session.user.role)) {
+  if (!session || !canAccessTeamManagerDashboard(session.user.role)) {
     redirect("/login");
   }
 
@@ -125,8 +126,8 @@ export default async function TeamDashboard() {
               <div
                 className="rounded-2xl p-6 text-white mb-6"
                 style={{
-                  background: `linear-gradient(135deg, ${team.jerseyColor || "#1B3A5C"}cc, ${team.jerseyColor || "#2D5484"}99)`,
-                  backgroundColor: team.jerseyColor || "#1B3A5C",
+                  background: `linear-gradient(135deg, ${team.jerseyColor || "var(--primary-dark)"}cc, ${team.jerseyColor || "#17364e"}99)`,
+                  backgroundColor: team.jerseyColor || "var(--primary-dark)",
                 }}
               >
                 <div className="flex items-center gap-5">
@@ -289,7 +290,7 @@ export default async function TeamDashboard() {
                             <p className="text-sm font-medium text-gray-900">{tl.league.name}</p>
                             <div className="flex items-center gap-2 mt-0.5">
                               <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                                tl.status === "ACTIVE" ? "bg-[#D6E6F2] text-[#769FCD]" :
+                                tl.status === "ACTIVE" ? "bg-[color:var(--card-muted)] text-[color:var(--primary)]" :
                                 tl.status === "PENDING" ? "bg-yellow-100 text-yellow-700" :
                                 "bg-gray-100 text-gray-600"
                               }`}>{tl.status}</span>

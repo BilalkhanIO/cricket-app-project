@@ -136,9 +136,9 @@ export default function FixtureGeneratorPage({ params }: { params: Promise<{ id:
       {result ? (
         /* Success State */
         <div className="space-y-4">
-          <div className="bg-[#F7FBFC] border border-[#B9D7EA] rounded-xl p-5">
+          <div className="bg-[color:var(--card-muted)] border border-[color:var(--border-color)] rounded-xl p-5">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-[#769FCD] rounded-full flex items-center justify-center text-white font-bold text-lg">
+              <div className="w-10 h-10 bg-[color:var(--primary)] rounded-full flex items-center justify-center text-white font-bold text-lg">
                 ✓
               </div>
               <div>
@@ -154,7 +154,7 @@ export default function FixtureGeneratorPage({ params }: { params: Promise<{ id:
                 </button>
                 <Link
                   href={`/admin/leagues/${id}`}
-                  className="px-4 py-2 bg-[#1B3A5C] text-white rounded-lg text-sm hover:bg-[#2D5484]"
+                  className="px-4 py-2 bg-[color:var(--primary-dark)] text-white rounded-lg text-sm hover:bg-[#17364e]"
                 >
                   Back to League
                 </Link>
@@ -163,7 +163,7 @@ export default function FixtureGeneratorPage({ params }: { params: Promise<{ id:
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-[#B9D7EA]">
+                  <tr className="border-b border-[color:var(--border-color)]">
                     <th className="text-left py-2 px-3 text-xs font-medium text-gray-500">#</th>
                     <th className="text-left py-2 px-3 text-xs font-medium text-gray-500">Match</th>
                     <th className="text-left py-2 px-3 text-xs font-medium text-gray-500">Date & Time</th>
@@ -202,8 +202,8 @@ export default function FixtureGeneratorPage({ params }: { params: Promise<{ id:
                     key={ft.value}
                     className={`cursor-pointer rounded-xl border-2 p-4 transition-colors ${
                       fixtureType === ft.value
-                        ? "border-[#769FCD] bg-[#F7FBFC]"
-                        : "border-gray-200 hover:border-[#B9D7EA]"
+                        ? "border-[color:var(--primary)] bg-[color:var(--card-muted)]"
+                        : "border-gray-200 hover:border-[color:var(--border-color)]"
                     }`}
                   >
                     <input
@@ -235,7 +235,7 @@ export default function FixtureGeneratorPage({ params }: { params: Promise<{ id:
                       selectedTeams.length === teams.length ? [] : teams.map((t) => t.id)
                     )
                   }
-                  className="text-xs text-[#769FCD] hover:underline"
+                  className="text-xs text-[color:var(--primary)] hover:underline"
                 >
                   {selectedTeams.length === teams.length ? "Deselect All" : "Select All"}
                 </button>
@@ -243,7 +243,7 @@ export default function FixtureGeneratorPage({ params }: { params: Promise<{ id:
               {teams.length === 0 ? (
                 <p className="text-sm text-gray-400">
                   No approved teams. Approve teams first from the{" "}
-                  <Link href={`/admin/leagues/${id}/teams`} className="text-[#769FCD] hover:underline">
+                  <Link href={`/admin/leagues/${id}/teams`} className="text-[color:var(--primary)] hover:underline">
                     teams registration page
                   </Link>.
                 </p>
@@ -254,7 +254,7 @@ export default function FixtureGeneratorPage({ params }: { params: Promise<{ id:
                       key={team.id}
                       className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
                         selectedTeams.includes(team.id)
-                          ? "border-[#769FCD] bg-[#F7FBFC]"
+                          ? "border-[color:var(--primary)] bg-[color:var(--card-muted)]"
                           : "border-gray-200 hover:border-gray-300"
                       }`}
                     >
@@ -262,11 +262,11 @@ export default function FixtureGeneratorPage({ params }: { params: Promise<{ id:
                         type="checkbox"
                         checked={selectedTeams.includes(team.id)}
                         onChange={() => toggleTeam(team.id)}
-                        className="accent-[#769FCD]"
+                        className="accent-[color:var(--primary)]"
                       />
                       <div
                         className="w-5 h-5 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: team.jerseyColor || "#769FCD" }}
+                        style={{ backgroundColor: team.jerseyColor || "var(--primary)" }}
                       />
                       <span className="text-sm font-medium text-gray-900 truncate">{team.shortName}</span>
                     </label>
@@ -285,7 +285,7 @@ export default function FixtureGeneratorPage({ params }: { params: Promise<{ id:
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#769FCD]"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--primary)]"
                   />
                 </div>
                 <div>
@@ -294,7 +294,7 @@ export default function FixtureGeneratorPage({ params }: { params: Promise<{ id:
                     <select
                       value={matchTimeHour}
                       onChange={(e) => setMatchTimeHour(Number(e.target.value))}
-                      className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#769FCD]"
+                      className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--primary)]"
                     >
                       {Array.from({ length: 24 }, (_, i) => (
                         <option key={i} value={i}>{String(i).padStart(2, "0")}:00</option>
@@ -303,7 +303,7 @@ export default function FixtureGeneratorPage({ params }: { params: Promise<{ id:
                     <select
                       value={matchTimeMinute}
                       onChange={(e) => setMatchTimeMinute(Number(e.target.value))}
-                      className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#769FCD]"
+                      className="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--primary)]"
                     >
                       {[0, 15, 30, 45].map((m) => (
                         <option key={m} value={m}>{String(m).padStart(2, "0")}</option>
@@ -319,7 +319,7 @@ export default function FixtureGeneratorPage({ params }: { params: Promise<{ id:
                     max={14}
                     value={daysBetween}
                     onChange={(e) => setDaysBetween(Number(e.target.value))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#769FCD]"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--primary)]"
                   />
                 </div>
                 <div>
@@ -327,7 +327,7 @@ export default function FixtureGeneratorPage({ params }: { params: Promise<{ id:
                   <select
                     value={venueId}
                     onChange={(e) => setVenueId(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#769FCD]"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--primary)]"
                   >
                     <option value="">No default venue</option>
                     {venues.map((v) => (
@@ -340,7 +340,7 @@ export default function FixtureGeneratorPage({ params }: { params: Promise<{ id:
                   <select
                     value={stage}
                     onChange={(e) => setStage(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#769FCD]"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--primary)]"
                   >
                     {["GROUP", "SUPER_4", "QUARTER_FINAL", "SEMI_FINAL", "FINAL", "PLATE"].map((s) => (
                       <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
@@ -359,7 +359,7 @@ export default function FixtureGeneratorPage({ params }: { params: Promise<{ id:
             <button
               onClick={handleGenerate}
               disabled={generating || selectedTeams.length < 2 || !startDate}
-              className="w-full bg-[#1B3A5C] hover:bg-[#2D5484] disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl font-semibold transition-colors"
+              className="w-full bg-[color:var(--primary-dark)] hover:bg-[#17364e] disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl font-semibold transition-colors"
             >
               {generating ? "Generating..." : `Generate ${previewCount} Fixture${previewCount !== 1 ? "s" : ""}`}
             </button>
@@ -381,7 +381,7 @@ export default function FixtureGeneratorPage({ params }: { params: Promise<{ id:
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Matches to generate</span>
-                  <span className="font-bold text-[#769FCD] text-base">{previewCount}</span>
+                  <span className="font-bold text-[color:var(--primary)] text-base">{previewCount}</span>
                 </div>
                 {startDate && (
                   <div className="flex justify-between text-sm">

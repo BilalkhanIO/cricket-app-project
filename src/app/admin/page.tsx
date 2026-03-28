@@ -129,7 +129,7 @@ export default async function AdminDashboard() {
   const statCards = [
     { label: "Total Leagues", value: stats.leaguesCount, icon: "🏆", href: "/admin/leagues", color: "bg-purple-50 border-purple-100" },
     { label: "Total Teams", value: stats.teamsCount, icon: "👕", href: "/admin/teams", color: "bg-blue-50 border-blue-100" },
-    { label: "Total Players", value: stats.playersCount, icon: "🏏", href: "/admin/players", color: "bg-[#F7FBFC] border-[#D6E6F2]" },
+    { label: "Total Players", value: stats.playersCount, icon: "🏏", href: "/admin/players", color: "bg-[color:var(--card-muted)] border-[color:var(--border-color)]" },
     { label: "Total Matches", value: stats.matchesCount, icon: "📅", href: "/admin/matches", color: "bg-orange-50 border-orange-100" },
     { label: "Live Now", value: stats.liveMatches.length, icon: "⚡", href: "/admin/matches?status=LIVE", color: "bg-red-50 border-red-100" },
     { label: "Upcoming", value: stats.upcomingMatches, icon: "📆", href: "/admin/matches?status=UPCOMING", color: "bg-sky-50 border-sky-100" },
@@ -140,30 +140,36 @@ export default async function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <div className="flex gap-2">
-          <Link href="/admin/leagues/new" className="bg-[#769FCD] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#5A8BBE]">
+      <div className="section-banner rounded-[2rem] px-6 py-7 text-white">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.24em] text-[#c8c8b0]">Control Room</p>
+            <h1 className="mt-2 text-3xl font-bold tracking-tight">Admin Dashboard</h1>
+            <p className="mt-2 text-sm text-[#c4c6cf]">High-density league operations, live match oversight, and announcement control.</p>
+          </div>
+          <div className="flex gap-2">
+          <Link href="/admin/leagues/new" className="bg-[#06bb63] text-[#00142b] px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#4ae183]">
             + New League
           </Link>
-          <Link href="/admin/matches/new" className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
+          <Link href="/admin/matches/new" className="bg-white/10 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-white/15">
             + Schedule Match
           </Link>
+          </div>
         </div>
       </div>
 
       {/* Today's Quick Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: "Runs Scored Today", value: stats.todayRuns, icon: "🏏", color: "bg-[#F7FBFC] border-[#D6E6F2]" },
+          { label: "Runs Scored Today", value: stats.todayRuns, icon: "🏏", color: "bg-[color:var(--card-muted)] border-[color:var(--border-color)]" },
           { label: "Wickets Today", value: stats.todayWickets, icon: "🎳", color: "bg-red-50 border-red-200" },
           { label: "Live Matches", value: stats.liveMatches.length, icon: "⚡", color: "bg-orange-50 border-orange-200" },
           { label: "Pending Approvals", value: stats.pendingTeams, icon: "⏳", color: "bg-yellow-50 border-yellow-200" },
         ].map((s) => (
-          <div key={s.label} className={`rounded-xl border p-4 ${s.color}`}>
+          <div key={s.label} className="rounded-[1.5rem] border border-white/10 bg-[#012040] p-4">
             <div className="text-2xl mb-1">{s.icon}</div>
-            <div className="text-3xl font-bold text-gray-900">{s.value}</div>
-            <div className="text-xs text-gray-600 mt-1">{s.label}</div>
+            <div className="text-3xl font-bold text-white">{s.value}</div>
+            <div className="text-xs text-[#c4c6cf] mt-1 uppercase tracking-[0.14em]">{s.label}</div>
           </div>
         ))}
       </div>
@@ -172,10 +178,10 @@ export default async function AdminDashboard() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {statCards.map((stat) => (
           <Link key={stat.label} href={stat.href}>
-            <div className={`rounded-xl border p-4 hover:shadow-md transition-shadow ${stat.color}`}>
+            <div className="rounded-[1.5rem] border border-white/10 bg-[#012040] p-4 hover:bg-[#0e2b4b] transition-colors">
               <div className="text-2xl mb-2">{stat.icon}</div>
-              <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
-              <div className="text-xs text-gray-600 mt-1">{stat.label}</div>
+              <div className="text-2xl font-bold text-white">{stat.value}</div>
+              <div className="text-xs text-[#c4c6cf] mt-1 uppercase tracking-[0.14em]">{stat.label}</div>
             </div>
           </Link>
         ))}
@@ -187,28 +193,28 @@ export default async function AdminDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Live Matches */}
         <Card>
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="font-bold text-gray-900 flex items-center gap-2">
+          <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-[#012040]">
+            <h2 className="font-bold text-white flex items-center gap-2">
               <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse"></span>
               Live Matches
             </h2>
-            <Link href="/matches" className="text-[#769FCD] text-sm hover:underline">View all</Link>
+            <Link href="/matches" className="text-[#6bfe9c] text-sm hover:underline">View all</Link>
           </div>
-          <CardBody className="p-0">
+          <CardBody className="p-0 bg-[#001c3a]">
             {stats.liveMatches.length === 0 ? (
-              <p className="text-center py-6 text-gray-400 text-sm">No live matches</p>
+              <p className="text-center py-6 text-[#c4c6cf] text-sm">No live matches</p>
             ) : (
               stats.liveMatches.map((m) => (
                 <Link key={m.id} href={`/scorer/${m.id}`}>
-                  <div className="flex items-center justify-between px-6 py-3 border-b border-gray-50 hover:bg-gray-50 last:border-0">
-                    <span className="text-sm font-medium">{m.homeTeam.shortName} vs {m.awayTeam.shortName}</span>
+                  <div className="flex items-center justify-between px-6 py-3 border-b border-white/5 hover:bg-[#012040] last:border-0">
+                    <span className="text-sm font-medium text-white">{m.homeTeam.shortName} vs {m.awayTeam.shortName}</span>
                     <div className="flex items-center gap-2">
                       {m.innings.map((i) => (
-                        <span key={i.teamId} className="text-xs bg-red-50 text-red-700 px-2 py-0.5 rounded">
+                        <span key={i.teamId} className="text-xs bg-[#1b3656] text-[#d4e3ff] px-2 py-0.5 rounded">
                           {i.totalRuns}/{i.totalWickets}
                         </span>
                       ))}
-                      <span className="text-xs text-[#769FCD] hover:underline">Score →</span>
+                      <span className="text-xs text-[#6bfe9c] hover:underline">Score →</span>
                     </div>
                   </div>
                 </Link>
@@ -219,23 +225,23 @@ export default async function AdminDashboard() {
 
         {/* Recent Announcements */}
         <Card>
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="font-bold text-gray-900">Announcements</h2>
-            <Link href="/admin/announcements" className="text-[#769FCD] text-sm hover:underline">Manage</Link>
+          <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-[#012040]">
+            <h2 className="font-bold text-white">Announcements</h2>
+            <Link href="/admin/announcements" className="text-[#6bfe9c] text-sm hover:underline">Manage</Link>
           </div>
-          <CardBody className="p-0">
+          <CardBody className="p-0 bg-[#001c3a]">
             {stats.recentAnnouncements.length === 0 ? (
-              <p className="text-center py-6 text-gray-400 text-sm">No announcements</p>
+              <p className="text-center py-6 text-[#c4c6cf] text-sm">No announcements</p>
             ) : (
               stats.recentAnnouncements.map((ann) => (
-                <div key={ann.id} className="px-6 py-3 border-b border-gray-50 last:border-0">
-                  <p className="text-sm font-medium text-gray-900">{ann.title}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">by {ann.author.name}</p>
+                <div key={ann.id} className="px-6 py-3 border-b border-white/5 last:border-0">
+                  <p className="text-sm font-medium text-white">{ann.title}</p>
+                  <p className="text-xs text-[#c4c6cf] mt-0.5">by {ann.author.name}</p>
                 </div>
               ))
             )}
             <div className="px-6 py-3">
-              <Link href="/admin/announcements/new" className="text-[#769FCD] text-sm hover:underline">
+              <Link href="/admin/announcements/new" className="text-[#6bfe9c] text-sm hover:underline">
                 + New Announcement
               </Link>
             </div>
@@ -246,16 +252,16 @@ export default async function AdminDashboard() {
       {/* Recent Audit Logs */}
       {stats.recentAuditLogs.length > 0 && (
         <Card>
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h2 className="font-bold text-gray-900">Recent Activity Log</h2>
+          <div className="px-6 py-4 border-b border-white/10 bg-[#012040]">
+            <h2 className="font-bold text-white">Recent Activity Log</h2>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto bg-[#001c3a]">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 border-b">
-                  <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">Action</th>
-                  <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">Entity</th>
-                  <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">Time</th>
+                <tr className="bg-[#012040] border-b border-white/10">
+                  <th className="text-left px-4 py-2 text-xs font-medium text-[#c4c6cf]">Action</th>
+                  <th className="text-left px-4 py-2 text-xs font-medium text-[#c4c6cf]">Entity</th>
+                  <th className="text-left px-4 py-2 text-xs font-medium text-[#c4c6cf]">Time</th>
                 </tr>
               </thead>
               <tbody>
@@ -292,7 +298,7 @@ export default async function AdminDashboard() {
               <Link
                 key={action.label}
                 href={action.href}
-                className="flex flex-col items-center gap-2 p-4 bg-gray-50 hover:bg-[#F7FBFC] border border-gray-200 hover:border-[#B9D7EA] rounded-xl transition-colors text-center"
+                className="flex flex-col items-center gap-2 p-4 bg-gray-50 hover:bg-[color:var(--card-muted)] border border-gray-200 hover:border-[color:var(--border-color)] rounded-xl transition-colors text-center"
               >
                 <span className="text-2xl">{action.icon}</span>
                 <span className="text-xs font-medium text-gray-700">{action.label}</span>

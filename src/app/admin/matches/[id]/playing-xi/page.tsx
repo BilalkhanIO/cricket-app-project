@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 interface Player {
@@ -30,14 +29,11 @@ interface PlayingXIEntry {
 
 export default function PlayingXIPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: matchId } = use(params);
-  const router = useRouter();
 
   const [match, setMatch] = useState<any>(null);
   const [homeXI, setHomeXI] = useState<PlayingXIEntry[]>([]);
   const [awayXI, setAwayXI] = useState<PlayingXIEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     fetch(`/api/matches/${matchId}`)
@@ -59,40 +55,6 @@ export default function PlayingXIPage({ params }: { params: Promise<{ id: string
       });
   }, [matchId]);
 
-  const togglePlayer = (
-    teamType: "home" | "away",
-    playerId: string,
-    xi: PlayingXIEntry[],
-    setXI: (v: PlayingXIEntry[]) => void
-  ) => {
-    const exists = xi.find((p) => p.playerId === playerId);
-    if (exists) {
-      setXI(xi.filter((p) => p.playerId !== playerId));
-    } else {
-      setXI([...xi, { playerId, battingOrder: xi.length + 1, isSubstitute: false }]);
-    }
-  };
-
-  const saveXI = async () => {
-    setSaving(true);
-    try {
-      await fetch(`/api/matches/${matchId}/playing-xi`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamId: match.homeTeamId, players: homeXI }),
-      });
-      await fetch(`/api/matches/${matchId}/playing-xi`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamId: match.awayTeamId, players: awayXI }),
-      });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
-    } finally {
-      setSaving(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -102,81 +64,6 @@ export default function PlayingXIPage({ params }: { params: Promise<{ id: string
   }
 
   if (!match) return <p className="text-gray-500">Match not found.</p>;
-
-  const renderTeamSelector = (
-    team: any,
-    xi: PlayingXIEntry[],
-    setXI: (v: PlayingXIEntry[]) => void
-  ) => {
-    const teamPlayers: Player[] = team.players || [];
-    const xiLimit = match.league?.playingXISize || 11;
-
-    return (
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div
-          className="px-5 py-4 text-white font-bold flex items-center justify-between"
-          style={{ backgroundColor: team.jerseyColor || "#1B3A5C" }}
-        >
-          <span>{team.name}</span>
-          <span className="text-sm font-normal opacity-80">
-            {xi.length}/{xiLimit} selected
-          </span>
-        </div>
-
-        {teamPlayers.length === 0 ? (
-          <div className="px-5 py-6 text-sm text-gray-400 text-center">
-            No players in squad.{" "}
-            <Link href="/admin/players" className="text-blue-500 underline">Add players</Link>
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-50">
-            {teamPlayers.map((player) => {
-              const isSelected = xi.some((p) => p.playerId === player.id);
-              return (
-                <label
-                  key={player.id}
-                  className={`flex items-center gap-3 px-5 py-3 cursor-pointer transition-colors ${
-                    isSelected ? "bg-[#F7FBFC]" : "hover:bg-gray-50"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => togglePlayer(team.id === match.homeTeamId ? "home" : "away", player.id, xi, setXI)}
-                    className="w-4 h-4 accent-[#769FCD]"
-                    disabled={!isSelected && xi.length >= xiLimit}
-                  />
-                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-600">
-                    {player.jerseyNumber || "?"}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-medium text-gray-900 text-sm">{player.user.name}</span>
-                      {player.isCaptain && <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 rounded">C</span>}
-                      {player.isViceCaptain && <span className="text-xs bg-blue-100 text-blue-700 px-1.5 rounded">VC</span>}
-                      {player.isWicketkeeper && <span className="text-xs bg-purple-100 text-purple-700 px-1.5 rounded">WK</span>}
-                    </div>
-                    <p className="text-xs text-gray-400">{player.role.replace(/_/g, " ")}</p>
-                  </div>
-                  {isSelected && (
-                    <span className="text-xs font-bold text-[#769FCD]">
-                      #{xi.findIndex((p) => p.playerId === player.id) + 1}
-                    </span>
-                  )}
-                </label>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // Fetch team players (need to include team.players in match API or fetch separately)
-  // We use match.playingXIs and cross-reference from a teams API
-  // Actually we need to get team players - let's fetch them
-  const [homePlayers, setHomePlayers] = useState<Player[]>([]);
-  const [awayPlayers, setAwayPlayers] = useState<Player[]>([]);
 
   return <PlayingXIClient matchId={matchId} match={match} initialHomeXI={homeXI} initialAwayXI={awayXI} />;
 }
@@ -200,6 +87,7 @@ function PlayingXIClient({
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loadingPlayers, setLoadingPlayers] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const fetchPlayers = async () => {
@@ -233,8 +121,9 @@ function PlayingXIClient({
 
   const saveXI = async () => {
     setSaving(true);
+    setError("");
     try {
-      await Promise.all([
+      const responses = await Promise.all([
         fetch(`/api/matches/${matchId}/playing-xi`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -246,6 +135,12 @@ function PlayingXIClient({
           body: JSON.stringify({ teamId: match.awayTeamId, players: awayXI }),
         }),
       ]);
+      const failed = responses.find((response) => !response.ok);
+      if (failed) {
+        const data = await failed.json().catch(() => ({}));
+        setError(data.error || "Failed to save one or more Playing XIs");
+        return;
+      }
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } finally {
@@ -263,10 +158,10 @@ function PlayingXIClient({
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
       <div
         className="px-5 py-4 text-white font-bold flex items-center justify-between"
-        style={{ backgroundColor: team.jerseyColor || "#1B3A5C" }}
+        style={{ backgroundColor: team.jerseyColor || "var(--primary-dark)" }}
       >
         <span>{team.name}</span>
-        <span className={`text-sm font-normal opacity-90 ${xi.length === xiiLimit ? "text-[#B9D7EA] font-bold" : ""}`}>
+        <span className={`text-sm font-normal opacity-90 ${xi.length === xiiLimit ? "text-[#9a8569] font-bold" : ""}`}>
           {xi.length}/{xiiLimit} selected
         </span>
       </div>
@@ -286,14 +181,14 @@ function PlayingXIClient({
               <label
                 key={player.id}
                 className={`flex items-center gap-3 px-5 py-3 cursor-pointer transition-colors ${
-                  isSelected ? "bg-[#F7FBFC] border-l-4 border-[#769FCD]" : "hover:bg-gray-50"
+                  isSelected ? "bg-[color:var(--card-muted)] border-l-4 border-[color:var(--primary)]" : "hover:bg-gray-50"
                 }`}
               >
                 <input
                   type="checkbox"
                   checked={isSelected}
                   onChange={() => togglePlayer(player.id, xi, setXI)}
-                  className="w-4 h-4 accent-[#769FCD]"
+                  className="w-4 h-4 accent-[color:var(--primary)]"
                   disabled={!isSelected && xi.length >= xiiLimit}
                 />
                 <div
@@ -315,7 +210,7 @@ function PlayingXIClient({
                   <p className="text-xs text-gray-400">{player.role.replace(/_/g, " ")}</p>
                 </div>
                 {isSelected && (
-                  <span className="text-sm font-bold text-[#769FCD] w-6 text-center">#{order}</span>
+                  <span className="text-sm font-bold text-[color:var(--primary)] w-6 text-center">#{order}</span>
                 )}
               </label>
             );
@@ -338,7 +233,7 @@ function PlayingXIClient({
         </div>
         <div className="flex items-center gap-3">
           {saved && (
-            <span className="text-sm text-[#769FCD] font-medium bg-[#F7FBFC] px-3 py-1.5 rounded-lg border border-[#B9D7EA]">
+            <span className="text-sm text-[color:var(--primary)] font-medium bg-[color:var(--card-muted)] px-3 py-1.5 rounded-lg border border-[color:var(--border-color)]">
               ✓ Saved!
             </span>
           )}
@@ -365,8 +260,13 @@ function PlayingXIClient({
           </div>
         )}
         {homeXI.length === xiiLimit && awayXI.length === xiiLimit && (
-          <div className="bg-[#F7FBFC] border border-[#B9D7EA] text-[#769FCD] px-3 py-2 rounded-lg font-medium">
+          <div className="bg-[color:var(--card-muted)] border border-[color:var(--border-color)] text-[color:var(--primary)] px-3 py-2 rounded-lg font-medium">
             ✓ Both Playing XIs complete. Ready to start!
+          </div>
+        )}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg">
+            {error}
           </div>
         )}
       </div>
@@ -382,7 +282,7 @@ function PlayingXIClient({
         <button
           onClick={saveXI}
           disabled={saving || (homeXI.length !== xiiLimit || awayXI.length !== xiiLimit)}
-          className="bg-[#769FCD] hover:bg-[#1B3A5C] disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+          className="bg-[color:var(--primary)] hover:bg-[color:var(--primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-semibold transition-colors"
         >
           {saving ? "Saving..." : `Save & Confirm Playing XIs`}
         </button>

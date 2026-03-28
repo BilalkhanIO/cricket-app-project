@@ -1,6 +1,7 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { format } from "date-fns";
+import { ROLE, ROLE_COLORS } from "@/lib/roles";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -67,14 +68,7 @@ export function calcAverage(runs: number, dismissals: number): number {
   return Math.round((runs / dismissals) * 100) / 100;
 }
 
-export const ROLES = {
-  SUPER_ADMIN: "SUPER_ADMIN",
-  LEAGUE_ADMIN: "LEAGUE_ADMIN",
-  TEAM_MANAGER: "TEAM_MANAGER",
-  SCORER: "SCORER",
-  PLAYER: "PLAYER",
-  FAN: "FAN",
-} as const;
+export const ROLES = ROLE;
 
 export const MATCH_STATUS = {
   UPCOMING: "UPCOMING",
@@ -98,7 +92,7 @@ export const LEAGUE_STATUS = {
 export const statusColors: Record<string, string> = {
   LIVE: "bg-red-500",
   UPCOMING: "bg-blue-500",
-  COMPLETED: "bg-[#769FCD]",
+  COMPLETED: "bg-[color:var(--primary)]",
   INNINGS_BREAK: "bg-yellow-500",
   ABANDONED: "bg-gray-500",
   DELAYED: "bg-orange-500",
@@ -106,11 +100,4 @@ export const statusColors: Record<string, string> = {
   TOSS: "bg-purple-500",
 };
 
-export const roleColors: Record<string, string> = {
-  SUPER_ADMIN: "bg-red-100 text-red-800",
-  LEAGUE_ADMIN: "bg-purple-100 text-purple-800",
-  TEAM_MANAGER: "bg-blue-100 text-blue-800",
-  SCORER: "bg-[#D6E6F2] text-[#1B3A5C]",
-  PLAYER: "bg-yellow-100 text-yellow-800",
-  FAN: "bg-gray-100 text-gray-800",
-};
+export const roleColors: Record<string, string> = ROLE_COLORS;

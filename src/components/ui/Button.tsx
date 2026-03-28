@@ -9,13 +9,13 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantStyles = {
-  primary:   "bg-[#769FCD] hover:bg-[#5A8BBE] text-white border-transparent shadow-sm",
-  navy:      "bg-[#1B3A5C] hover:bg-[#2D5484] text-white border-transparent shadow-sm",
-  secondary: "bg-[#D6E6F2] hover:bg-[#B9D7EA] text-[#1B3A5C] border-transparent",
+  primary:   "bg-[color:var(--primary)] hover:bg-[#185a41] text-white border-transparent shadow-sm",
+  navy:      "bg-[color:var(--primary-dark)] hover:bg-[#17364e] text-white border-transparent shadow-sm",
+  secondary: "bg-[color:var(--card-muted)] hover:bg-[#efe4d4] text-[color:var(--color-ink)] border-[color:var(--border-color)]",
   danger:    "bg-red-600 hover:bg-red-700 text-white border-transparent",
   success:   "bg-emerald-600 hover:bg-emerald-700 text-white border-transparent",
-  ghost:     "bg-transparent hover:bg-[#D6E6F2] text-[#1B3A5C] border-transparent",
-  outline:   "bg-transparent hover:bg-[#D6E6F2] text-[#769FCD] border-[#769FCD]",
+  ghost:     "bg-transparent hover:bg-[color:var(--card-muted)] text-[color:var(--color-ink)] border-transparent",
+  outline:   "bg-transparent hover:bg-[color:var(--card-muted)] text-[color:var(--primary)] border-[color:var(--border-color)]",
 };
 
 const sizeStyles = {
@@ -32,7 +32,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={disabled || loading}
         className={cn(
           "inline-flex items-center justify-center gap-2 font-medium border transition-all duration-150",
-          "focus:outline-none focus:ring-2 focus:ring-[#769FCD] focus:ring-offset-2",
+          "focus:outline-none focus:ring-2 focus:ring-[color:var(--primary)] focus:ring-offset-2",
           "disabled:opacity-50 disabled:cursor-not-allowed",
           variantStyles[variant],
           sizeStyles[size],

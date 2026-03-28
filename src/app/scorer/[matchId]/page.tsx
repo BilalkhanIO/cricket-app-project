@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, use, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, use, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
@@ -194,7 +194,6 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
   const [error, setError] = useState<string | null>(null);
   const [showMomModal, setShowMomModal] = useState(false);
   const [momPlayerId, setMomPlayerId] = useState("");
-  const autoStartingOverRef = useRef(false);
 
   const getTeamPlayerPool = useCallback(
     (teamId: string | null): ScoringPlayerOption[] => {
@@ -325,6 +324,15 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
   const startOver = useCallback(async (forcedBowlerId?: string) => {
     const bowlerId = forcedBowlerId || currentBowler;
     if (!currentInnings || !bowlerId) return;
+    if (!striker || !nonStriker) {
+      setError("Select both batters before starting the over");
+      return;
+    }
+    if (striker === nonStriker) {
+      setError("Striker and non-striker must be different players");
+      return;
+    }
+    setError(null);
     const overNum = Math.floor(currentInnings.totalBalls / 6) + 1;
 
     const res = await fetch("/api/scoring/over", {
@@ -342,7 +350,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
     }
     if (!res.ok) setError(data.error || "Failed to start over");
     return false;
-  }, [currentBowler, currentInnings]);
+  }, [currentBowler, currentInnings, nonStriker, striker]);
 
   const getNextBatter = useCallback(
     (exclude: string[] = []) => {
@@ -370,14 +378,6 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
       if (nextBowler) setCurrentBowler(nextBowler);
     }
 
-    if (!currentOverId && !autoStartingOverRef.current) {
-      const nextBowler = currentBowler || selectNextBowler();
-      if (!nextBowler) return;
-      autoStartingOverRef.current = true;
-      startOver(nextBowler).finally(() => {
-        autoStartingOverRef.current = false;
-      });
-    }
   }, [
     bowlingTeamPlayers,
     currentBowler,
@@ -388,7 +388,6 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
     nonStriker,
     phase,
     selectNextBowler,
-    startOver,
     striker,
   ]);
 
@@ -401,6 +400,8 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
   ) => {
     if (!currentInnings || !currentOverId) return;
     if (!striker) { setError("Select striker before recording a ball"); return; }
+    if (!nonStriker) { setError("Select non-striker before recording a ball"); return; }
+    if (striker === nonStriker) { setError("Striker and non-striker must be different players"); return; }
     if (!currentBowler) { setError("Select bowler before recording a ball"); return; }
     setError(null);
     setSubmitting(true);
@@ -538,13 +539,40 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
     setShowMomModal(true);
   };
 
+  const getManualOutcome = useCallback(
+    (winnerId: string) => {
+      const firstInningsLocal = match.innings.find((innings) => innings.inningsNumber === 1);
+
+      if (!currentInnings || !firstInningsLocal) {
+        return { winMargin: 0, winType: "runs" };
+      }
+
+      const defendingTeamId = firstInningsLocal.teamId;
+      const chasingTeamId = defendingTeamId === match.homeTeam.id ? match.awayTeam.id : match.homeTeam.id;
+
+      if (currentInnings.inningsNumber === 2) {
+        if (winnerId === chasingTeamId) {
+          const wicketsLeft = Math.max(0, 10 - currentInnings.totalWickets);
+          return { winMargin: wicketsLeft, winType: "wickets" };
+        }
+
+        const runsMargin = Math.max(0, firstInningsLocal.totalRuns - currentInnings.totalRuns);
+        return { winMargin: runsMargin, winType: "runs" };
+      }
+
+      return { winMargin: Math.max(0, currentInnings.totalRuns), winType: "runs" };
+    },
+    [currentInnings, match]
+  );
+
   if (!session || !["SUPER_ADMIN", "LEAGUE_ADMIN", "SCORER"].includes(session.user.role)) {
     return (
-      <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-3">Access Denied</h2>
-          <p className="text-gray-400">Only scorers can access this panel.</p>
-          <Link href="/login" className="text-[#769FCD] mt-4 block">Login as Scorer</Link>
+      <div className="min-h-screen bg-[#00142b] text-white flex items-center justify-center px-4">
+        <div className="border border-white/10 bg-[#001c3a] p-8 text-center max-w-md w-full">
+          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7f9abd]">Scoring access</p>
+          <h2 className="font-[var(--font-display)] text-4xl font-black uppercase tracking-tight mt-3">Access denied</h2>
+          <p className="text-[#9bb2d1] mt-3 text-sm leading-7">Only scorers and authorized admins can access this scoring console.</p>
+          <Link href="/login" className="mt-5 inline-block bg-[#4ae183] px-5 py-3 text-sm font-black uppercase tracking-[0.18em] text-[#003919]">Login as scorer</Link>
         </div>
       </div>
     );
@@ -552,16 +580,21 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="animate-spin w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full"></div>
+      <div className="min-h-screen bg-[#00142b] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin w-10 h-10 border-4 border-[#4ae183] border-t-transparent rounded-full"></div>
+          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#9bb2d1]">Loading match console</p>
+        </div>
       </div>
     );
   }
 
   if (!match) {
     return (
-      <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
-        <p>Match not found</p>
+      <div className="min-h-screen bg-[#00142b] text-white flex items-center justify-center px-4">
+        <div className="border border-white/10 bg-[#001c3a] p-8 text-center">
+          <p className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight">Match not found</p>
+        </div>
       </div>
     );
   }
@@ -571,15 +604,15 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
   const isAssignedScorer = match.scorerId === session.user.id;
   if (!isAdmin && !isAssignedScorer) {
     return (
-      <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
-        <div className="text-center max-w-sm">
+      <div className="min-h-screen bg-[#00142b] text-white flex items-center justify-center px-4">
+        <div className="border border-white/10 bg-[#001c3a] p-8 text-center max-w-sm w-full">
           <div className="text-5xl mb-4">🔒</div>
-          <h2 className="text-2xl font-bold mb-3">Not Your Match</h2>
-          <p className="text-gray-400 mb-4">
+          <h2 className="font-[var(--font-display)] text-4xl font-black uppercase tracking-tight mb-3">Not your match</h2>
+          <p className="text-[#9bb2d1] mb-4 text-sm leading-7">
             You are not the assigned scorer for this match. Contact the league admin if this is a mistake.
           </p>
-          <Link href="/dashboard/scorer" className="text-[#769FCD] hover:underline">
-            ← Back to Dashboard
+          <Link href="/dashboard/scorer" className="inline-block bg-[#4ae183] px-5 py-3 text-sm font-black uppercase tracking-[0.18em] text-[#003919]">
+            Back to dashboard
           </Link>
         </div>
       </div>
@@ -606,6 +639,19 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
   const currentRunRate = currentInnings && currentInnings.totalBalls > 0
     ? (currentInnings.totalRuns / currentInnings.totalBalls) * 6
     : 0;
+  const canEditBatters = !currentOverId || ballInOver === 0;
+  const canEditBowler = !currentOverId;
+  const selectionError =
+    striker && nonStriker && striker === nonStriker
+      ? "Striker and non-striker must be different players."
+      : null;
+  const canStartOver =
+    !submitting &&
+    !currentOverId &&
+    !!striker &&
+    !!nonStriker &&
+    !!currentBowler &&
+    !selectionError;
 
   let requiredRunRate: number | null = null;
   let runsNeeded = 0;
@@ -649,24 +695,36 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
   const dismissedBatters = currentInnings?.battingScores.filter((b) => b.isOut) || [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-950 text-white">
+    <div className="min-h-screen bg-[#00142b] text-white">
       {/* Header */}
-      <div className="bg-gray-900/95 backdrop-blur px-3 sm:px-4 py-3 flex items-center justify-between border-b border-gray-800 sticky top-0 z-20">
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <Link href={`/matches/${match.id}`} className="text-gray-400 hover:text-white text-sm shrink-0">← Back</Link>
-          <div className="min-w-0">
-            <p className="text-white font-semibold text-sm truncate">
-              {match.homeTeam.shortName} vs {match.awayTeam.shortName}
-            </p>
-            <p className="text-[11px] text-gray-400 truncate">{match.league.oversPerInnings || match.overs} overs</p>
+      <div className="sticky top-0 z-20 border-b border-white/10 bg-[rgba(0,20,43,0.94)] backdrop-blur-xl">
+        <div className="border-b border-white/10 bg-[rgba(15,34,51,0.72)] px-3 sm:px-4 py-2">
+          <div className="mx-auto max-w-screen-xl flex items-center justify-between gap-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#9bb2d1]">
+            <span>Scoring console</span>
+            <span>{phase.replace(/_/g, " ")}</span>
           </div>
         </div>
-        <span className={`text-[11px] px-2 py-1 rounded font-semibold tracking-wide ${
-          match.status === "LIVE" ? "bg-red-500 animate-pulse" :
-          match.status === "COMPLETED" ? "bg-green-600" : "bg-gray-600"
-        }`}>
-          {match.status}
-        </span>
+        <div className="mx-auto max-w-screen-xl px-3 sm:px-4 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <Link href={`/matches/${match.id}`} className="shrink-0 bg-[#001c3a] px-3 py-2 text-xs font-black uppercase tracking-[0.18em] text-[#d4e3ff] hover:bg-[#0b2747]">
+              Back
+            </Link>
+            <div className="min-w-0">
+              <p className="font-[var(--font-display)] text-xl font-black uppercase tracking-tight text-white truncate">
+                {match.homeTeam.shortName} vs {match.awayTeam.shortName}
+              </p>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1] truncate">
+                {match.league.oversPerInnings || match.overs} overs
+              </p>
+            </div>
+          </div>
+          <span className={`text-[10px] px-3 py-2 font-black uppercase tracking-[0.18em] ${
+            match.status === "LIVE" ? "bg-[#93000a] text-[#ffdad6] animate-pulse" :
+            match.status === "COMPLETED" ? "bg-[#4ae183] text-[#003919]" : "bg-[#12324d] text-[#d4e3ff]"
+          }`}>
+            {match.status}
+          </span>
+        </div>
       </div>
 
       {/* Man of the Match Modal */}
@@ -749,25 +807,27 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
       {/* Toss Phase */}
       {phase === "toss" && match.status !== "COMPLETED" && (
         <div className="max-w-lg mx-auto px-4 py-10">
-          <h2 className="text-xl font-bold mb-6 text-center">Record Toss</h2>
+          <div className="border border-white/10 bg-[#001c3a] p-6">
+          <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight mb-6 text-center">Record toss</h2>
           <div className="space-y-4">
             {[match.homeTeam, match.awayTeam].map((team) => (
-              <div key={team.id} className="bg-gray-800 rounded-xl p-5">
+              <div key={team.id} className="border border-white/10 bg-[#00142b] p-5">
                 <h3 className="font-semibold mb-3 text-center" style={{ color: team.jerseyColor || "#4ade80" }}>
                   {team.name} wins toss
                 </h3>
                 <div className="flex gap-3">
                   <button onClick={() => recordToss(team.id, "bat")}
-                    className="flex-1 bg-green-700 hover:bg-green-600 px-4 py-3 rounded-lg font-medium transition-colors">
+                    className="flex-1 bg-[#4ae183] hover:bg-[#6bfe9c] px-4 py-3 font-medium text-[#003919] transition-colors">
                     Choose to Bat
                   </button>
                   <button onClick={() => recordToss(team.id, "field")}
-                    className="flex-1 bg-gray-700 hover:bg-gray-600 px-4 py-3 rounded-lg font-medium transition-colors">
+                    className="flex-1 bg-[#12324d] hover:bg-[#1b3656] px-4 py-3 font-medium transition-colors">
                     Choose to Field
                   </button>
                 </div>
               </div>
             ))}
+          </div>
           </div>
         </div>
       )}
@@ -775,10 +835,11 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
       {/* Playing XI Phase */}
       {phase === "playing_xi" && match.status !== "COMPLETED" && (
         <div className="max-w-2xl mx-auto px-4 py-10">
+          <div className="border border-white/10 bg-[#001c3a] p-6">
           <div className="text-center mb-6">
-            <h2 className="text-xl font-bold mb-2">Toss Recorded ✓</h2>
+            <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight mb-2">Toss recorded</h2>
             {match.tossWinnerId && (
-              <p className="text-gray-400">
+              <p className="text-[#9bb2d1]">
                 {match.tossWinnerId === match.homeTeam.id ? match.homeTeam.name : match.awayTeam.name}{" "}
                 won toss and chose to {match.tossDecision}
               </p>
@@ -787,7 +848,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
 
           {/* Show Playing XIs if set */}
           {match.playingXIs.length > 0 ? (
-            <div className="bg-gray-800 rounded-xl p-5 mb-5">
+            <div className="border border-white/10 bg-[#00142b] p-5 mb-5">
               <p className="text-sm text-green-400 font-medium mb-3">✓ Playing XIs are set</p>
               <div className="grid grid-cols-2 gap-4 text-xs">
                 {[match.homeTeam, match.awayTeam].map((team) => {
@@ -806,7 +867,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
               </div>
             </div>
           ) : (
-            <div className="bg-yellow-900/20 border border-yellow-700/50 rounded-xl p-4 mb-5 text-center">
+            <div className="bg-yellow-900/20 border border-yellow-700/50 p-4 mb-5 text-center">
               <p className="text-yellow-300 text-sm">Playing XIs not set yet.</p>
               <p className="text-yellow-400 text-xs mt-1">
                 Scoring will continue using full active team rosters automatically.
@@ -815,17 +876,19 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
           )}
 
           <button onClick={startInnings}
-            className="w-full bg-green-700 hover:bg-green-600 px-6 py-4 rounded-xl font-bold text-lg transition-colors">
+            className="w-full bg-[#4ae183] hover:bg-[#6bfe9c] px-6 py-4 font-bold text-lg text-[#003919] transition-colors">
             Start 1st Innings
           </button>
+          </div>
         </div>
       )}
 
       {/* Start Innings (Innings Break) */}
       {phase === "start_innings" && match.status !== "COMPLETED" && (
         <div className="max-w-lg mx-auto px-4 py-10 text-center">
+          <div className="border border-white/10 bg-[#001c3a] p-6">
           {match.innings.length === 1 && (
-            <div className="bg-gray-800 rounded-xl p-6 mb-6">
+            <div className="border border-white/10 bg-[#00142b] p-6 mb-6">
               <p className="text-sm text-gray-400 mb-1">Innings Break</p>
               <p className="text-3xl font-bold text-green-400">
                 {match.innings[0].totalRuns}/{match.innings[0].totalWickets}
@@ -841,9 +904,10 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
             </div>
           )}
           <button onClick={startInnings}
-            className="bg-green-700 hover:bg-green-600 px-8 py-4 rounded-xl font-bold text-lg transition-colors">
+            className="bg-[#4ae183] hover:bg-[#6bfe9c] px-8 py-4 font-bold text-lg text-[#003919] transition-colors">
             Start {match.innings.length + 1}{match.innings.length === 0 ? "st" : "nd"} Innings
           </button>
+          </div>
         </div>
       )}
 
@@ -866,7 +930,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
           )}
 
           {/* Score Header */}
-          <div className="bg-gray-800 rounded-xl p-4">
+          <div className="border border-white/10 bg-[#001c3a] p-4">
             <div className="flex items-start justify-between mb-3">
               <div>
                 <p className="text-xs text-gray-400 mb-1">
@@ -895,28 +959,28 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
 
             {/* Stats row */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              <div className="bg-gray-700 rounded-lg p-2 text-center">
+              <div className="bg-[#00142b] border border-white/10 p-2 text-center">
                 <p className="text-xs text-gray-400">CRR</p>
                 <p className="font-bold text-green-400 text-sm">{currentRunRate.toFixed(2)}</p>
               </div>
               {requiredRunRate !== null ? (
-                <div className="bg-gray-700 rounded-lg p-2 text-center">
+                <div className="bg-[#00142b] border border-white/10 p-2 text-center">
                   <p className="text-xs text-gray-400">RRR</p>
                   <p className={`font-bold text-sm ${requiredRunRate > currentRunRate ? "text-red-400" : "text-green-400"}`}>
                     {requiredRunRate.toFixed(2)}
                   </p>
                 </div>
               ) : currentInnings.inningsNumber === 1 && projectedScore > 0 ? (
-                <div className="bg-gray-700 rounded-lg p-2 text-center">
+                <div className="bg-[#00142b] border border-white/10 p-2 text-center">
                   <p className="text-xs text-gray-400">Projected</p>
                   <p className="font-bold text-blue-400 text-sm">{projectedScore}</p>
                 </div>
               ) : null}
-              <div className="bg-gray-700 rounded-lg p-2 text-center">
+              <div className="bg-[#00142b] border border-white/10 p-2 text-center">
                 <p className="text-xs text-gray-400">Partnership</p>
                 <p className="font-bold text-purple-400 text-sm">{partnershipRuns} ({partnershipBalls}b)</p>
               </div>
-              <div className="bg-gray-700 rounded-lg p-2 text-center">
+              <div className="bg-[#00142b] border border-white/10 p-2 text-center">
                 <p className="text-xs text-gray-400">Extras</p>
                 <p className="font-bold text-yellow-400 text-sm">{currentInnings.extras}</p>
               </div>
@@ -932,7 +996,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
 
           {/* Current batters at crease */}
           {(strikerScore || nonStrikerScore || striker || nonStriker) && (
-            <div className="bg-gray-800 rounded-xl p-3">
+            <div className="border border-white/10 bg-[#001c3a] p-3">
               <p className="text-xs text-gray-400 mb-2 font-medium uppercase tracking-wide">At The Crease</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {[
@@ -941,7 +1005,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
                 ].map(({ id, score, label }) => {
                   const playerName = battingTeamPlayers.find((p) => p.playerId === id)?.player.user.name || "—";
                   return (
-                    <div key={label} className="bg-gray-700/50 rounded-lg p-2">
+                    <div key={label} className="bg-[#00142b] border border-white/10 p-2">
                       <div className="flex items-center gap-1 mb-1">
                         <span className="text-green-400 text-xs font-medium">{label}</span>
                       </div>
@@ -965,7 +1029,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
 
           {/* Current over balls */}
           {currentOverId && (
-            <div className="bg-gray-800 rounded-xl p-3">
+            <div className="border border-white/10 bg-[#001c3a] p-3">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-gray-400 font-medium">
                   Over {Math.floor(currentInnings.totalBalls / 6) + 1} · {ballInOver}/6 balls
@@ -992,10 +1056,16 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
           {/* Player Selection */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="text-xs text-gray-400 mb-1 block">Striker (Auto)</label>
+              <label className="text-xs text-gray-400 mb-1 block">
+                Striker {canEditBatters ? "(Editable)" : "(Locked after ball 1)"}
+              </label>
               <select
                 value={striker}
-                disabled
+                onChange={(e) => {
+                  setStriker(e.target.value);
+                  setError(null);
+                }}
+                disabled={!canEditBatters}
                 className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500"
               >
                 {playerOptions(battingTeamPlayers).map((o) => (
@@ -1004,10 +1074,16 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-400 mb-1 block">Non-Striker (Auto)</label>
+              <label className="text-xs text-gray-400 mb-1 block">
+                Non-Striker {canEditBatters ? "(Editable)" : "(Locked after ball 1)"}
+              </label>
               <select
                 value={nonStriker}
-                disabled
+                onChange={(e) => {
+                  setNonStriker(e.target.value);
+                  setError(null);
+                }}
+                disabled={!canEditBatters}
                 className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500"
               >
                 {playerOptions(battingTeamPlayers).map((o) => (
@@ -1016,10 +1092,16 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-400 mb-1 block">Bowler (Auto)</label>
+              <label className="text-xs text-gray-400 mb-1 block">
+                Bowler {canEditBowler ? "(Editable)" : "(Locked for current over)"}
+              </label>
               <select
                 value={currentBowler}
-                disabled
+                onChange={(e) => {
+                  setCurrentBowler(e.target.value);
+                  setError(null);
+                }}
+                disabled={!canEditBowler}
                 className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500"
               >
                 {playerOptions(bowlingTeamPlayers).map((o) => (
@@ -1029,32 +1111,44 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
             </div>
           </div>
 
+          {!currentOverId && (
+            <div className="border border-white/10 bg-[#00142b] px-3 py-2 text-xs text-[#9bb2d1]">
+              Auto-selection still happens, but you can now change both batters and the bowler before starting the next over.
+            </div>
+          )}
+
+          {selectionError && (
+            <div className="border border-red-500/40 bg-red-950/40 px-3 py-2 text-xs text-red-200">
+              {selectionError}
+            </div>
+          )}
+
           {/* Start Over */}
           {!currentOverId && (
-            <div className="bg-yellow-900/20 border border-yellow-700/50 rounded-xl p-4 text-center">
+            <div className="bg-yellow-900/20 border border-yellow-700/50 p-4 text-center">
               <p className="text-yellow-300 text-sm mb-3">
-                Auto-selecting bowler and starting Over {Math.floor(currentInnings.totalBalls / 6) + 1}...
+                Review the auto-selected players, then start Over {Math.floor(currentInnings.totalBalls / 6) + 1}.
               </p>
               <button
                 onClick={() => startOver()}
-                disabled
+                disabled={!canStartOver}
                 className="bg-green-700 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed px-6 py-2.5 rounded-lg font-semibold transition-colors"
               >
-                Starting...
+                {submitting ? "Starting..." : `Start Over ${Math.floor(currentInnings.totalBalls / 6) + 1}`}
               </button>
             </div>
           )}
 
           {/* Scoring Buttons */}
           {currentOverId && (
-            <div className="bg-gray-800 rounded-xl p-4 space-y-4">
+            <div className="border border-white/10 bg-[#001c3a] p-4 space-y-4">
               {/* Undo button */}
               <div className="flex items-center justify-between">
                 <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Score Ball</p>
                 <button
                   onClick={undoLastBall}
                   disabled={submitting || (currentInnings.overs.reduce((s, o) => s + o.balls.length, 0) === 0)}
-                  className="flex items-center gap-1.5 text-xs text-orange-400 hover:text-orange-300 disabled:opacity-30 bg-orange-900/20 px-3 py-1.5 rounded-lg border border-orange-700/50 transition-colors"
+                  className="flex items-center gap-1.5 text-xs text-orange-400 hover:text-orange-300 disabled:opacity-30 bg-orange-900/20 px-3 py-1.5 border border-orange-700/50 transition-colors"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
@@ -1072,7 +1166,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
                       key={r}
                       onClick={() => addBall(r)}
                       disabled={submitting || !!extraMode}
-                      className={`h-12 sm:h-14 rounded-xl font-bold text-lg sm:text-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                      className={`h-12 sm:h-14 font-bold text-lg sm:text-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
                         r === 4 ? "bg-blue-600 hover:bg-blue-500" :
                         r === 6 ? "bg-purple-600 hover:bg-purple-500" :
                         r === 0 ? "bg-gray-700 hover:bg-gray-600" :
@@ -1095,14 +1189,14 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
                         key={type}
                         onClick={() => setExtraMode(type)}
                         disabled={submitting}
-                        className="bg-yellow-700 hover:bg-yellow-600 disabled:opacity-50 px-2 py-3 rounded-lg text-xs font-semibold transition-colors min-h-11"
+                        className="bg-yellow-700 hover:bg-yellow-600 disabled:opacity-50 px-2 py-3 text-xs font-semibold transition-colors min-h-11"
                       >
                         {type.replace("_", " ")}
                       </button>
                     ))}
                   </div>
                 ) : (
-                  <div className="bg-yellow-900/20 border border-yellow-700/50 rounded-xl p-3">
+                  <div className="bg-yellow-900/20 border border-yellow-700/50 p-3">
                     <div className="flex items-center justify-between mb-3">
                       <p className="text-yellow-300 text-sm font-medium">
                         {extraMode.replace("_", " ")} — Select runs:
@@ -1120,7 +1214,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
                           key={opt.label}
                           onClick={() => addBall(opt.runs, { type: extraMode, runs: opt.extraRuns })}
                           disabled={submitting}
-                          className="bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 py-3 rounded-lg text-xs font-bold transition-colors min-h-11"
+                          className="bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 py-3 text-xs font-bold transition-colors min-h-11"
                         >
                           {opt.label}
                         </button>
@@ -1137,12 +1231,12 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
                   <button
                     onClick={() => { setShowWicketModal(true); setSelectedWicketType(""); setFielder(""); }}
                     disabled={submitting || !!extraMode}
-                    className="w-full bg-red-700 hover:bg-red-600 disabled:opacity-50 px-4 py-4 rounded-xl font-bold text-xl transition-colors"
+                    className="w-full bg-red-700 hover:bg-red-600 disabled:opacity-50 px-4 py-4 font-bold text-xl transition-colors"
                   >
                     W I C K E T
                   </button>
                 ) : (
-                  <div className="bg-red-900/20 border border-red-700/50 rounded-xl p-4 space-y-4">
+                  <div className="bg-red-900/20 border border-red-700/50 p-4 space-y-4">
                     <p className="text-red-300 font-semibold text-sm">Select Dismissal Type:</p>
 
                     {/* Wicket type grid */}
@@ -1171,7 +1265,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
                         <select
                           value={fielder}
                           onChange={(e) => setFielder(e.target.value)}
-                          className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm"
+                          className="w-full bg-[#00142b] border border-white/10 text-white px-3 py-2 text-sm"
                         >
                           <option value="">Select fielder...</option>
                           {bowlingTeamPlayers.map((p) => (
@@ -1195,13 +1289,13 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
                           }
                         }}
                         disabled={!selectedWicketType || submitting}
-                        className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed py-3 rounded-lg font-bold transition-colors"
+                        className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed py-3 font-bold transition-colors"
                       >
                         Confirm Out — {selectedWicketType ? selectedWicketType.replace(/_/g, " ") : "Select type"}
                       </button>
                       <button
                         onClick={() => { setShowWicketModal(false); setSelectedWicketType(""); setFielder(""); }}
-                        className="px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition-colors"
+                        className="px-4 py-3 bg-[#12324d] hover:bg-[#1b3656] text-sm transition-colors"
                       >
                         Cancel
                       </button>
@@ -1213,7 +1307,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
           )}
 
           {/* Live Scorecard Toggle */}
-          <div className="bg-gray-800 rounded-xl overflow-hidden">
+          <div className="border border-white/10 bg-[#001c3a] overflow-hidden">
             <button
               onClick={() => setShowScorecard((v) => !v)}
               className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-700/50 transition-colors"
@@ -1223,11 +1317,11 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
             </button>
 
             {showScorecard && (
-              <div className="border-t border-gray-700">
+              <div className="border-t border-white/10">
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="bg-gray-700 text-gray-400">
+                      <tr className="bg-[#00142b] text-[#9bb2d1]">
                         <th className="text-left px-3 py-2">Batter</th>
                         <th className="px-2 py-2 text-center">R</th>
                         <th className="px-2 py-2 text-center">B</th>
@@ -1273,11 +1367,11 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
                 </div>
 
                 {/* Bowling scorecard */}
-                <div className="border-t border-gray-700">
+                <div className="border-t border-white/10">
                   <p className="text-xs text-gray-400 px-3 py-2 font-medium uppercase tracking-wide">Bowling</p>
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="bg-gray-700 text-gray-400">
+                      <tr className="bg-[#00142b] text-[#9bb2d1]">
                         <th className="text-left px-3 py-2">Bowler</th>
                         <th className="px-2 py-2 text-center">O</th>
                         <th className="px-2 py-2 text-center">M</th>
@@ -1335,7 +1429,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
 
           {/* Manhattan Chart */}
           {overData.length > 0 && (
-            <div className="bg-gray-800 rounded-xl p-4">
+            <div className="border border-white/10 bg-[#001c3a] p-4">
               <p className="text-xs text-gray-400 mb-3 font-medium uppercase tracking-wide">Runs Per Over</p>
               <ResponsiveContainer width="100%" height={100}>
                 <BarChart data={overData} margin={{ top: 5, right: 5, left: -30, bottom: 5 }}>
@@ -1354,7 +1448,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
 
           {/* Over Summary */}
           {overData.length > 0 && (
-            <div className="bg-gray-800 rounded-xl p-4">
+            <div className="border border-white/10 bg-[#001c3a] p-4">
               <p className="text-xs text-gray-400 mb-3 font-medium uppercase tracking-wide">Over Summary</p>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
@@ -1390,17 +1484,23 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
           )}
 
           {/* Manual Match Control */}
-          <div className="bg-gray-800 rounded-xl p-4">
+          <div className="border border-white/10 bg-[#001c3a] p-4">
             <p className="text-xs text-gray-400 mb-3 font-medium uppercase tracking-wide">Match Control</p>
             <div className="flex flex-wrap gap-2">
               <button
-                onClick={() => completeMatch(match.homeTeam.id, 10, "wickets")}
+                onClick={() => {
+                  const outcome = getManualOutcome(match.homeTeam.id);
+                  completeMatch(match.homeTeam.id, outcome.winMargin, outcome.winType);
+                }}
                 className="bg-green-800 hover:bg-green-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
               >
                 {match.homeTeam.shortName} Won
               </button>
               <button
-                onClick={() => completeMatch(match.awayTeam.id, 10, "wickets")}
+                onClick={() => {
+                  const outcome = getManualOutcome(match.awayTeam.id);
+                  completeMatch(match.awayTeam.id, outcome.winMargin, outcome.winType);
+                }}
                 className="bg-blue-800 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
               >
                 {match.awayTeam.shortName} Won

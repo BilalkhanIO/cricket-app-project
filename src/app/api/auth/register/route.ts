@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
+import { ROLE, canSelfRegister } from "@/lib/roles";
 
 export const dynamic = 'force-dynamic';
 
@@ -12,6 +13,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "Name, email and password are required" },
         { status: 400 }
+      );
+    }
+
+    const requestedRole = role || ROLE.FAN;
+    if (!canSelfRegister(requestedRole)) {
+      return NextResponse.json(
+        { error: "This role cannot be created through public registration" },
+        { status: 403 }
       );
     }
 
@@ -31,7 +40,7 @@ export async function POST(req: NextRequest) {
         email,
         password: hashed,
         phone: phone || null,
-        role: role || "FAN",
+        role: requestedRole,
       },
       select: { id: true, name: true, email: true, role: true },
     });

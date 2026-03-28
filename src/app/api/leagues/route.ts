@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { canCreateLeague } from "@/lib/permissions";
 
 export const dynamic = 'force-dynamic';
 
@@ -34,14 +35,17 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const canCreate = ["SUPER_ADMIN", "LEAGUE_ADMIN"].includes(session.user.role);
-    if (!canCreate) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (!canCreateLeague(session.user.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     const data = await req.json();
+    const parentLeagueId = data.parentLeagueId || null;
     const startDate = new Date(data.startDate);
     const endDate = new Date(data.endDate);
     const oversPerInnings = Number(data.oversPerInnings ?? 20);
     const powerplayOvers = Number(data.powerplayOvers ?? 6);
+    const playerRegistrationStatus = data.playerRegistrationStatus || "CLOSED";
 
     if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
       return NextResponse.json({ error: "Invalid start/end date" }, { status: 400 });
@@ -63,15 +67,39 @@ export async function POST(req: NextRequest) {
     if (registrationCloseDate && registrationCloseDate > startDate) {
       return NextResponse.json({ error: "Registration close date must be before league start date" }, { status: 400 });
     }
+    if (!["OPEN", "CLOSED"].includes(playerRegistrationStatus)) {
+      return NextResponse.json({ error: "Invalid player registration status" }, { status: 400 });
+    }
+    if (parentLeagueId) {
+      const parentLeague = await prisma.league.findUnique({
+        where: { id: parentLeagueId },
+        select: { id: true },
+      });
+      if (!parentLeague) {
+        return NextResponse.json({ error: "Parent league not found" }, { status: 404 });
+      }
+    }
+
+    const {
+      startDate: _startDate,
+      endDate: _endDate,
+      registrationOpenDate: _registrationOpenDate,
+      registrationCloseDate: _registrationCloseDate,
+      parentLeagueId: _parentLeagueId,
+      playerRegistrationStatus: _playerRegistrationStatus,
+      ...rest
+    } = data;
 
     const league = await prisma.league.create({
       data: {
-        ...data,
+        ...rest,
         adminId: session.user.id,
+        parentLeagueId,
+        playerRegistrationStatus,
         startDate,
         endDate,
-        ...(registrationOpenDate && { registrationOpenDate }),
-        ...(registrationCloseDate && { registrationCloseDate }),
+        registrationOpenDate: registrationOpenDate || null,
+        registrationCloseDate: registrationCloseDate || null,
       },
     });
 

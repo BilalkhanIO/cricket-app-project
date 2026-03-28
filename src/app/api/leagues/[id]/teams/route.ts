@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { canManageTeamRegistrations } from "@/lib/permissions";
 
 export const dynamic = 'force-dynamic';
 
@@ -47,18 +48,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
 
       if (!league.allowMultiTeamPlayers && teamWithPlayers.players.length > 0) {
-        const duplicatePlayer = await prisma.player.findFirst({
+        const duplicatePlayer = await prisma.playerLeagueRegistration.findFirst({
           where: {
-            userId: { in: teamWithPlayers.players.map((p) => p.userId) },
-            teamId: { not: teamId },
-            team: {
-              leagues: {
-                some: {
-                  leagueId: id,
-                  status: { in: ["PENDING", "APPROVED", "WAITLISTED"] },
-                },
-              },
+            leagueId: id,
+            player: {
+              userId: { in: teamWithPlayers.players.map((p) => p.userId) },
             },
+            teamId: { not: null },
+            status: { in: ["PENDING", "APPROVED", "WAITLISTED"] },
+            NOT: { teamId },
           },
           select: { id: true },
         });
@@ -88,8 +86,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     if (action === "approve" || action === "reject" || action === "waitlist") {
-      const canApprove = ["SUPER_ADMIN", "LEAGUE_ADMIN"].includes(session.user.role);
-      if (!canApprove) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      if (!canManageTeamRegistrations(session.user.role)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
 
       const updated = await prisma.teamLeague.update({
         where: { teamId_leagueId: { teamId, leagueId: id } },

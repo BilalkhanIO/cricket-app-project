@@ -29,14 +29,14 @@ interface TeamReg {
 
 const STATUS_COLORS: Record<Status, string> = {
   PENDING: "bg-yellow-100 text-yellow-800",
-  APPROVED: "bg-[#D6E6F2] text-[#1B3A5C]",
+  APPROVED: "bg-[color:var(--card-muted)] text-[color:var(--color-ink)]",
   REJECTED: "bg-red-100 text-red-700",
   WAITLISTED: "bg-gray-100 text-gray-700",
 };
 
 const FEE_COLORS: Record<string, string> = {
   PENDING: "bg-yellow-50 text-yellow-700",
-  PAID: "bg-[#D6E6F2] text-[#769FCD]",
+  PAID: "bg-[color:var(--card-muted)] text-[color:var(--primary)]",
   WAIVED: "bg-gray-100 text-gray-600",
 };
 
@@ -129,14 +129,14 @@ export default function TeamRegistrationsPage({ params }: { params: Promise<{ id
             <button
               onClick={bulkApprove}
               disabled={!!processing}
-              className="px-4 py-2 bg-[#769FCD] text-white rounded-lg text-sm font-medium hover:bg-[#1B3A5C] disabled:opacity-50 transition-colors"
+              className="px-4 py-2 bg-[color:var(--primary)] text-white rounded-lg text-sm font-medium hover:bg-[color:var(--primary-dark)] disabled:opacity-50 transition-colors"
             >
               Approve All Pending ({counts.PENDING})
             </button>
           )}
           <Link
             href={`/admin/leagues/${id}/fixtures`}
-            className="px-4 py-2 bg-[#1B3A5C] text-white rounded-lg text-sm font-medium hover:bg-[#2D5484] transition-colors"
+            className="px-4 py-2 bg-[color:var(--primary-dark)] text-white rounded-lg text-sm font-medium hover:bg-[#17364e] transition-colors"
           >
             Generate Fixtures →
           </Link>
@@ -150,7 +150,7 @@ export default function TeamRegistrationsPage({ params }: { params: Promise<{ id
             key={s}
             onClick={() => setFilter(filter === s ? "ALL" : s)}
             className={`rounded-xl border-2 p-4 text-left transition-colors ${
-              filter === s ? "border-[#769FCD] bg-[#F7FBFC]" : "border-transparent bg-white hover:border-gray-200"
+              filter === s ? "border-[color:var(--primary)] bg-[color:var(--card-muted)]" : "border-transparent bg-white hover:border-gray-200"
             }`}
           >
             <div className="text-2xl font-bold text-gray-900">{counts[s]}</div>
@@ -171,7 +171,7 @@ export default function TeamRegistrationsPage({ params }: { params: Promise<{ id
             key={reg.id}
             className={`bg-white rounded-xl border-2 overflow-hidden transition-colors ${
               reg.status === "PENDING" ? "border-yellow-200" :
-              reg.status === "APPROVED" ? "border-[#B9D7EA]" :
+              reg.status === "APPROVED" ? "border-[color:var(--border-color)]" :
               reg.status === "REJECTED" ? "border-red-100" :
               "border-gray-200"
             }`}
@@ -182,7 +182,7 @@ export default function TeamRegistrationsPage({ params }: { params: Promise<{ id
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <div
                   className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold text-sm"
-                  style={{ backgroundColor: reg.team.jerseyColor || "#769FCD" }}
+                  style={{ backgroundColor: reg.team.jerseyColor || "var(--primary)" }}
                 >
                   {reg.team.shortName.charAt(0)}
                 </div>
@@ -232,7 +232,7 @@ export default function TeamRegistrationsPage({ params }: { params: Promise<{ id
                   <button
                     onClick={() => updateStatus(reg.id, reg.team.id, "approve")}
                     disabled={processing === reg.id}
-                    className="px-3 py-1.5 bg-[#769FCD] text-white rounded-lg text-xs font-medium hover:bg-[#1B3A5C] disabled:opacity-50 transition-colors"
+                    className="px-3 py-1.5 bg-[color:var(--primary)] text-white rounded-lg text-xs font-medium hover:bg-[color:var(--primary-dark)] disabled:opacity-50 transition-colors"
                   >
                     {processing === reg.id ? "..." : "Approve"}
                   </button>
@@ -274,7 +274,7 @@ export default function TeamRegistrationsPage({ params }: { params: Promise<{ id
                   <div>
                     <p className="text-xs font-medium text-gray-500 mb-1">Timeline</p>
                     <p className="text-xs text-gray-600">Registered: {new Date(reg.registeredAt).toLocaleString("en-GB")}</p>
-                    {reg.approvedAt && <p className="text-xs text-[#769FCD]">Approved: {new Date(reg.approvedAt).toLocaleString("en-GB")}</p>}
+                    {reg.approvedAt && <p className="text-xs text-[color:var(--primary)]">Approved: {new Date(reg.approvedAt).toLocaleString("en-GB")}</p>}
                     {reg.rejectedAt && <p className="text-xs text-red-600">Rejected: {new Date(reg.rejectedAt).toLocaleString("en-GB")}</p>}
                   </div>
                 </div>
@@ -291,7 +291,7 @@ export default function TeamRegistrationsPage({ params }: { params: Promise<{ id
                       placeholder="Add a note (optional)..."
                       value={notes[reg.id] || ""}
                       onChange={(e) => setNotes(prev => ({ ...prev, [reg.id]: e.target.value }))}
-                      className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#769FCD]"
+                      className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[color:var(--primary)]"
                     />
                   </div>
                 </div>
@@ -299,7 +299,7 @@ export default function TeamRegistrationsPage({ params }: { params: Promise<{ id
                 <div className="flex gap-2">
                   <Link
                     href={`/admin/teams/${reg.team.id}`}
-                    className="text-xs text-[#769FCD] hover:underline"
+                    className="text-xs text-[color:var(--primary)] hover:underline"
                   >
                     View Team Profile →
                   </Link>

@@ -96,7 +96,7 @@ export default function MatchOfficialsPage({ params }: { params: Promise<{ id: s
                 <select
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD] focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[color:var(--primary)] focus:border-transparent"
                 >
                   {OFFICIAL_ROLES.map((r) => (
                     <option key={r} value={r}>{r}</option>
@@ -110,14 +110,14 @@ export default function MatchOfficialsPage({ params }: { params: Promise<{ id: s
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD] focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[color:var(--primary)] focus:border-transparent"
                   placeholder="e.g. John Smith"
                   required
                 />
               </div>
 
               {message && (
-                <p className={`text-sm ${message.includes("success") ? "text-[#769FCD]" : "text-red-600"}`}>
+                <p className={`text-sm ${message.includes("success") ? "text-[color:var(--primary)]" : "text-red-600"}`}>
                   {message}
                 </p>
               )}

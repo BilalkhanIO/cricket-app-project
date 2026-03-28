@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { canManageLeaguePlayers } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -14,14 +15,13 @@ export async function PATCH(
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const canManage = ["SUPER_ADMIN", "LEAGUE_ADMIN", "TEAM_MANAGER"].includes(session.user.role);
-    if (!canManage) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (!canManageLeaguePlayers(session.user.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     const body = await req.json();
-    const teamId = body.teamId;
-    const status = body.status || "APPROVED";
-
-    if (!teamId) return NextResponse.json({ error: "teamId is required" }, { status: 400 });
+    const teamId = body.teamId || null;
+    const status = body.status || (teamId ? "APPROVED" : "PENDING");
 
     const league = await prisma.league.findUnique({ where: { id } });
     if (!league) return NextResponse.json({ error: "League not found" }, { status: 404 });
@@ -33,26 +33,31 @@ export async function PATCH(
       return NextResponse.json({ error: "Player is not registered in this league" }, { status: 404 });
     }
 
-    const teamLeague = await prisma.teamLeague.findUnique({
-      where: { teamId_leagueId: { teamId, leagueId: id } },
-    });
-    if (!teamLeague || teamLeague.status !== "APPROVED") {
-      return NextResponse.json({ error: "Target team is not approved in this league" }, { status: 400 });
-    }
+    if (teamId) {
+      const teamLeague = await prisma.teamLeague.findUnique({
+        where: { teamId_leagueId: { teamId, leagueId: id } },
+      });
+      if (!teamLeague || teamLeague.status !== "APPROVED") {
+        return NextResponse.json(
+          { error: "Target team is not approved in this league" },
+          { status: 400 }
+        );
+      }
 
-    const assignedCount = await prisma.playerLeagueRegistration.count({
-      where: {
-        leagueId: id,
-        teamId,
-        status: { in: ["PENDING", "APPROVED"] },
-      },
-    });
+      const assignedCount = await prisma.playerLeagueRegistration.count({
+        where: {
+          leagueId: id,
+          teamId,
+          status: { in: ["PENDING", "APPROVED"] },
+        },
+      });
 
-    if (registration.teamId !== teamId && assignedCount >= league.squadSizeLimit) {
-      return NextResponse.json(
-        { error: `Team squad limit reached for this league (${league.squadSizeLimit})` },
-        { status: 400 }
-      );
+      if (registration.teamId !== teamId && assignedCount >= league.squadSizeLimit) {
+        return NextResponse.json(
+          { error: `Team squad limit reached for this league (${league.squadSizeLimit})` },
+          { status: 400 }
+        );
+      }
     }
 
     const updated = await prisma.playerLeagueRegistration.update({
@@ -60,20 +65,20 @@ export async function PATCH(
       data: {
         teamId,
         status,
-        ...(status === "APPROVED" && { approvedAt: new Date() }),
-        ...(status === "REJECTED" && { rejectedAt: new Date() }),
-        ...(status === "WAITLISTED" && { waitlistedAt: new Date() }),
+        approvedAt: status === "APPROVED" ? new Date() : null,
+        rejectedAt: status === "REJECTED" ? new Date() : null,
+        waitlistedAt: status === "WAITLISTED" ? new Date() : null,
       },
       include: {
         player: {
-          include: { user: { select: { id: true, name: true, email: true } } },
+          include: {
+            user: { select: { id: true, name: true, email: true, profileImage: true } },
+            team: { select: { id: true, name: true, shortName: true } },
+          },
         },
         team: { select: { id: true, name: true, shortName: true } },
       },
     });
-
-    // Keep the main Player.teamId aligned for squad and playing-XI flows.
-    await prisma.player.update({ where: { id: playerId }, data: { teamId } });
 
     return NextResponse.json({ registration: updated });
   } catch (error) {

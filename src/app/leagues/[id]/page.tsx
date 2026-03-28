@@ -1,19 +1,32 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import {
+  CalendarDays,
+  Camera,
+  CircleAlert,
+  LayoutGrid,
+  Megaphone,
+  ShieldCheck,
+  Trophy,
+  Users,
+} from "lucide-react";
 import prisma from "@/lib/prisma";
-import { Card, CardBody, CardHeader } from "@/components/ui/Card";
-import { StatusBadge } from "@/components/ui/Badge";
 import { formatDate, formatDateTime } from "@/lib/utils";
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
+import PublicShell from "@/components/layout/PublicShell";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 async function getLeague(id: string) {
   return prisma.league.findUnique({
     where: { id },
     include: {
       admin: { select: { name: true } },
+      parentLeague: { select: { id: true, name: true } },
+      seasons: {
+        select: { id: true, name: true, season: true, status: true, year: true },
+        orderBy: [{ year: "desc" }, { createdAt: "desc" }],
+        take: 6,
+      },
       teams: {
         include: {
           team: {
@@ -27,48 +40,150 @@ async function getLeague(id: string) {
       },
       matches: {
         include: {
-          homeTeam: { select: { id: true, name: true, shortName: true } },
-          awayTeam: { select: { id: true, name: true, shortName: true } },
+          homeTeam: { select: { id: true, name: true, shortName: true, jerseyColor: true } },
+          awayTeam: { select: { id: true, name: true, shortName: true, jerseyColor: true } },
           venue: { select: { name: true, city: true } },
-          innings: { select: { inningsNumber: true, teamId: true, totalRuns: true, totalWickets: true, totalOvers: true } },
+          innings: {
+            select: {
+              inningsNumber: true,
+              teamId: true,
+              totalRuns: true,
+              totalWickets: true,
+              totalOvers: true,
+            },
+          },
         },
         orderBy: { matchDate: "asc" },
       },
       pointsTable: {
-        include: { team: { select: { id: true, name: true, shortName: true } } },
+        include: {
+          team: { select: { id: true, name: true, shortName: true, jerseyColor: true } },
+        },
         orderBy: [{ points: "desc" }, { netRunRate: "desc" }],
       },
       announcements: {
         where: { isPublic: true },
         include: { author: { select: { name: true } } },
         orderBy: { createdAt: "desc" },
-        take: 5,
+        take: 6,
       },
-      sponsors: true,
+      sponsors: {
+        orderBy: [{ tier: "asc" }, { name: "asc" }],
+      },
       awards: {
         include: {
-          player: { include: { user: { select: { name: true } } } },
+          player: {
+            include: {
+              user: { select: { name: true } },
+              team: { select: { shortName: true, jerseyColor: true } },
+            },
+          },
         },
         orderBy: { createdAt: "desc" },
-        take: 10,
+        take: 8,
+      },
+      _count: {
+        select: {
+          announcements: true,
+          awards: true,
+          matches: true,
+          media: true,
+          playerRegistrations: true,
+          sponsors: true,
+          teams: true,
+        },
       },
     },
   });
 }
 
-// Calculate form guide for a team (last 5 results)
-function getFormGuide(teamId: string, matches: any[]): string[] {
+function formatLabel(value: string) {
+  return value.replace(/_/g, " ");
+}
+
+function getFormGuide(teamId: string, matches: any[]) {
   const completedMatches = matches
-    .filter((m) =>
-      m.status === "COMPLETED" &&
-      (m.homeTeamId === teamId || m.awayTeamId === teamId)
-    )
+    .filter((match) => match.status === "COMPLETED" && (match.homeTeamId === teamId || match.awayTeamId === teamId))
     .slice(-5);
 
-  return completedMatches.map((m) => {
-    if (!m.winnerTeamId) return "T";
-    return m.winnerTeamId === teamId ? "W" : "L";
+  return completedMatches.map((match) => {
+    if (!match.winnerTeamId) return "T";
+    return match.winnerTeamId === teamId ? "W" : "L";
   });
+}
+
+function getInning(match: any, teamId: string) {
+  return match.innings.find((inning: any) => inning.teamId === teamId);
+}
+
+function formatScore(inning: any) {
+  if (!inning) return "--";
+  return `${inning.totalRuns}/${inning.totalWickets}`;
+}
+
+function getStatusTone(status: string) {
+  if (status === "ACTIVE") return "bg-[#4ae183] text-[#003919]";
+  if (status === "REGISTRATION") return "bg-[#c8c8b0] text-[#303221]";
+  if (status === "COMPLETED") return "bg-[#1b3656] text-[#d4e3ff]";
+  return "bg-[#12324d] text-[#9bb2d1]";
+}
+
+function getRegistrationCopy(league: any) {
+  if (league.playerRegistrationStatus === "OPEN") {
+    return league.registrationCloseDate
+      ? `Player registration closes ${formatDate(league.registrationCloseDate)}`
+      : "Player registration is open";
+  }
+
+  if (league.status === "REGISTRATION") {
+    return league.registrationCloseDate
+      ? `League registration closes ${formatDate(league.registrationCloseDate)}`
+      : "League registration is open";
+  }
+
+  return "Registration closed";
+}
+
+function MatchBoard({ match }: { match: any }) {
+  const homeInning = getInning(match, match.homeTeamId);
+  const awayInning = getInning(match, match.awayTeamId);
+
+  return (
+    <Link
+      href={`/matches/${match.id}`}
+      className="block border border-white/10 bg-[#001c3a] p-5 transition hover:bg-[#0b2747]"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7f9abd]">
+            {match.status === "LIVE" ? "Live match" : match.status === "COMPLETED" ? "Final result" : "Scheduled fixture"}
+          </p>
+          <p className="mt-2 font-[var(--font-display)] text-2xl font-black uppercase tracking-tight text-white">
+            {match.homeTeam.shortName} vs {match.awayTeam.shortName}
+          </p>
+        </div>
+        <span className={`px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${getStatusTone(match.status)}`}>
+          {formatLabel(match.status)}
+        </span>
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <div className="border border-white/10 bg-[#00142b] px-4 py-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#9bb2d1]">{match.homeTeam.name}</p>
+          <p className="mt-2 font-[var(--font-display)] text-3xl font-black text-white">{formatScore(homeInning)}</p>
+        </div>
+        <div className="border border-white/10 bg-[#00142b] px-4 py-4">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#9bb2d1]">{match.awayTeam.name}</p>
+          <p className="mt-2 font-[var(--font-display)] text-3xl font-black text-white">{formatScore(awayInning)}</p>
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-col gap-2 border-t border-white/10 pt-4 text-xs font-bold uppercase tracking-[0.18em] text-[#9bb2d1] sm:flex-row sm:items-center sm:justify-between">
+        <span>{match.status === "UPCOMING" ? formatDateTime(match.matchDate) : match.result || formatDateTime(match.matchDate)}</span>
+        <span>{match.venue ? `${match.venue.name}, ${match.venue.city}` : "Venue pending"}</span>
+      </div>
+    </Link>
+  );
 }
 
 export default async function LeagueDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -76,383 +191,614 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
   const league = await getLeague(id);
   if (!league) notFound();
 
-  const liveMatches = league.matches.filter((m) => m.status === "LIVE");
-  const upcomingMatches = league.matches.filter((m) => m.status === "UPCOMING");
-  const completedMatches = league.matches.filter((m) => m.status === "COMPLETED");
-
-  // Enrich points table with form guide
+  const liveMatches = league.matches.filter((match) => match.status === "LIVE");
+  const upcomingMatches = league.matches.filter((match) => ["UPCOMING", "TOSS"].includes(match.status));
+  const completedMatches = league.matches.filter((match) => match.status === "COMPLETED");
   const enrichedPointsTable = league.pointsTable.map((row) => ({
     ...row,
-    formGuide: getFormGuide(row.teamId, league.matches as any),
+    formGuide: getFormGuide(row.teamId, league.matches as any[]),
   }));
 
+  const sections = [
+    { id: "overview", label: "Overview" },
+    { id: "standings", label: "Standings" },
+    { id: "fixtures", label: "Fixtures" },
+    { id: "teams", label: "Teams" },
+    { id: "records", label: "Awards" },
+    { id: "bulletin", label: "Bulletin" },
+  ];
+
   return (
-    <div className="flex flex-col min-h-screen">
-      <Navbar />
-      <main className="flex-1">
-        {/* League Header */}
-        <div className="bg-gradient-to-br from-[#1B3A5C] to-[#2D5484] text-white py-10">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center text-3xl">
-                🏆
-              </div>
-              <div className="flex-1">
-                <div className="flex flex-wrap items-center gap-2 mb-1">
-                  <h1 className="text-2xl md:text-3xl font-bold">{league.name}</h1>
-                  <StatusBadge status={league.status} />
+    <PublicShell mainClassName="overflow-hidden">
+      <div className="bg-[#00142b] text-[#d4e3ff]">
+        <section className="relative overflow-hidden px-4 pb-8 pt-10 sm:px-6 lg:pb-10 lg:pt-12">
+          <div
+            className="absolute inset-0 opacity-30"
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(74,225,131,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(74,225,131,0.06) 1px, transparent 1px)",
+              backgroundSize: "40px 40px",
+            }}
+          />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(27,54,86,0.95),transparent_52%),linear-gradient(180deg,rgba(0,20,43,0.22),#00142b_76%)]" />
+
+          <div className="relative mx-auto max-w-screen-xl">
+            <div className="inline-flex items-center gap-2 bg-[#1b3656] px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-[#d4e3ff]">
+              League hub
+            </div>
+
+            <div className="mt-6 grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-end">
+              <div className="space-y-5">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className={`px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${getStatusTone(league.status)}`}>
+                    {formatLabel(league.status)}
+                  </span>
+                  <span className="bg-[#12324d] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
+                    {league.matchFormat}
+                  </span>
+                  <span className="bg-[#12324d] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
+                    {formatLabel(league.tournamentType)}
+                  </span>
                 </div>
-                <p className="text-[#B9D7EA] text-sm">
-                  {league.season} · {league.matchFormat} · {league.tournamentType.replace("_", " ")}
+
+                <div>
+                  <h1 className="font-[var(--font-display)] text-5xl font-black uppercase tracking-tight text-white sm:text-6xl">
+                    {league.name}
+                  </h1>
+                  <p className="mt-3 text-sm font-bold uppercase tracking-[0.18em] text-[#c8c8b0]">
+                    {league.season} · {league.year}
+                    {league.parentLeague ? ` · ${league.parentLeague.name}` : ""}
+                  </p>
+                </div>
+
+                <p className="max-w-2xl text-sm leading-7 text-[#9bb2d1] sm:text-base">
+                  {league.description ||
+                    `Public league board for fixtures, standings, results, registration windows, announcements, sponsors, and season history under ${league.admin.name}.`}
                 </p>
-                <p className="text-[#B9D7EA] text-xs mt-1">
-                  {formatDate(league.startDate)} – {formatDate(league.endDate)} · Admin: {league.admin.name}
-                </p>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Link
+                    href={`/matches?leagueId=${league.id}`}
+                    className="bg-[#4ae183] px-6 py-4 text-center text-sm font-black uppercase tracking-[0.22em] text-[#003919] transition hover:bg-[#6bfe9c]"
+                  >
+                    Open fixtures
+                  </Link>
+                  <Link
+                    href={`/leagues/${league.id}/media`}
+                    className="bg-[#1b3656] px-6 py-4 text-center text-sm font-black uppercase tracking-[0.22em] text-white transition hover:bg-[#234669]"
+                  >
+                    Media gallery
+                  </Link>
+                </div>
               </div>
-              <div className="grid grid-cols-3 gap-3 text-center">
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[
-                  { v: league.teams.length, l: "Teams" },
-                  { v: league.matches.length, l: "Matches" },
-                  { v: liveMatches.length, l: "Live" },
-                ].map((s) => (
-                  <div key={s.l} className="bg-white/10 rounded-xl px-4 py-2">
-                    <div className="text-xl font-bold">{s.v}</div>
-                    <div className="text-xs text-[#B9D7EA]">{s.l}</div>
+                  { value: league._count.teams, label: "Teams" },
+                  { value: league._count.matches, label: "Matches" },
+                  { value: liveMatches.length, label: "Live" },
+                  { value: league._count.playerRegistrations, label: "Players" },
+                ].map((stat) => (
+                  <div key={stat.label} className="border border-white/10 bg-[#001c3a] px-4 py-4">
+                    <p className="font-[var(--font-display)] text-3xl font-black text-white">{stat.value}</p>
+                    <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
+                      {stat.label}
+                    </p>
                   </div>
                 ))}
               </div>
             </div>
+
+            <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="border border-white/10 bg-[#001c3a] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#7f9abd]">Window</p>
+                <p className="mt-2 text-sm font-bold uppercase tracking-[0.14em] text-white">
+                  {formatDate(league.startDate)} to {formatDate(league.endDate)}
+                </p>
+              </div>
+              <div className="border border-white/10 bg-[#001c3a] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#7f9abd]">Registration</p>
+                <p className="mt-2 text-sm font-bold uppercase tracking-[0.14em] text-white">
+                  {getRegistrationCopy(league)}
+                </p>
+              </div>
+              <div className="border border-white/10 bg-[#001c3a] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#7f9abd]">Competition desk</p>
+                <p className="mt-2 text-sm font-bold uppercase tracking-[0.14em] text-white">{league.admin.name}</p>
+              </div>
+              <div className="border border-white/10 bg-[#001c3a] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#7f9abd]">League family</p>
+                <p className="mt-2 text-sm font-bold uppercase tracking-[0.14em] text-white">
+                  {league.parentLeague ? league.parentLeague.name : "Standalone"}
+                </p>
+              </div>
+            </div>
           </div>
-        </div>
+        </section>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Main Content */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Live Matches */}
-              {liveMatches.length > 0 && (
-                <section>
-                  <h2 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse"></span>
-                    Live Matches
-                  </h2>
-                  <div className="space-y-3">
-                    {liveMatches.map((match) => (
-                      <MatchCard key={match.id} match={match} />
-                    ))}
+        <section className="sticky top-[72px] z-30 border-y border-white/10 bg-[rgba(0,20,43,0.94)] px-4 py-3 backdrop-blur-xl sm:px-6">
+          <div className="mx-auto flex max-w-screen-xl gap-2 overflow-x-auto">
+            {sections.map((section) => (
+              <a
+                key={section.id}
+                href={`#${section.id}`}
+                className="whitespace-nowrap bg-[#001c3a] px-4 py-3 text-xs font-black uppercase tracking-[0.18em] text-[#d4e3ff] transition hover:bg-[#0b2747]"
+              >
+                {section.label}
+              </a>
+            ))}
+          </div>
+        </section>
+
+        <div className="mx-auto max-w-screen-xl px-4 py-10 sm:px-6 lg:py-12">
+          <section id="overview" className="grid gap-6 lg:grid-cols-[1.02fr_0.98fr]">
+            <div className="space-y-4">
+              <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
+                Competition
+                <span className="block text-[#4ae183]">overview</span>
+              </h2>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {[
+                  { icon: CalendarDays, label: "Schedule span", value: `${formatDate(league.startDate)} to ${formatDate(league.endDate)}` },
+                  { icon: LayoutGrid, label: "Overs per innings", value: `${league.oversPerInnings} overs` },
+                  { icon: ShieldCheck, label: "Squad and XI", value: `${league.squadSizeLimit} squad · ${league.playingXISize} XI` },
+                  { icon: Users, label: "Points model", value: `${league.pointsPerWin} win · ${league.pointsPerTie} tie · ${league.pointsPerNoResult} NR` },
+                ].map((item) => (
+                  <div key={item.label} className="border border-white/10 bg-[#001c3a] p-5">
+                    <item.icon className="h-5 w-5 text-[#4ae183]" />
+                    <p className="mt-4 text-[10px] font-black uppercase tracking-[0.22em] text-[#7f9abd]">{item.label}</p>
+                    <p className="mt-2 text-sm font-bold uppercase tracking-[0.14em] text-white">{item.value}</p>
                   </div>
-                </section>
-              )}
-
-              {/* Enhanced Points Table */}
-              {enrichedPointsTable.length > 0 && (
-                <section>
-                  <h2 className="text-lg font-bold text-gray-900 mb-3">Points Table</h2>
-                  <Card>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="bg-[#F7FBFC] border-b border-[#D6E6F2]">
-                            <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Team</th>
-                            <th className="px-3 py-3 text-xs font-semibold text-gray-500 uppercase">M</th>
-                            <th className="px-3 py-3 text-xs font-semibold text-gray-500 uppercase">W</th>
-                            <th className="px-3 py-3 text-xs font-semibold text-gray-500 uppercase">L</th>
-                            <th className="px-3 py-3 text-xs font-semibold text-gray-500 uppercase">T</th>
-                            <th className="px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Pts</th>
-                            <th className="px-3 py-3 text-xs font-semibold text-gray-500 uppercase">NRR</th>
-                            <th className="px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Form</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {enrichedPointsTable.map((row, i) => (
-                            <tr
-                              key={row.id}
-                              className={`border-b border-gray-50 hover:bg-gray-50 ${
-                                i < 2
-                                  ? "bg-[#F7FBFC]/50 border-l-4 border-l-[#769FCD]"
-                                  : i < 4
-                                  ? "bg-blue-50/30"
-                                  : ""
-                              }`}
-                            >
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-2">
-                                  <span className={`text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center ${
-                                    i < 2 ? "bg-[#F7FBFC]0 text-white" : "text-gray-400"
-                                  }`}>
-                                    {i + 1}
-                                  </span>
-                                  <Link href={`/teams/${row.teamId}`} className="font-medium text-gray-900 hover:text-[#1B3A5C]">
-                                    {row.team.name}
-                                  </Link>
-                                  {i < 2 && (
-                                    <span className="text-xs bg-[#D6E6F2] text-[#1B3A5C] px-1.5 py-0.5 rounded font-medium">
-                                      Playoff
-                                    </span>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="px-3 py-3 text-center text-gray-600">{row.matchesPlayed}</td>
-                              <td className="px-3 py-3 text-center text-[#1B3A5C] font-medium">{row.wins}</td>
-                              <td className="px-3 py-3 text-center text-red-600">{row.losses}</td>
-                              <td className="px-3 py-3 text-center text-gray-600">{row.ties}</td>
-                              <td className="px-3 py-3 text-center font-bold text-gray-900">{row.points}</td>
-                              <td className={`px-3 py-3 text-center text-xs font-medium ${row.netRunRate >= 0 ? "text-[#1B3A5C]" : "text-red-600"}`}>
-                                {row.netRunRate > 0 ? "+" : ""}{row.netRunRate.toFixed(3)}
-                              </td>
-                              <td className="px-3 py-3">
-                                <div className="flex gap-0.5">
-                                  {row.formGuide.map((result, fi) => (
-                                    <span
-                                      key={fi}
-                                      className={`w-5 h-5 rounded text-xs font-bold flex items-center justify-center ${
-                                        result === "W" ? "bg-[#F7FBFC]0 text-white" :
-                                        result === "L" ? "bg-red-500 text-white" :
-                                        "bg-gray-300 text-gray-600"
-                                      }`}
-                                    >
-                                      {result}
-                                    </span>
-                                  ))}
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    <div className="px-4 py-2 bg-gray-50 border-t text-xs text-gray-500 flex gap-4">
-                      <span className="flex items-center gap-1"><span className="w-3 h-3 bg-[#F7FBFC]0 rounded-full inline-block"></span> Playoff spots</span>
-                      <span>Form: last 5 results (W/L/T)</span>
-                    </div>
-                  </Card>
-                </section>
-              )}
-
-              {/* Upcoming Matches */}
-              {upcomingMatches.length > 0 && (
-                <section>
-                  <h2 className="text-lg font-bold text-gray-900 mb-3">Upcoming Fixtures</h2>
-                  <div className="space-y-2">
-                    {upcomingMatches.map((match) => (
-                      <MatchCard key={match.id} match={match} compact />
-                    ))}
-                  </div>
-                </section>
-              )}
-
-              {/* Results */}
-              {completedMatches.length > 0 && (
-                <section>
-                  <h2 className="text-lg font-bold text-gray-900 mb-3">Recent Results</h2>
-                  <div className="space-y-2">
-                    {completedMatches.slice(0, 5).map((match) => (
-                      <MatchCard key={match.id} match={match} compact />
-                    ))}
-                  </div>
-                </section>
-              )}
-
-              {/* Awards Section */}
-              {league.awards.length > 0 && (
-                <section>
-                  <h2 className="text-lg font-bold text-gray-900 mb-3">Awards</h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {league.awards.map((award) => (
-                      <div key={award.id} className="flex items-center gap-3 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl p-3">
-                        <div className="text-2xl">
-                          {award.awardType === "MAN_OF_MATCH" ? "🏅" :
-                           award.awardType === "BEST_BATSMAN" ? "🏏" :
-                           award.awardType === "BEST_BOWLER" ? "🎳" :
-                           award.awardType === "PLAYER_OF_TOURNAMENT" ? "🏆" : "⭐"}
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">
-                            {award.awardType.replace(/_/g, " ")}
-                          </p>
-                          {award.player && (
-                            <Link href={`/players/${award.playerId}`} className="text-xs text-[#1B3A5C] hover:underline font-medium">
-                              {award.player.user.name}
-                            </Link>
-                          )}
-                          {award.description && (
-                            <p className="text-xs text-gray-500 mt-0.5">{award.description}</p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              )}
+                ))}
+              </div>
             </div>
 
-            {/* Sidebar */}
-            <div className="space-y-5">
-              {/* Teams */}
-              <Card>
-                <CardHeader>
-                  <h3 className="font-bold text-gray-900">Participating Teams ({league.teams.length})</h3>
-                </CardHeader>
-                <CardBody className="p-0">
-                  {league.teams.map((tl) => (
-                    <Link key={tl.teamId} href={`/teams/${tl.teamId}`}>
-                      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 hover:bg-gray-50 last:border-0">
-                        <div
-                          className="w-8 h-8 rounded-full border-2 flex items-center justify-center text-white text-xs font-bold"
-                          style={{ backgroundColor: tl.team.jerseyColor || "#16a34a" }}
-                        >
-                          {tl.team.shortName.charAt(0)}
-                        </div>
+            <div className="space-y-4">
+              <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
+                Season
+                <span className="block text-[#c8c8b0]">lineage</span>
+              </h2>
+              <div className="border border-white/10 bg-[#001c3a] p-5">
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7f9abd]">Current branch</p>
+                <p className="mt-2 font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
+                  {league.parentLeague ? `${league.parentLeague.name} / ${league.season}` : league.season}
+                </p>
+                <p className="mt-3 text-sm leading-7 text-[#9bb2d1]">
+                  {league.parentLeague
+                    ? `This league runs as a season under ${league.parentLeague.name}.`
+                    : "This competition is operating as a standalone league season."}
+                </p>
+
+                {league.seasons.length > 0 && (
+                  <div className="mt-5 grid gap-3">
+                    {league.seasons.map((season) => (
+                      <Link
+                        key={season.id}
+                        href={`/leagues/${season.id}`}
+                        className="flex items-center justify-between gap-4 border border-white/10 bg-[#00142b] px-4 py-4 transition hover:bg-[#0b2747]"
+                      >
                         <div>
-                          <p className="text-sm font-medium text-gray-900">{tl.team.name}</p>
-                          <p className="text-xs text-gray-500">{tl.team._count.players} players</p>
+                          <p className="font-[var(--font-display)] text-xl font-black uppercase tracking-tight text-white">
+                            {season.name}
+                          </p>
+                          <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
+                            {season.season} · {season.year}
+                          </p>
+                        </div>
+                        <span className={`px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${getStatusTone(season.status)}`}>
+                          {formatLabel(season.status)}
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+
+          <section id="standings" className="mt-14">
+            <div className="flex items-end justify-between gap-4">
+              <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
+                Table
+                <span className="block text-[#4ae183]">standings</span>
+              </h2>
+            </div>
+
+            {enrichedPointsTable.length === 0 ? (
+              <div className="mt-6 border border-white/10 bg-[#001c3a] p-6 text-sm text-[#9bb2d1]">
+                Standings will appear once league results are recorded.
+              </div>
+            ) : (
+              <div className="mt-6 overflow-x-auto border border-white/10 bg-[#001c3a]">
+                <table className="min-w-full text-sm">
+                  <thead className="border-b border-white/10 bg-[#00142b] text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
+                    <tr>
+                      <th className="px-4 py-4 text-left">Team</th>
+                      <th className="px-3 py-4 text-center">M</th>
+                      <th className="px-3 py-4 text-center">W</th>
+                      <th className="px-3 py-4 text-center">L</th>
+                      <th className="px-3 py-4 text-center">T</th>
+                      <th className="px-3 py-4 text-center">Pts</th>
+                      <th className="px-3 py-4 text-center">NRR</th>
+                      <th className="px-4 py-4 text-left">Form</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {enrichedPointsTable.map((row, index) => (
+                      <tr key={row.id} className="border-b border-white/10 last:border-b-0">
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="flex h-9 w-9 items-center justify-center text-xs font-black text-white"
+                              style={{ backgroundColor: row.team.jerseyColor || "#1b3656" }}
+                            >
+                              {index + 1}
+                            </div>
+                            <div>
+                              <Link href={`/teams/${row.teamId}`} className="font-bold uppercase tracking-[0.08em] text-white">
+                                {row.team.name}
+                              </Link>
+                              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
+                                {row.team.shortName}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-3 py-4 text-center font-bold text-[#d4e3ff]">{row.matchesPlayed}</td>
+                        <td className="px-3 py-4 text-center font-bold text-[#4ae183]">{row.wins}</td>
+                        <td className="px-3 py-4 text-center font-bold text-[#ffb4ab]">{row.losses}</td>
+                        <td className="px-3 py-4 text-center font-bold text-[#c8c8b0]">{row.ties}</td>
+                        <td className="px-3 py-4 text-center font-[var(--font-display)] text-2xl font-black text-white">{row.points}</td>
+                        <td className="px-3 py-4 text-center font-bold text-[#d4e3ff]">
+                          {row.netRunRate > 0 ? "+" : ""}
+                          {row.netRunRate.toFixed(3)}
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex gap-1">
+                            {row.formGuide.map((result: string, formIndex: number) => (
+                              <span
+                                key={`${row.id}-${formIndex}`}
+                                className={`flex h-6 w-6 items-center justify-center text-[10px] font-black ${
+                                  result === "W"
+                                    ? "bg-[#4ae183] text-[#003919]"
+                                    : result === "L"
+                                      ? "bg-[#93000a] text-[#ffdad6]"
+                                      : "bg-[#c8c8b0] text-[#303221]"
+                                }`}
+                              >
+                                {result}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <section id="fixtures" className="mt-14 grid gap-6 xl:grid-cols-3">
+            <div className="space-y-4 xl:col-span-1">
+              <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
+                Matchday
+                <span className="block text-[#c8c8b0]">centre</span>
+              </h2>
+              <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                {[
+                  { label: "Live", value: liveMatches.length },
+                  { label: "Upcoming", value: upcomingMatches.length },
+                  { label: "Completed", value: completedMatches.length },
+                ].map((item) => (
+                  <div key={item.label} className="border border-white/10 bg-[#001c3a] p-4">
+                    <p className="font-[var(--font-display)] text-3xl font-black text-white">{item.value}</p>
+                    <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
+                      {item.label}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-4 xl:col-span-2">
+              {liveMatches.length > 0 && (
+                <div>
+                  <p className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#4ae183]">Live now</p>
+                  <div className="grid gap-4">{liveMatches.map((match) => <MatchBoard key={match.id} match={match} />)}</div>
+                </div>
+              )}
+
+              <div>
+                <p className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#c8c8b0]">Upcoming fixtures</p>
+                <div className="grid gap-4">
+                  {upcomingMatches.length > 0 ? (
+                    upcomingMatches.slice(0, 5).map((match) => <MatchBoard key={match.id} match={match} />)
+                  ) : (
+                    <div className="border border-white/10 bg-[#001c3a] p-6 text-sm text-[#9bb2d1]">
+                      No upcoming fixtures have been scheduled yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#7f9abd]">Recent results</p>
+                <div className="grid gap-4">
+                  {completedMatches.length > 0 ? (
+                    completedMatches.slice(-5).reverse().map((match) => <MatchBoard key={match.id} match={match} />)
+                  ) : (
+                    <div className="border border-white/10 bg-[#001c3a] p-6 text-sm text-[#9bb2d1]">
+                      Results will appear once completed matches are locked in.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="teams" className="mt-14 grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+            <div>
+              <div className="flex items-end justify-between gap-4">
+                <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
+                  Teams
+                  <span className="block text-[#4ae183]">in the field</span>
+                </h2>
+              </div>
+
+              {league.teams.length === 0 ? (
+                <div className="mt-6 border border-white/10 bg-[#001c3a] p-6 text-sm text-[#9bb2d1]">
+                  No approved teams are listed for this league yet.
+                </div>
+              ) : (
+                <div className="mt-6 grid gap-4 md:grid-cols-2">
+                  {league.teams.map((teamLeague) => (
+                    <Link
+                      key={teamLeague.teamId}
+                      href={`/teams/${teamLeague.teamId}`}
+                      className="block border border-white/10 bg-[#001c3a] p-5 transition hover:bg-[#0b2747]"
+                    >
+                      <div className="flex items-start gap-4">
+                        <div
+                          className="flex h-12 w-12 items-center justify-center text-sm font-black text-white"
+                          style={{ backgroundColor: teamLeague.team.jerseyColor || "#1b3656" }}
+                        >
+                          {teamLeague.team.shortName}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-[var(--font-display)] text-2xl font-black uppercase tracking-tight text-white">
+                            {teamLeague.team.name}
+                          </p>
+                          <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
+                            Managed by {teamLeague.team.manager.name}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-5 grid grid-cols-2 gap-3">
+                        <div className="border border-white/10 bg-[#00142b] px-3 py-3">
+                          <p className="font-[var(--font-display)] text-2xl font-black text-white">
+                            {teamLeague.team._count.players}
+                          </p>
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">Players</p>
+                        </div>
+                        <div className="border border-white/10 bg-[#00142b] px-3 py-3">
+                          <p className="font-[var(--font-display)] text-2xl font-black text-white">
+                            {getFormGuide(teamLeague.teamId, league.matches as any[]).join("") || "--"}
+                          </p>
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">Recent form</p>
                         </div>
                       </div>
                     </Link>
                   ))}
-                </CardBody>
-              </Card>
-
-              {/* Sponsors */}
-              {league.sponsors.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <h3 className="font-bold text-gray-900">Sponsors</h3>
-                  </CardHeader>
-                  <CardBody className="space-y-2">
-                    {league.sponsors.map((sponsor) => (
-                      <div key={sponsor.id} className="flex items-center gap-2">
-                        {sponsor.logo ? (
-                          <img src={sponsor.logo} alt={sponsor.name} className="w-8 h-8 object-contain rounded" />
-                        ) : (
-                          <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-xs font-bold text-gray-500">
-                            {sponsor.name.charAt(0)}
-                          </div>
-                        )}
-                        <div className="flex-1">
-                          {sponsor.website ? (
-                            <a href={sponsor.website} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 hover:underline">
-                              {sponsor.name}
-                            </a>
-                          ) : (
-                            <p className="text-sm font-medium text-gray-900">{sponsor.name}</p>
-                          )}
-                          {sponsor.tier && (
-                            <p className="text-xs text-gray-400">{sponsor.tier}</p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </CardBody>
-                </Card>
+                </div>
               )}
+            </div>
 
-              {/* League Info */}
-              <Card>
-                <CardHeader>
-                  <h3 className="font-bold text-gray-900">Tournament Info</h3>
-                </CardHeader>
-                <CardBody className="space-y-3">
+            <div className="space-y-4">
+              <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
+                Operations
+                <span className="block text-[#c8c8b0]">desk</span>
+              </h2>
+
+              <div className="border border-white/10 bg-[#001c3a] p-5">
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7f9abd]">Rules snapshot</p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   {[
-                    { label: "Format", value: league.matchFormat },
-                    { label: "Type", value: league.tournamentType.replace("_", " ") },
-                    { label: "Overs", value: league.oversPerInnings },
-                    { label: "Max Teams", value: league.maxTeams },
-                    { label: "Points/Win", value: league.pointsPerWin },
+                    { label: "Powerplay", value: `${league.powerplayOvers} overs` },
+                    { label: "DLS", value: league.dlsEnabled ? "Enabled" : "Disabled" },
+                    { label: "Super over", value: league.superOverEnabled ? "Enabled" : "Disabled" },
+                    { label: "Multi-team players", value: league.allowMultiTeamPlayers ? "Allowed" : "Blocked" },
+                    { label: "Minimum overs", value: `${league.minimumOversForResult} overs` },
+                    { label: "Tie rule", value: league.tieRule || "Standard" },
                   ].map((item) => (
-                    <div key={item.label} className="flex justify-between text-sm">
-                      <span className="text-gray-500">{item.label}</span>
-                      <span className="font-medium text-gray-900">{item.value}</span>
+                    <div key={item.label} className="border border-white/10 bg-[#00142b] px-4 py-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">{item.label}</p>
+                      <p className="mt-2 text-sm font-bold uppercase tracking-[0.14em] text-white">{item.value}</p>
                     </div>
                   ))}
-                </CardBody>
-              </Card>
-
-              {/* Media Link */}
-              <Link href={`/leagues/${league.id}/media`}>
-                <div className="bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200 rounded-xl p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">📷</span>
-                    <div>
-                      <p className="font-semibold text-gray-900 text-sm">Media Gallery</p>
-                      <p className="text-xs text-gray-500">Photos & videos from this league</p>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-
-              {/* Announcements */}
-              {league.announcements.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <h3 className="font-bold text-gray-900">Announcements</h3>
-                  </CardHeader>
-                  <CardBody className="space-y-3 p-3">
-                    {league.announcements.map((ann) => (
-                      <div key={ann.id} className="bg-blue-50 rounded-lg p-3">
-                        <p className="text-sm font-medium text-blue-900">{ann.title}</p>
-                        <p className="text-xs text-blue-700 mt-1 line-clamp-2">{ann.content}</p>
-                        <p className="text-xs text-blue-400 mt-1">{formatDate(ann.createdAt)}</p>
-                      </div>
-                    ))}
-                  </CardBody>
-                </Card>
-              )}
-            </div>
-          </div>
-        </div>
-      </main>
-      <Footer />
-    </div>
-  );
-}
-
-function MatchCard({ match, compact }: { match: any; compact?: boolean }) {
-  return (
-    <Link href={`/matches/${match.id}`}>
-      <Card hoverable>
-        <CardBody className={compact ? "py-3" : "py-4"}>
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-3">
-                <div className="text-center min-w-[60px]">
-                  <p className="font-bold text-sm text-gray-900">{match.homeTeam.shortName}</p>
-                  {match.innings.find((i: any) => i.teamId === match.homeTeamId) && (
-                    <p className="text-xs text-gray-600">
-                      {match.innings.find((i: any) => i.teamId === match.homeTeamId).totalRuns}/
-                      {match.innings.find((i: any) => i.teamId === match.homeTeamId).totalWickets}
-                    </p>
-                  )}
-                </div>
-                <div className="flex-1 text-center">
-                  <p className="text-xs text-gray-400">vs</p>
-                  {match.status === "LIVE" && (
-                    <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-medium">LIVE</span>
-                  )}
-                  {match.status === "COMPLETED" && match.result && (
-                    <p className="text-xs text-[#1B3A5C] font-medium">{match.result}</p>
-                  )}
-                  {match.status === "UPCOMING" && (
-                    <p className="text-xs text-gray-500">{formatDateTime(match.matchDate)}</p>
-                  )}
-                </div>
-                <div className="text-center min-w-[60px]">
-                  <p className="font-bold text-sm text-gray-900">{match.awayTeam.shortName}</p>
-                  {match.innings.find((i: any) => i.teamId === match.awayTeamId) && (
-                    <p className="text-xs text-gray-600">
-                      {match.innings.find((i: any) => i.teamId === match.awayTeamId).totalRuns}/
-                      {match.innings.find((i: any) => i.teamId === match.awayTeamId).totalWickets}
-                    </p>
-                  )}
                 </div>
               </div>
-              {match.venue && !compact && (
-                <p className="text-xs text-gray-400 text-center mt-1">📍 {match.venue.city}</p>
+
+              <div className="border border-white/10 bg-[#001c3a] p-5">
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7f9abd]">Sponsors and media</p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  {[
+                    { icon: Trophy, value: league._count.sponsors, label: "Sponsors" },
+                    { icon: Camera, value: league._count.media, label: "Media" },
+                    { icon: Megaphone, value: league._count.announcements, label: "Notices" },
+                  ].map((item) => (
+                    <div key={item.label} className="border border-white/10 bg-[#00142b] px-4 py-4">
+                      <item.icon className="h-5 w-5 text-[#4ae183]" />
+                      <p className="mt-4 font-[var(--font-display)] text-3xl font-black text-white">{item.value}</p>
+                      <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
+                        {item.label}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="records" className="mt-14 grid gap-6 lg:grid-cols-[0.96fr_1.04fr]">
+            <div className="space-y-4">
+              <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
+                Awards
+                <span className="block text-[#4ae183]">and honours</span>
+              </h2>
+
+              {league.awards.length === 0 ? (
+                <div className="border border-white/10 bg-[#001c3a] p-6 text-sm text-[#9bb2d1]">
+                  Awards and honours will appear once the competition records them.
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {league.awards.map((award) => (
+                    <div key={award.id} className="border border-white/10 bg-[#001c3a] p-5">
+                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#c8c8b0]">
+                        {formatLabel(award.awardType)}
+                      </p>
+                      <div className="mt-3 flex items-center justify-between gap-4">
+                        <div>
+                          <p className="font-[var(--font-display)] text-2xl font-black uppercase tracking-tight text-white">
+                            {award.player?.user.name || "League award"}
+                          </p>
+                          {award.description && (
+                            <p className="mt-2 text-sm leading-7 text-[#9bb2d1]">{award.description}</p>
+                          )}
+                        </div>
+                        {award.player?.team && (
+                          <div
+                            className="flex h-12 w-12 items-center justify-center text-sm font-black text-white"
+                            style={{ backgroundColor: award.player.team.jerseyColor || "#1b3656" }}
+                          >
+                            {award.player.team.shortName}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
-          </div>
-        </CardBody>
-      </Card>
-    </Link>
+
+            <div className="space-y-4">
+              <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
+                Sponsors
+                <span className="block text-[#c8c8b0]">and partners</span>
+              </h2>
+
+              {league.sponsors.length === 0 ? (
+                <div className="border border-white/10 bg-[#001c3a] p-6 text-sm text-[#9bb2d1]">
+                  No sponsors are listed publicly for this league yet.
+                </div>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {league.sponsors.map((sponsor) => (
+                    <div key={sponsor.id} className="border border-white/10 bg-[#001c3a] p-5">
+                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7f9abd]">
+                        {sponsor.tier || "League partner"}
+                      </p>
+                      <p className="mt-2 font-[var(--font-display)] text-2xl font-black uppercase tracking-tight text-white">
+                        {sponsor.name}
+                      </p>
+                      {sponsor.website ? (
+                        <a
+                          href={sponsor.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-3 inline-block text-xs font-black uppercase tracking-[0.18em] text-[#4ae183] underline"
+                        >
+                          Visit sponsor
+                        </a>
+                      ) : (
+                        <p className="mt-3 text-xs font-bold uppercase tracking-[0.18em] text-[#9bb2d1]">
+                          Public partner listing
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section id="bulletin" className="mt-14 grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+            <div className="space-y-4">
+              <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
+                League
+                <span className="block text-[#4ae183]">bulletin</span>
+              </h2>
+
+              {league.announcements.length === 0 ? (
+                <div className="border border-white/10 bg-[#001c3a] p-6 text-sm text-[#9bb2d1]">
+                  No public announcements are available yet.
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {league.announcements.map((announcement) => (
+                    <div key={announcement.id} className="border border-white/10 bg-[#001c3a] p-5">
+                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#4ae183]">Notice</p>
+                      <p className="mt-2 font-[var(--font-display)] text-2xl font-black uppercase tracking-tight text-white">
+                        {announcement.title}
+                      </p>
+                      <p className="mt-3 text-sm leading-7 text-[#9bb2d1]">{announcement.content}</p>
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-[10px] font-black uppercase tracking-[0.18em] text-[#7f9abd]">
+                        <span>{announcement.author.name}</span>
+                        <span>{formatDate(announcement.createdAt)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
+                Public
+                <span className="block text-[#c8c8b0]">actions</span>
+              </h2>
+
+              <div className="border border-white/10 bg-[#001c3a] p-5">
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7f9abd]">What you can do</p>
+                <div className="mt-4 grid gap-3">
+                  {[
+                    { href: `/matches?leagueId=${league.id}`, label: "View all league matches", icon: CalendarDays },
+                    { href: `/stats?leagueId=${league.id}`, label: "Open league statistics", icon: Trophy },
+                    { href: `/leagues/${league.id}/media`, label: "Browse media gallery", icon: Camera },
+                  ].map((action) => (
+                    <Link
+                      key={action.href}
+                      href={action.href}
+                      className="flex items-center justify-between gap-4 border border-white/10 bg-[#00142b] px-4 py-4 transition hover:bg-[#0b2747]"
+                    >
+                      <div className="flex items-center gap-3">
+                        <action.icon className="h-5 w-5 text-[#4ae183]" />
+                        <span className="text-sm font-bold uppercase tracking-[0.14em] text-white">{action.label}</span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+
+              <div className="border border-white/10 bg-[#4ae183] p-6 text-[#003919]">
+                <div className="flex items-start gap-3">
+                  <CircleAlert className="mt-0.5 h-5 w-5" />
+                  <div>
+                    <p className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight">
+                      Matchday ready
+                    </p>
+                    <p className="mt-3 text-sm font-medium leading-6">
+                      Follow standings, match boards, registration, season lineage, awards, and public league updates from one complete league page.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </PublicShell>
   );
 }

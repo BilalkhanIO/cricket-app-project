@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -12,13 +12,19 @@ export default function NewLeaguePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [existingLeagues, setExistingLeagues] = useState<
+    { id: string; name: string; season: string; year: number }[]
+  >([]);
   const [form, setForm] = useState({
     name: "",
     description: "",
+    parentLeagueId: "",
     season: new Date().getFullYear().toString(),
     year: new Date().getFullYear(),
     startDate: "",
     endDate: "",
+    registrationOpenDate: "",
+    registrationCloseDate: "",
     tournamentType: "ROUND_ROBIN",
     matchFormat: "T20",
     maxTeams: 8,
@@ -30,14 +36,32 @@ export default function NewLeaguePage() {
     squadSizeLimit: 15,
     playingXISize: 11,
     superOverEnabled: true,
+    allowMultiTeamPlayers: false,
+    playerRegistrationStatus: "OPEN",
     status: "REGISTRATION",
   });
+
+  useEffect(() => {
+    fetch("/api/leagues")
+      .then((res) => res.json())
+      .then((data) => {
+        setExistingLeagues(data.leagues || []);
+      })
+      .catch(() => {
+        setExistingLeagues([]);
+      });
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     setForm((prev) => ({
       ...prev,
-      [name]: type === "number" ? Number(value) : value,
+      [name]:
+        type === "number"
+          ? Number(value)
+          : type === "checkbox"
+            ? (e.target as HTMLInputElement).checked
+            : value,
     }));
   };
 
@@ -76,6 +100,19 @@ export default function NewLeaguePage() {
           <CardBody className="space-y-4">
             <Input label="League Name *" name="name" value={form.name} onChange={handleChange} placeholder="Pakistan Super League 2024" required />
             <Textarea label="Description" name="description" value={form.description} onChange={handleChange} placeholder="Brief description of the league" rows={3} />
+            <Select
+              label="Parent League / Competition"
+              name="parentLeagueId"
+              value={form.parentLeagueId}
+              onChange={handleChange}
+              options={[
+                { value: "", label: "Standalone league season" },
+                ...existingLeagues.map((league) => ({
+                  value: league.id,
+                  label: `${league.name} · ${league.season} ${league.year}`,
+                })),
+              ]}
+            />
             <div className="grid grid-cols-2 gap-4">
               <Input label="Season" name="season" value={form.season} onChange={handleChange} placeholder="2024" />
               <Input label="Year" name="year" type="number" value={form.year} onChange={handleChange} />
@@ -83,6 +120,10 @@ export default function NewLeaguePage() {
             <div className="grid grid-cols-2 gap-4">
               <Input label="Start Date *" name="startDate" type="date" value={form.startDate} onChange={handleChange} required />
               <Input label="End Date *" name="endDate" type="date" value={form.endDate} onChange={handleChange} required />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Input label="Player Registration Open" name="registrationOpenDate" type="date" value={form.registrationOpenDate} onChange={handleChange} />
+              <Input label="Player Registration Close" name="registrationCloseDate" type="date" value={form.registrationCloseDate} onChange={handleChange} />
             </div>
           </CardBody>
         </Card>
@@ -128,6 +169,27 @@ export default function NewLeaguePage() {
                 { value: "ACTIVE", label: "Active" },
               ]}
             />
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Select
+                label="Player Registration"
+                name="playerRegistrationStatus"
+                value={form.playerRegistrationStatus}
+                onChange={handleChange}
+                options={[
+                  { value: "OPEN", label: "Open" },
+                  { value: "CLOSED", label: "Closed" },
+                ]}
+              />
+              <label className="flex items-center gap-3 rounded-2xl border border-[color:var(--border-color)] bg-[color:var(--card-bg)] px-4 py-3 text-sm font-medium text-[color:var(--color-ink)]">
+                <input
+                  type="checkbox"
+                  name="allowMultiTeamPlayers"
+                  checked={form.allowMultiTeamPlayers}
+                  onChange={handleChange}
+                />
+                Allow players from already-registered squads
+              </label>
+            </div>
           </CardBody>
         </Card>
 

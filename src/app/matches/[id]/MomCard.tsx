@@ -67,7 +67,7 @@ export default function MomCard({ player, matchTitle, result, matchId, leagueNam
   return (
     <div className="bg-gradient-to-br from-yellow-50 to-amber-50 border border-yellow-200 rounded-2xl overflow-hidden">
       {/* Card visual area (shareable feel) */}
-      <div className="bg-gradient-to-br from-[#1B3A5C] to-[#2D5484] p-6 text-white relative overflow-hidden">
+      <div className="bg-gradient-to-br from-[color:var(--primary-dark)] to-[#17364e] p-6 text-white relative overflow-hidden">
         {/* Background decoration */}
         <div className="absolute top-0 right-0 w-40 h-40 bg-yellow-400/10 rounded-full -translate-y-1/2 translate-x-1/2" />
         <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
@@ -160,7 +160,7 @@ export default function MomCard({ player, matchTitle, result, matchId, leagueNam
           {/* Native share (mobile) */}
           <button
             onClick={handleShare}
-            className="flex items-center gap-2 bg-[#1B3A5C] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#2D5484] transition-colors"
+            className="flex items-center gap-2 bg-[color:var(--primary-dark)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#17364e] transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
@@ -201,10 +201,10 @@ export default function MomCard({ player, matchTitle, result, matchId, leagueNam
           >
             {copied ? (
               <>
-                <svg className="w-4 h-4 text-[#769FCD]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-[color:var(--primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                <span className="text-[#769FCD]">Copied!</span>
+                <span className="text-[color:var(--primary)]">Copied!</span>
               </>
             ) : (
               <>

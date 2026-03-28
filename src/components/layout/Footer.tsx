@@ -1,125 +1,114 @@
 import Link from "next/link";
+import { ArrowUpRight, RadioTower, Shield, Trophy } from "lucide-react";
 
 export default function Footer() {
   const year = new Date().getFullYear();
 
+  const columns = [
+    {
+      title: "Platform",
+      links: [
+        { href: "/leagues", label: "Leagues" },
+        { href: "/matches", label: "Matches" },
+        { href: "/teams", label: "Teams" },
+        { href: "/players", label: "Players" },
+      ],
+    },
+    {
+      title: "Insights",
+      links: [
+        { href: "/stats", label: "Leaderboards" },
+        { href: "/stats?tab=batting", label: "Batting Tables" },
+        { href: "/stats?tab=bowling", label: "Bowling Tables" },
+        { href: "/notifications", label: "Match Alerts" },
+      ],
+    },
+    {
+      title: "Access",
+      links: [
+        { href: "/login", label: "Login" },
+        { href: "/register", label: "Register" },
+        { href: "/profile", label: "Profile" },
+        { href: "/admin", label: "Admin Desk" },
+      ],
+    },
+  ];
+
   return (
-    <footer className="bg-[#1B3A5C] text-[#B9D7EA]">
-      {/* Top accent */}
-      <div className="h-0.5 bg-gradient-to-r from-[#769FCD] via-[#B9D7EA] to-[#769FCD]" />
+    <footer className="relative overflow-hidden border-t border-white/10 bg-[#00142b] text-[#e8decd]">
+      <div
+        className="absolute inset-0 opacity-20"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(74,225,131,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(74,225,131,0.06) 1px, transparent 1px)",
+          backgroundSize: "40px 40px",
+        }}
+      />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(27,54,86,0.8),transparent_48%),linear-gradient(180deg,rgba(0,20,43,0.2),#00142b_74%)]" />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-8">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8">
-
-          {/* Brand */}
-          <div className="lg:col-span-2">
-            <Link href="/home" className="flex items-center gap-2.5 mb-4 group w-fit">
-              <div className="w-10 h-10 bg-[#769FCD] rounded-xl flex items-center justify-center text-2xl shadow-sm">
-                🏏
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="grid gap-8 py-10 sm:py-12 lg:grid-cols-[1.5fr_repeat(3,minmax(0,1fr))]">
+          <div className="space-y-5">
+            <Link href="/home" className="inline-flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center border border-white/10 bg-[#1b3656] text-[#f4d58a]">
+                <Shield className="h-5 w-5" />
               </div>
               <div>
-                <span className="font-bold text-xl text-white block leading-tight">CricketLeague</span>
-                <span className="text-xs text-[#769FCD] tracking-widest uppercase">Pro Platform</span>
+                <p className="font-[var(--font-display)] text-lg font-black uppercase tracking-tight text-white">
+                  CricketLeague
+                </p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#9bb2d1]">
+                  Broadcast footer
+                </p>
               </div>
             </Link>
-            <p className="text-sm leading-relaxed text-[#B9D7EA] max-w-xs">
-              The complete platform for managing cricket leagues, tracking live scores, and following your favorite teams — all in one place.
+
+            <p className="max-w-md text-sm leading-7 text-[#9bb2d1]">
+              Fixtures, live centres, public standings, and player records staged with the same broadcast atmosphere as the home experience.
             </p>
 
-            <div className="flex gap-3 mt-5">
-              {["🏆", "🏏", "📊", "🌟"].map((icon, i) => (
-                <div key={i} className="w-9 h-9 bg-[#2D5484] rounded-lg flex items-center justify-center text-base hover:bg-[#769FCD] transition-colors cursor-pointer">
-                  {icon}
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { value: "Live", label: "Centre" },
+                { value: "T20+", label: "Formats" },
+                { value: "Stats", label: "Records" },
+              ].map((item) => (
+                <div key={item.label} className="border border-white/10 bg-[#001c3a] px-3 py-3">
+                  <p className="font-[var(--font-display)] text-xl font-black uppercase text-white">{item.value}</p>
+                  <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-[#c8c8b0]">{item.label}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Quick Links */}
-          <div>
-            <h3 className="font-semibold text-white mb-4 text-sm uppercase tracking-wider">Explore</h3>
-            <ul className="space-y-2.5 text-sm">
-              {[
-                { href: "/leagues", label: "Leagues" },
-                { href: "/matches", label: "Matches" },
-                { href: "/teams",   label: "Teams" },
-                { href: "/players", label: "Players" },
-                { href: "/stats",   label: "Statistics" },
-              ].map((link) => (
-                <li key={link.href}>
-                  <Link href={link.href} className="hover:text-white hover:translate-x-1 transition-all inline-flex items-center gap-1.5 group">
-                    <span className="w-1 h-1 bg-[#769FCD] rounded-full group-hover:w-2 transition-all" />
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Stats */}
-          <div>
-            <h3 className="font-semibold text-white mb-4 text-sm uppercase tracking-wider">Statistics</h3>
-            <ul className="space-y-2.5 text-sm">
-              {[
-                { href: "/stats",               label: "Leaderboards" },
-                { href: "/stats?tab=batting",   label: "Top Batters" },
-                { href: "/stats?tab=bowling",   label: "Top Bowlers" },
-                { href: "/stats?tab=allrounder",label: "All-Rounders" },
-                { href: "/stats?tab=fielding",  label: "Fielding" },
-              ].map((link) => (
-                <li key={link.href}>
-                  <Link href={link.href} className="hover:text-white hover:translate-x-1 transition-all inline-flex items-center gap-1.5 group">
-                    <span className="w-1 h-1 bg-[#769FCD] rounded-full group-hover:w-2 transition-all" />
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Account */}
-          <div>
-            <h3 className="font-semibold text-white mb-4 text-sm uppercase tracking-wider">Account</h3>
-            <ul className="space-y-2.5 text-sm">
-              {[
-                { href: "/login",    label: "Login" },
-                { href: "/register", label: "Register" },
-                { href: "/profile",  label: "My Profile" },
-                { href: "/admin",    label: "Admin Panel" },
-              ].map((link) => (
-                <li key={link.href}>
-                  <Link href={link.href} className="hover:text-white hover:translate-x-1 transition-all inline-flex items-center gap-1.5 group">
-                    <span className="w-1 h-1 bg-[#769FCD] rounded-full group-hover:w-2 transition-all" />
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-
-        {/* Stats bar */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 my-8 py-6 border-y border-[#2D5484]">
-          {[
-            { value: "100+", label: "Matches Managed" },
-            { value: "20+",  label: "Active Leagues" },
-            { value: "500+", label: "Registered Players" },
-            { value: "Live", label: "Real-time Scoring" },
-          ].map((stat) => (
-            <div key={stat.label} className="text-center">
-              <p className="text-2xl font-bold text-[#769FCD]">{stat.value}</p>
-              <p className="text-xs text-[#B9D7EA] mt-0.5">{stat.label}</p>
+          {columns.map((column) => (
+            <div key={column.title}>
+              <h3 className="text-[11px] font-black uppercase tracking-[0.22em] text-[#4ae183]">{column.title}</h3>
+              <ul className="mt-4 space-y-3 text-sm text-[#d4e3ff]">
+                {column.links.map((link) => (
+                  <li key={link.href}>
+                    <Link href={link.href} className="inline-flex items-center gap-2 font-semibold uppercase tracking-[0.12em] transition hover:text-white">
+                      <ArrowUpRight className="h-3.5 w-3.5 text-[#c8c8b0]" />
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             </div>
           ))}
         </div>
 
-        {/* Bottom bar */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#769FCD]">
-          <p>© {year} CricketLeague App. All rights reserved.</p>
-          <div className="flex items-center gap-4">
-            <Link href="#" className="hover:text-white transition-colors">Privacy Policy</Link>
-            <Link href="#" className="hover:text-white transition-colors">Terms of Service</Link>
-            <Link href="#" className="hover:text-white transition-colors">Contact</Link>
+        <div className="flex flex-col gap-3 border-t border-white/10 py-5 text-xs uppercase tracking-[0.18em] text-[#9bb2d1] sm:flex-row sm:items-center sm:justify-between">
+          <p>© {year} CricketLeague App</p>
+          <div className="flex flex-wrap items-center gap-4">
+            <span className="inline-flex items-center gap-2">
+              <Trophy className="h-4 w-4 text-[#4ae183]" />
+              League tables
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <RadioTower className="h-4 w-4 text-[#4ae183]" />
+              Live scoring
+            </span>
           </div>
         </div>
       </div>

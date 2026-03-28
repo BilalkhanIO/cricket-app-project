@@ -41,6 +41,7 @@ model League {
   description           String?
   logo                  String?
   banner                String?
+  parentLeagueId        String?
   season                String
   year                  Int
   startDate             DateTime
@@ -68,6 +69,7 @@ model League {
   noResultRule          String?
   registrationCloseDate DateTime?
   registrationOpenDate  DateTime?
+  playerRegistrationStatus String      @default("CLOSED")
   tieRule               String?
   announcements         Announcement[]
   awards                Award[]
@@ -76,8 +78,12 @@ model League {
   media                 Media[]
   pointsTable           PointsTable[]
   playerRegistrations   PlayerLeagueRegistration[]
+  parentLeague          League?        @relation("LeagueSeasons", fields: [parentLeagueId], references: [id])
+  seasons               League[]       @relation("LeagueSeasons")
   sponsors              Sponsor[]
   teams                 TeamLeague[]
+
+  @@index([parentLeagueId])
 }
 
 model Team {

@@ -1,8 +1,7 @@
 import Link from "next/link";
 import prisma from "@/lib/prisma";
 import { Card, CardBody } from "@/components/ui/Card";
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
+import PublicShell from "@/components/layout/PublicShell";
 
 export const dynamic = 'force-dynamic';
 
@@ -20,17 +19,26 @@ export default async function TeamsPage() {
   const teams = await getTeams();
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <Navbar />
-      <main className="flex-1">
-        <div className="bg-[#1B3A5C] text-white py-10">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h1 className="text-3xl font-bold mb-2">Teams</h1>
-            <p className="text-[#B9D7EA]">All cricket teams registered on the platform</p>
+    <PublicShell>
+      <section className="section-banner border-x-0 border-t-0 py-14 text-white">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-3xl">
+              <p className="text-xs uppercase tracking-[0.28em] text-[#c8c8b0]">Club Directory</p>
+              <h1 className="mt-3 text-4xl font-bold tracking-tight md:text-5xl">Teams</h1>
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-[#d6d9df] md:text-base">
+                Browse registered clubs, squad sizes, match activity, and team identities across the platform.
+              </p>
+            </div>
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/10 px-6 py-4 text-center">
+              <div className="text-3xl font-bold text-white">{teams.length}</div>
+              <div className="mt-1 text-[11px] uppercase tracking-[0.18em] text-[#c4c6cf]">Registered Teams</div>
+            </div>
           </div>
         </div>
+      </section>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {teams.length === 0 ? (
             <Card>
               <CardBody className="text-center py-16">
@@ -84,9 +92,7 @@ export default async function TeamsPage() {
               ))}
             </div>
           )}
-        </div>
-      </main>
-      <Footer />
-    </div>
+      </div>
+    </PublicShell>
   );
 }

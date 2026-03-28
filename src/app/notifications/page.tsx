@@ -3,8 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
+import PublicShell from "@/components/layout/PublicShell";
 
 interface Notification {
   id: string;
@@ -80,33 +79,30 @@ export default function NotificationsPage() {
 
   if (!session) {
     return (
-      <div className="flex flex-col min-h-screen">
-        <Navbar />
-        <main className="flex-1 flex items-center justify-center">
+      <PublicShell>
+        <div className="flex min-h-[50vh] items-center justify-center">
           <div className="text-center p-10">
             <div className="text-5xl mb-3">🔔</div>
-            <h2 className="text-xl font-bold text-[#1B3A5C] mb-2">Sign in to view notifications</h2>
-            <Link href="/login" className="text-[#769FCD] hover:underline font-medium">Login →</Link>
+            <h2 className="text-xl font-bold text-[color:var(--color-ink)] mb-2">Sign in to view notifications</h2>
+            <Link href="/login" className="text-[color:var(--primary)] hover:underline font-medium">Login →</Link>
           </div>
-        </main>
-        <Footer />
-      </div>
+        </div>
+      </PublicShell>
     );
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#F7FBFC]">
-      <Navbar />
-      <main className="flex-1">
+    <PublicShell mainClassName="bg-[#061727] text-[#d4e3ff]">
+      <div>
         {/* Header */}
-        <div className="bg-[#1B3A5C] text-white py-8">
+        <div className="section-banner py-8">
           <div className="max-w-3xl mx-auto px-4 sm:px-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#769FCD] rounded-xl flex items-center justify-center text-xl">🔔</div>
+                <div className="w-10 h-10 bg-[#06bb63] rounded-xl flex items-center justify-center text-xl text-[#00142b]">🔔</div>
                 <div>
-                  <h1 className="text-2xl font-bold">Notifications</h1>
-                  <p className="text-[#B9D7EA] text-sm mt-0.5">
+                  <h1 className="text-2xl font-bold tracking-tight">NOTIFICATIONS</h1>
+                  <p className="text-[#c4c6cf] text-sm mt-0.5 uppercase tracking-[0.18em]">
                     {unreadCount > 0 ? `${unreadCount} unread` : "All caught up!"}
                   </p>
                 </div>
@@ -114,7 +110,7 @@ export default function NotificationsPage() {
               {unreadCount > 0 && (
                 <button
                   onClick={markAllRead}
-                  className="text-sm text-[#B9D7EA] hover:text-white border border-[#2D5484] hover:border-[#769FCD] px-4 py-2 rounded-lg transition-colors"
+                  className="text-sm text-[#e4e4cc] hover:text-white border border-white/10 hover:border-[#06bb63] px-4 py-2 rounded-lg transition-colors"
                 >
                   Mark all read
                 </button>
@@ -132,8 +128,8 @@ export default function NotificationsPage() {
                 onClick={() => setFilter(f)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                   filter === f
-                    ? "bg-[#769FCD] text-white shadow-sm"
-                    : "bg-white border border-[#B9D7EA] text-[#4A7098] hover:border-[#769FCD]"
+                    ? "bg-[#06bb63] text-[#00142b] shadow-sm"
+                    : "bg-[#012040] border border-white/10 text-[#c4c6cf] hover:border-[#06bb63]"
                 }`}
               >
                 {f === "all" ? `All (${notifications.length})` : `Unread (${unreadCount})`}
@@ -144,25 +140,25 @@ export default function NotificationsPage() {
           {loading ? (
             <div className="space-y-3">
               {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="bg-white rounded-2xl border border-[#D6E6F2] p-4 animate-pulse">
+                <div key={i} className="bg-[#012040] rounded-2xl border border-white/10 p-4 animate-pulse">
                   <div className="flex gap-4">
-                    <div className="w-10 h-10 bg-[#D6E6F2] rounded-xl" />
+                    <div className="w-10 h-10 bg-[#1b3656] rounded-xl" />
                     <div className="flex-1 space-y-2">
-                      <div className="h-3 bg-[#D6E6F2] rounded w-1/2" />
-                      <div className="h-3 bg-[#D6E6F2] rounded w-3/4" />
-                      <div className="h-2 bg-[#D6E6F2] rounded w-1/4" />
+                      <div className="h-3 bg-[#1b3656] rounded w-1/2" />
+                      <div className="h-3 bg-[#1b3656] rounded w-3/4" />
+                      <div className="h-2 bg-[#1b3656] rounded w-1/4" />
                     </div>
                   </div>
                 </div>
               ))}
             </div>
           ) : visible.length === 0 ? (
-            <div className="text-center py-16 bg-white rounded-2xl border border-[#B9D7EA]">
+            <div className="text-center py-16 bg-[#012040] rounded-2xl border border-white/10">
               <div className="text-5xl mb-3">🔔</div>
-              <h3 className="text-lg font-semibold text-[#1B3A5C] mb-1">
+              <h3 className="text-lg font-semibold text-white mb-1">
                 {filter === "unread" ? "No unread notifications" : "No notifications yet"}
               </h3>
-              <p className="text-[#4A7098] text-sm">
+              <p className="text-[#c4c6cf] text-sm">
                 {filter === "unread" ? "You're all caught up!" : "Notifications will appear here as activity happens."}
               </p>
             </div>
@@ -172,39 +168,39 @@ export default function NotificationsPage() {
                 <div
                   key={notif.id}
                   onClick={() => markRead(notif.id)}
-                  className={`bg-white rounded-2xl border transition-all cursor-pointer hover:shadow-sm ${
+                  className={`bg-[#012040] rounded-2xl border transition-all cursor-pointer hover:bg-[#0e2b4b] ${
                     !notif.isRead
-                      ? "border-[#769FCD] border-l-4"
-                      : "border-[#D6E6F2]"
+                      ? "border-[#06bb63] border-l-4"
+                      : "border-white/10"
                   }`}
                 >
                   <div className="flex gap-4 p-4">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0 ${typeColor[notif.type] || "bg-[#D6E6F2] text-[#4A7098]"}`}>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0 ${typeColor[notif.type] || "bg-[#1b3656] text-[#d4e3ff]"}`}>
                       {typeIcon[notif.type] || "🔔"}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <p className={`text-sm font-semibold ${!notif.isRead ? "text-[#1B3A5C]" : "text-[#4A7098]"}`}>
+                        <p className={`text-sm font-semibold ${!notif.isRead ? "text-white" : "text-[#c4c6cf]"}`}>
                           {notif.title}
                         </p>
-                        <span className="text-[10px] text-[#B9D7EA] flex-shrink-0">{formatTime(notif.createdAt)}</span>
+                        <span className="text-[10px] text-[#8e9198] flex-shrink-0 uppercase tracking-[0.16em]">{formatTime(notif.createdAt)}</span>
                       </div>
-                      <p className="text-sm text-[#4A7098] mt-0.5 line-clamp-2">{notif.message}</p>
+                      <p className="text-sm text-[#c4c6cf] mt-0.5 line-clamp-2">{notif.message}</p>
                       <div className="flex items-center gap-3 mt-2">
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${typeColor[notif.type] || "bg-[#D6E6F2] text-[#4A7098]"}`}>
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${typeColor[notif.type] || "bg-[#1b3656] text-[#d4e3ff]"}`}>
                           {notif.type.replace(/_/g, " ")}
                         </span>
                         {notif.matchId && (
                           <Link
                             href={`/matches/${notif.matchId}`}
-                            className="text-xs text-[#769FCD] hover:underline font-medium"
+                            className="text-xs text-[#6bfe9c] hover:underline font-medium"
                             onClick={(e) => e.stopPropagation()}
                           >
                             View match →
                           </Link>
                         )}
                         {!notif.isRead && (
-                          <span className="ml-auto text-[10px] text-[#769FCD] font-semibold">• New</span>
+                          <span className="ml-auto text-[10px] text-[#6bfe9c] font-semibold uppercase tracking-[0.16em]">New</span>
                         )}
                       </div>
                     </div>
@@ -214,8 +210,7 @@ export default function NotificationsPage() {
             </div>
           )}
         </div>
-      </main>
-      <Footer />
-    </div>
+      </div>
+    </PublicShell>
   );
 }

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { canScoreMatch } from "@/lib/permissions";
+import { ROLE } from "@/lib/roles";
 
 export const dynamic = 'force-dynamic';
 
@@ -10,8 +12,9 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const canScore = ["SUPER_ADMIN", "LEAGUE_ADMIN", "SCORER"].includes(session.user.role);
-    if (!canScore) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (!canScoreMatch(session.user.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     const { inningsId, overNumber, bowlerId } = await req.json();
     if (!inningsId || !overNumber || !bowlerId) {
@@ -22,7 +25,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify SCORER is assigned to this match
-    if (session.user.role === "SCORER") {
+    if (session.user.role === ROLE.SCORER) {
       const innings = await prisma.innings.findUnique({ where: { id: inningsId }, select: { matchId: true } });
       if (!innings) return NextResponse.json({ error: "Innings not found" }, { status: 404 });
       const match = await prisma.match.findUnique({ where: { id: innings.matchId }, select: { scorerId: true } });

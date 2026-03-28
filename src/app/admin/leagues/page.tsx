@@ -18,14 +18,40 @@ async function getLeagues() {
 
 export default async function AdminLeaguesPage() {
   const leagues = await getLeagues();
+  const activeCount = leagues.filter((league) => league.status === "ACTIVE").length;
+  const registrationCount = leagues.filter((league) => league.status === "REGISTRATION").length;
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Leagues</h1>
-        <Link href="/admin/leagues/new" className="bg-[#769FCD] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#5A8BBE]">
-          + Create League
-        </Link>
+      <div className="section-banner rounded-[2rem] px-6 py-7 text-white">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-3xl">
+            <p className="text-xs uppercase tracking-[0.24em] text-[#c8c8b0]">League Operations</p>
+            <h1 className="mt-2 text-3xl font-bold tracking-tight">League Management</h1>
+            <p className="mt-2 text-sm text-[#c4c6cf]">
+              Create competitions, review registration state, and move into fixture and scoring operations from one control surface.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <div className="rounded-[1.25rem] border border-white/10 bg-white/10 px-4 py-3 text-center">
+              <div className="text-2xl font-bold">{leagues.length}</div>
+              <div className="text-[11px] uppercase tracking-[0.18em] text-[#c4c6cf]">Total</div>
+            </div>
+            <div className="rounded-[1.25rem] border border-white/10 bg-white/10 px-4 py-3 text-center">
+              <div className="text-2xl font-bold">{activeCount}</div>
+              <div className="text-[11px] uppercase tracking-[0.18em] text-[#c4c6cf]">Active</div>
+            </div>
+            <div className="rounded-[1.25rem] border border-white/10 bg-white/10 px-4 py-3 text-center">
+              <div className="text-2xl font-bold">{registrationCount}</div>
+              <div className="text-[11px] uppercase tracking-[0.18em] text-[#c4c6cf]">Open</div>
+            </div>
+          </div>
+        </div>
+        <div className="mt-5">
+          <Link href="/admin/leagues/new" className="inline-flex items-center rounded-xl bg-[#06bb63] px-4 py-2 text-sm font-semibold text-[#00142b] hover:bg-[#4ae183]">
+            + Create League
+          </Link>
+        </div>
       </div>
 
       {leagues.length === 0 ? (
@@ -33,7 +59,7 @@ export default async function AdminLeaguesPage() {
           <div className="text-center py-16">
             <div className="text-5xl mb-4">🏆</div>
             <h3 className="text-xl font-semibold text-gray-700 mb-2">No Leagues</h3>
-            <Link href="/admin/leagues/new" className="text-[#769FCD] hover:underline">Create your first league →</Link>
+            <Link href="/admin/leagues/new" className="text-[color:var(--primary)] hover:underline">Create your first league →</Link>
           </div>
         </Card>
       ) : (
@@ -43,7 +69,7 @@ export default async function AdminLeaguesPage() {
               <Card hoverable className="h-full">
                 <div className="p-5">
                   <div className="flex items-start justify-between mb-3">
-                    <div className="w-12 h-12 bg-[#D6E6F2] rounded-xl flex items-center justify-center text-2xl">🏆</div>
+                    <div className="w-12 h-12 bg-[color:var(--card-muted)] rounded-xl flex items-center justify-center text-2xl">🏆</div>
                     <StatusBadge status={league.status} />
                   </div>
                   <h3 className="font-bold text-gray-900 mb-1">{league.name}</h3>

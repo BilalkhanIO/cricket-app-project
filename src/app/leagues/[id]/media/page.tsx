@@ -2,8 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
+import PublicShell from "@/components/layout/PublicShell";
 import { Button } from "@/components/ui/Button";
 import { useSession } from "next-auth/react";
 
@@ -65,13 +64,12 @@ export default function LeagueMediaPage({ params }: { params: Promise<{ id: stri
   };
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <Navbar />
-      <main className="flex-1">
-        <div className="bg-[#1B3A5C] text-white py-10">
+    <PublicShell>
+      <div>
+        <div className="bg-[color:var(--primary-dark)] text-white py-10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-2 mb-2">
-              <Link href={`/leagues/${id}`} className="text-[#B9D7EA] text-sm hover:text-white">
+              <Link href={`/leagues/${id}`} className="text-[#9a8569] text-sm hover:text-white">
                 ← {leagueName}
               </Link>
             </div>
@@ -132,7 +130,7 @@ export default function LeagueMediaPage({ params }: { params: Promise<{ id: stri
                       />
                     </div>
                     {message && (
-                      <p className={`text-sm ${message.includes("success") ? "text-[#769FCD]" : "text-red-600"}`}>
+                      <p className={`text-sm ${message.includes("success") ? "text-[color:var(--primary)]" : "text-red-600"}`}>
                         {message}
                       </p>
                     )}
@@ -147,7 +145,7 @@ export default function LeagueMediaPage({ params }: { params: Promise<{ id: stri
 
           {loading ? (
             <div className="flex justify-center py-20">
-              <div className="animate-spin w-8 h-8 border-4 border-[#769FCD] border-t-transparent rounded-full"></div>
+              <div className="animate-spin w-8 h-8 border-4 border-[color:var(--primary)] border-t-transparent rounded-full"></div>
             </div>
           ) : media.length === 0 ? (
             <div className="text-center py-20">
@@ -184,8 +182,7 @@ export default function LeagueMediaPage({ params }: { params: Promise<{ id: stri
             </div>
           )}
         </div>
-      </main>
-      <Footer />
-    </div>
+      </div>
+    </PublicShell>
   );
 }

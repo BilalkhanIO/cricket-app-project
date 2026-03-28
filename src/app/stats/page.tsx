@@ -1,21 +1,22 @@
 import Link from "next/link";
 import prisma from "@/lib/prisma";
-import { Card, CardHeader } from "@/components/ui/Card";
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
+import PublicShell from "@/components/layout/PublicShell";
 import { OVERALL_LEAGUE_KEY } from "@/lib/constants";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
-async function getStats() {
+async function getStats(filters: { leagueId?: string; teamId?: string }) {
+  const scopeLeagueId = filters.leagueId || OVERALL_LEAGUE_KEY;
+  const playerFilter = filters.teamId ? { player: { teamId: filters.teamId } } : {};
+
   const [topBatters, topBowlers, topSixers, leagues] = await Promise.all([
     prisma.playerStats.findMany({
-      where: { leagueId: OVERALL_LEAGUE_KEY, runs: { gt: 0 } },
+      where: { leagueId: scopeLeagueId, runs: { gt: 0 }, ...playerFilter },
       include: {
         player: {
           include: {
             user: { select: { name: true } },
-            team: { select: { shortName: true, jerseyColor: true } },
+            team: { select: { id: true, shortName: true, jerseyColor: true } },
           },
         },
       },
@@ -23,12 +24,12 @@ async function getStats() {
       take: 10,
     }),
     prisma.playerStats.findMany({
-      where: { leagueId: OVERALL_LEAGUE_KEY, wickets: { gt: 0 } },
+      where: { leagueId: scopeLeagueId, wickets: { gt: 0 }, ...playerFilter },
       include: {
         player: {
           include: {
             user: { select: { name: true } },
-            team: { select: { shortName: true, jerseyColor: true } },
+            team: { select: { id: true, shortName: true, jerseyColor: true } },
           },
         },
       },
@@ -36,12 +37,12 @@ async function getStats() {
       take: 10,
     }),
     prisma.playerStats.findMany({
-      where: { leagueId: OVERALL_LEAGUE_KEY, sixes: { gt: 0 } },
+      where: { leagueId: scopeLeagueId, sixes: { gt: 0 }, ...playerFilter },
       include: {
         player: {
           include: {
             user: { select: { name: true } },
-            team: { select: { shortName: true, jerseyColor: true } },
+            team: { select: { id: true, shortName: true, jerseyColor: true } },
           },
         },
       },
@@ -57,153 +58,129 @@ async function getStats() {
   return { topBatters, topBowlers, topSixers, leagues };
 }
 
-export default async function StatsPage() {
-  const { topBatters, topBowlers, topSixers, leagues } = await getStats();
+export default async function StatsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ leagueId?: string; teamId?: string }>;
+}) {
+  const { leagueId, teamId } = await searchParams;
+  const [{ topBatters, topBowlers, topSixers, leagues }, league, team] = await Promise.all([
+    getStats({ leagueId, teamId }),
+    leagueId ? prisma.league.findUnique({ where: { id: leagueId }, select: { id: true, name: true } }) : null,
+    teamId ? prisma.team.findUnique({ where: { id: teamId }, select: { id: true, name: true } }) : null,
+  ]);
+
+  const title = team ? `${team.name} Statistics` : league ? `${league.name} Statistics` : "Statistics & Leaderboards";
+  const description = team
+    ? `Filtered player leaderboards for ${team.name}.`
+    : league
+      ? `Filtered player leaderboards for ${league.name}.`
+      : "Track the best batters, bowlers, and power hitters across the competition landscape.";
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <Navbar />
-      <main className="flex-1">
-        <div className="bg-[#1B3A5C] text-white py-10">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h1 className="text-3xl font-bold mb-2">Statistics & Leaderboards</h1>
-            <p className="text-[#B9D7EA]">Top performers across all leagues</p>
+    <PublicShell mainClassName="overflow-hidden">
+      <div className="bg-[#00142b] text-[#d4e3ff]">
+        <section className="relative overflow-hidden px-4 pb-8 pt-10 sm:px-6 lg:pb-10 lg:pt-12">
+          <div
+            className="absolute inset-0 opacity-30"
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(74,225,131,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(74,225,131,0.06) 1px, transparent 1px)",
+              backgroundSize: "40px 40px",
+            }}
+          />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(27,54,86,0.95),transparent_52%),linear-gradient(180deg,rgba(0,20,43,0.22),#00142b_76%)]" />
+
+          <div className="relative mx-auto max-w-screen-xl">
+            <div className="inline-flex items-center gap-2 bg-[#1b3656] px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-[#d4e3ff]">
+              Leaderboards
+            </div>
+            <div className="mt-6 grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-end">
+              <div className="space-y-5">
+                <h1 className="font-[var(--font-display)] text-5xl font-black uppercase tracking-tight text-white sm:text-6xl">{title}</h1>
+                <p className="max-w-2xl text-sm leading-7 text-[#9bb2d1] sm:text-base">{description}</p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 text-center">
+                {[
+                  { value: topBatters.length, label: "Batters" },
+                  { value: topBowlers.length, label: "Bowlers" },
+                  { value: topSixers.length, label: "Hitters" },
+                ].map((stat) => (
+                  <div key={stat.label} className="border border-white/10 bg-[#001c3a] px-4 py-4">
+                    <p className="font-[var(--font-display)] text-3xl font-black text-white">{stat.value}</p>
+                    <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">{stat.label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
+        </section>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Top Batters */}
-            <Card>
-              <CardHeader>
-                <h2 className="font-bold text-gray-900 flex items-center gap-2">
-                  🏏 Most Runs
-                </h2>
-              </CardHeader>
-              {topBatters.length === 0 ? (
-                <div className="px-4 py-8 text-center text-gray-400 text-sm">No data yet</div>
-              ) : (
-                <div className="divide-y divide-gray-50">
-                  {topBatters.map((stat, i) => (
-                    <Link key={stat.id} href={`/players/${stat.playerId}`}>
-                      <div className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50">
-                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${i < 3 ? "bg-yellow-400 text-white" : "bg-gray-100 text-gray-500"}`}>
-                          {i + 1}
-                        </span>
+        <div className="mx-auto max-w-screen-xl px-4 py-10 sm:px-6 lg:py-12">
+          <div className="grid gap-6 lg:grid-cols-3">
+            {[
+              { title: "Most Runs", stats: topBatters, valueKey: "runs", subKey: "average" },
+              { title: "Most Wickets", stats: topBowlers, valueKey: "wickets", subKey: "economy" },
+              { title: "Most Sixes", stats: topSixers, valueKey: "sixes", subKey: null },
+            ].map((board) => (
+              <div key={board.title} className="border border-white/10 bg-[#001c3a]">
+                <div className="border-b border-white/10 px-5 py-4">
+                  <h2 className="font-[var(--font-display)] text-2xl font-black uppercase tracking-tight text-white">{board.title}</h2>
+                </div>
+                {board.stats.length === 0 ? (
+                  <div className="px-5 py-8 text-sm text-[#9bb2d1]">No data yet.</div>
+                ) : (
+                  <div className="divide-y divide-white/10">
+                    {board.stats.map((stat, index) => (
+                      <Link key={stat.id} href={`/players/${stat.playerId}`} className="flex items-center gap-3 px-5 py-4 transition hover:bg-[#0b2747]">
+                        <span className="flex h-7 w-7 items-center justify-center bg-[#12324d] text-xs font-black text-white">{index + 1}</span>
                         <div
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                          style={{ backgroundColor: stat.player.team?.jerseyColor || "#16a34a" }}
+                          className="flex h-9 w-9 items-center justify-center text-xs font-black text-white"
+                          style={{ backgroundColor: stat.player.team?.jerseyColor || "#1b3656" }}
                         >
                           {stat.player.team?.shortName?.charAt(0) || "?"}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{stat.player.user.name}</p>
-                          <p className="text-xs text-gray-500">{stat.player.team?.shortName} · {stat.matchesPlayed}M</p>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-bold uppercase tracking-[0.08em] text-white">{stat.player.user.name}</p>
+                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
+                            {stat.player.team?.shortName || "No team"} · {stat.matchesPlayed}M
+                          </p>
                         </div>
                         <div className="text-right">
-                          <p className="font-bold text-gray-900">{stat.runs}</p>
-                          <p className="text-xs text-gray-500">avg {stat.average.toFixed(1)}</p>
+                          <p className="font-[var(--font-display)] text-2xl font-black text-white">{(stat as any)[board.valueKey]}</p>
+                          {board.subKey && (
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
+                              {board.subKey} {(stat as any)[board.subKey].toFixed(2)}
+                            </p>
+                          )}
                         </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </Card>
-
-            {/* Top Wicket Takers */}
-            <Card>
-              <CardHeader>
-                <h2 className="font-bold text-gray-900 flex items-center gap-2">
-                  🎳 Most Wickets
-                </h2>
-              </CardHeader>
-              {topBowlers.length === 0 ? (
-                <div className="px-4 py-8 text-center text-gray-400 text-sm">No data yet</div>
-              ) : (
-                <div className="divide-y divide-gray-50">
-                  {topBowlers.map((stat, i) => (
-                    <Link key={stat.id} href={`/players/${stat.playerId}`}>
-                      <div className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50">
-                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${i < 3 ? "bg-yellow-400 text-white" : "bg-gray-100 text-gray-500"}`}>
-                          {i + 1}
-                        </span>
-                        <div
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                          style={{ backgroundColor: stat.player.team?.jerseyColor || "#16a34a" }}
-                        >
-                          {stat.player.team?.shortName?.charAt(0) || "?"}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{stat.player.user.name}</p>
-                          <p className="text-xs text-gray-500">{stat.player.team?.shortName} · {stat.oversBowled.toFixed(1)} ov</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-bold text-gray-900">{stat.wickets}</p>
-                          <p className="text-xs text-gray-500">eco {stat.economy.toFixed(2)}</p>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </Card>
-
-            {/* Most Sixes */}
-            <Card>
-              <CardHeader>
-                <h2 className="font-bold text-gray-900 flex items-center gap-2">
-                  💥 Most Sixes
-                </h2>
-              </CardHeader>
-              {topSixers.length === 0 ? (
-                <div className="px-4 py-8 text-center text-gray-400 text-sm">No data yet</div>
-              ) : (
-                <div className="divide-y divide-gray-50">
-                  {topSixers.map((stat, i) => (
-                    <Link key={stat.id} href={`/players/${stat.playerId}`}>
-                      <div className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50">
-                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${i < 3 ? "bg-yellow-400 text-white" : "bg-gray-100 text-gray-500"}`}>
-                          {i + 1}
-                        </span>
-                        <div
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                          style={{ backgroundColor: stat.player.team?.jerseyColor || "#16a34a" }}
-                        >
-                          {stat.player.team?.shortName?.charAt(0) || "?"}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{stat.player.user.name}</p>
-                          <p className="text-xs text-gray-500">{stat.player.team?.shortName}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-bold text-gray-900">{stat.sixes}</p>
-                          <p className="text-xs text-gray-500">sixes</p>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </Card>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
 
-          {/* League Points Tables */}
-          {leagues.length > 0 && (
-            <div className="mt-8 space-y-6">
-              <h2 className="text-2xl font-bold text-gray-900">League Standings</h2>
-              {leagues.map((league) => (
-                <div key={league.id}>
-                  <Link href={`/leagues/${league.id}`} className="text-[#1B3A5C] hover:text-[#1B3A5C] font-semibold text-lg mb-2 block">
-                    {league.name} →
+          {!teamId && leagues.length > 0 && (
+            <div className="mt-10 space-y-4">
+              <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
+                Active
+                <span className="block text-[#4ae183]">league boards</span>
+              </h2>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {leagues.map((league) => (
+                  <Link key={league.id} href={`/stats?leagueId=${league.id}`} className="border border-white/10 bg-[#001c3a] px-5 py-5 transition hover:bg-[#0b2747]">
+                    <p className="font-[var(--font-display)] text-2xl font-black uppercase tracking-tight text-white">{league.name}</p>
+                    <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">Open league-specific stats</p>
                   </Link>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
         </div>
-      </main>
-      <Footer />
-    </div>
+      </div>
+    </PublicShell>
   );
 }

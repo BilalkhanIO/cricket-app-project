@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { canEditLeague } from "@/lib/permissions";
+import { ROLE } from "@/lib/roles";
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +13,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const league = await prisma.league.findUnique({
       where: { id },
       include: {
+        parentLeague: { select: { id: true, name: true, season: true, year: true } },
+        seasons: {
+          select: { id: true, name: true, season: true, year: true, status: true },
+          orderBy: [{ year: "desc" }, { createdAt: "desc" }],
+        },
         admin: { select: { id: true, name: true, email: true } },
         teams: {
           include: {
@@ -72,8 +79,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!league) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const canEdit =
-      session.user.role === "SUPER_ADMIN" ||
-      (session.user.role === "LEAGUE_ADMIN" && league.adminId === session.user.id);
+      canEditLeague(session.user.role) &&
+      (session.user.role === ROLE.SUPER_ADMIN ||
+        session.user.role === ROLE.LEAGUE_STAFF ||
+        (session.user.role === ROLE.LEAGUE_ADMIN && league.adminId === session.user.id));
     if (!canEdit) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const data = await req.json();
@@ -81,6 +90,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const nextEndDate = data.endDate ? new Date(data.endDate) : league.endDate;
     const nextOvers = Number(data.oversPerInnings ?? league.oversPerInnings);
     const nextPowerplay = Number(data.powerplayOvers ?? league.powerplayOvers);
+    const nextPlayerRegistrationStatus =
+      data.playerRegistrationStatus ?? league.playerRegistrationStatus;
 
     if (Number.isNaN(nextStartDate.getTime()) || Number.isNaN(nextEndDate.getTime())) {
       return NextResponse.json({ error: "Invalid start/end date" }, { status: 400 });
@@ -92,12 +103,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: "Invalid overs configuration" }, { status: 400 });
     }
 
-    const nextRegistrationOpen = data.registrationOpenDate
-      ? new Date(data.registrationOpenDate)
-      : league.registrationOpenDate;
-    const nextRegistrationClose = data.registrationCloseDate
-      ? new Date(data.registrationCloseDate)
-      : league.registrationCloseDate;
+    const nextRegistrationOpen =
+      "registrationOpenDate" in data
+        ? data.registrationOpenDate
+          ? new Date(data.registrationOpenDate)
+          : null
+        : league.registrationOpenDate;
+    const nextRegistrationClose =
+      "registrationCloseDate" in data
+        ? data.registrationCloseDate
+          ? new Date(data.registrationCloseDate)
+          : null
+        : league.registrationCloseDate;
 
     if (
       nextRegistrationOpen &&
@@ -115,15 +132,43 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         { status: 400 }
       );
     }
+    if (!["OPEN", "CLOSED"].includes(nextPlayerRegistrationStatus)) {
+      return NextResponse.json(
+        { error: "Invalid player registration status" },
+        { status: 400 }
+      );
+    }
+
+    let nextParentLeagueId = league.parentLeagueId;
+    if ("parentLeagueId" in data) {
+      nextParentLeagueId = data.parentLeagueId || null;
+      if (nextParentLeagueId === id) {
+        return NextResponse.json(
+          { error: "A league season cannot be its own parent" },
+          { status: 400 }
+        );
+      }
+      if (nextParentLeagueId) {
+        const parentLeague = await prisma.league.findUnique({
+          where: { id: nextParentLeagueId },
+          select: { id: true },
+        });
+        if (!parentLeague) {
+          return NextResponse.json({ error: "Parent league not found" }, { status: 404 });
+        }
+      }
+    }
 
     const updated = await prisma.league.update({
       where: { id },
       data: {
         ...data,
+        parentLeagueId: nextParentLeagueId,
+        playerRegistrationStatus: nextPlayerRegistrationStatus,
         ...(data.startDate && { startDate: new Date(data.startDate) }),
         ...(data.endDate && { endDate: new Date(data.endDate) }),
-        ...(data.registrationOpenDate && { registrationOpenDate: new Date(data.registrationOpenDate) }),
-        ...(data.registrationCloseDate && { registrationCloseDate: new Date(data.registrationCloseDate) }),
+        ...("registrationOpenDate" in data && { registrationOpenDate: nextRegistrationOpen }),
+        ...("registrationCloseDate" in data && { registrationCloseDate: nextRegistrationClose }),
       },
     });
 

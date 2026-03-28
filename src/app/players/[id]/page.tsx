@@ -1,19 +1,28 @@
-import { notFound } from "next/navigation";
 import Link from "next/link";
+import { notFound } from "next/navigation";
+import { CalendarDays, ShieldCheck, Trophy, Users } from "lucide-react";
 import prisma from "@/lib/prisma";
-import { Card, CardBody, CardHeader } from "@/components/ui/Card";
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
+import PublicShell from "@/components/layout/PublicShell";
 import PlayerStatsCharts from "./PlayerStatsCharts";
 import { OVERALL_LEAGUE_KEY } from "@/lib/constants";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 async function getPlayer(id: string) {
   return prisma.player.findUnique({
     where: { id },
     include: {
-      user: { select: { name: true, email: true, profileImage: true, city: true, dateOfBirth: true, battingStyle: true, bowlingStyle: true } },
+      user: {
+        select: {
+          name: true,
+          email: true,
+          profileImage: true,
+          city: true,
+          dateOfBirth: true,
+          battingStyle: true,
+          bowlingStyle: true,
+        },
+      },
       team: { select: { id: true, name: true, shortName: true, jerseyColor: true } },
       playerStats: { orderBy: { updatedAt: "desc" } },
       battingScores: {
@@ -24,7 +33,7 @@ async function getPlayer(id: string) {
                 include: {
                   homeTeam: { select: { shortName: true } },
                   awayTeam: { select: { shortName: true } },
-                  league: { select: { name: true } },
+                  league: { select: { id: true, name: true } },
                 },
               },
             },
@@ -41,6 +50,7 @@ async function getPlayer(id: string) {
                 include: {
                   homeTeam: { select: { shortName: true } },
                   awayTeam: { select: { shortName: true } },
+                  league: { select: { id: true, name: true } },
                 },
               },
             },
@@ -65,7 +75,11 @@ async function getLeagueNames(leagueIds: string[]) {
     where: { id: { in: leagueIds } },
     select: { id: true, name: true },
   });
-  return new Map(leagues.map((l) => [l.id, l.name]));
+  return new Map(leagues.map((league) => [league.id, league.name]));
+}
+
+function formatLabel(value: string) {
+  return value.replace(/_/g, " ");
 }
 
 export default async function PlayerDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -73,325 +87,377 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
   const player = await getPlayer(id);
   if (!player) notFound();
 
-  const careerStats =
-    player.playerStats.find((s) => s.leagueId === OVERALL_LEAGUE_KEY) || player.playerStats[0];
-  const leagueStats = player.playerStats.filter(
-    (s) => s.leagueId && s.leagueId !== OVERALL_LEAGUE_KEY
-  );
-  const leagueNames = await getLeagueNames(
-    Array.from(new Set(leagueStats.map((s) => s.leagueId!).filter(Boolean)))
-  );
+  const careerStats = player.playerStats.find((stats) => stats.leagueId === OVERALL_LEAGUE_KEY) || player.playerStats[0];
+  const leagueStats = player.playerStats.filter((stats) => stats.leagueId && stats.leagueId !== OVERALL_LEAGUE_KEY);
+  const leagueNames = await getLeagueNames(Array.from(new Set(leagueStats.map((stats) => stats.leagueId!).filter(Boolean))));
 
-  // Prepare chart data
-  const battingChartData = player.battingScores.slice().reverse().map((bat, i) => ({
-    match: `M${i + 1}`,
+  const battingChartData = player.battingScores.slice().reverse().map((bat, index) => ({
+    match: `M${index + 1}`,
     runs: bat.runs,
   }));
-  const bowlingChartData = player.bowlingScores.slice().reverse().map((bowl, i) => ({
-    match: `M${i + 1}`,
+  const bowlingChartData = player.bowlingScores.slice().reverse().map((bowl, index) => ({
+    match: `M${index + 1}`,
     wickets: bowl.wickets,
   }));
 
+  const sections = [
+    { id: "overview", label: "Overview" },
+    { id: "career", label: "Career" },
+    { id: "league-stats", label: "Leagues" },
+    { id: "recent", label: "Recent Form" },
+  ];
+
   return (
-    <div className="flex flex-col min-h-screen">
-      <Navbar />
-      <main className="flex-1">
-        {/* Player Header */}
-        <div className="bg-gradient-to-br from-[#1B3A5C] to-[#2D5484] text-white py-10">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
-              {player.user.profileImage ? (
-                <img
-                  src={player.user.profileImage}
-                  alt={player.user.name}
-                  className="w-20 h-20 rounded-full object-cover border-4 border-white/30"
-                />
-              ) : (
-                <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center text-3xl font-bold">
-                  {player.user.name.charAt(0)}
-                </div>
-              )}
-              <div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h1 className="text-3xl font-bold">{player.user.name}</h1>
-                  {player.isCaptain && <span className="bg-yellow-400/20 border border-yellow-300 text-yellow-200 text-xs px-2 py-1 rounded">Captain</span>}
-                  {player.isViceCaptain && <span className="bg-blue-400/20 border border-blue-300 text-blue-200 text-xs px-2 py-1 rounded">Vice Captain</span>}
-                  {player.isWicketkeeper && <span className="bg-purple-400/20 border border-purple-300 text-purple-200 text-xs px-2 py-1 rounded">Wicketkeeper</span>}
-                </div>
-                <div className="flex flex-wrap gap-4 mt-2 text-sm text-white/80">
-                  <span>🎯 {player.role.replace("_", " ")}</span>
-                  <span>🏏 {player.battingHand} hand bat</span>
-                  {player.bowlingType && <span>🎳 {player.bowlingType.replace(/_/g, " ")}</span>}
-                  {player.age && <span>📅 Age {player.age}</span>}
-                  {player.user.city && <span>📍 {player.user.city}</span>}
-                  {player.jerseyNumber && <span>👕 #{player.jerseyNumber}</span>}
-                </div>
-                {player.team && (
-                  <Link href={`/teams/${player.team.id}`}>
-                    <div
-                      className="inline-flex items-center gap-2 mt-3 px-3 py-1.5 rounded-lg text-white text-sm"
-                      style={{ backgroundColor: "rgba(255,255,255,0.2)" }}
-                    >
-                      <div
-                        className="w-4 h-4 rounded-full"
-                        style={{ backgroundColor: player.team.jerseyColor || "#16a34a" }}
-                      />
-                      {player.team.name}
+    <PublicShell mainClassName="overflow-hidden">
+      <div className="bg-[#00142b] text-[#d4e3ff]">
+        <section className="relative overflow-hidden px-4 pb-8 pt-10 sm:px-6 lg:pb-10 lg:pt-12">
+          <div
+            className="absolute inset-0 opacity-30"
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(74,225,131,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(74,225,131,0.06) 1px, transparent 1px)",
+              backgroundSize: "40px 40px",
+            }}
+          />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(27,54,86,0.95),transparent_52%),linear-gradient(180deg,rgba(0,20,43,0.22),#00142b_76%)]" />
+
+          <div className="relative mx-auto max-w-screen-xl">
+            <div className="inline-flex items-center gap-2 bg-[#1b3656] px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-[#d4e3ff]">
+              Player hub
+            </div>
+
+            <div className="mt-6 grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-end">
+              <div className="space-y-5">
+                <div className="flex items-center gap-4">
+                  {player.user.profileImage ? (
+                    <img src={player.user.profileImage} alt={player.user.name} className="h-20 w-20 rounded-full object-cover border border-white/20" />
+                  ) : (
+                    <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#1b3656] text-3xl font-black text-white">
+                      {player.user.name.charAt(0)}
                     </div>
+                  )}
+                  <div>
+                    <h1 className="font-[var(--font-display)] text-5xl font-black uppercase tracking-tight text-white sm:text-6xl">
+                      {player.user.name}
+                    </h1>
+                    <p className="mt-2 text-sm font-bold uppercase tracking-[0.18em] text-[#c8c8b0]">
+                      {formatLabel(player.role)} · {player.battingHand} bat
+                      {player.bowlingType ? ` · ${formatLabel(player.bowlingType)}` : ""}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {player.isCaptain && <span className="bg-[#c8c8b0] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#303221]">Captain</span>}
+                  {player.isViceCaptain && <span className="bg-[#12324d] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#d4e3ff]">Vice captain</span>}
+                  {player.isWicketkeeper && <span className="bg-[#1b3656] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-white">Wicketkeeper</span>}
+                  {player.jerseyNumber && <span className="bg-[#12324d] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#d4e3ff]">#{player.jerseyNumber}</span>}
+                </div>
+
+                <p className="max-w-2xl text-sm leading-7 text-[#9bb2d1]">
+                  Public player profile with overall career numbers, league-by-league production, recent batting and bowling returns, awards, and team context.
+                </p>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {player.team ? (
+                    <Link
+                      href={`/teams/${player.team.id}`}
+                      className="bg-[#4ae183] px-6 py-4 text-center text-sm font-black uppercase tracking-[0.22em] text-[#003919] transition hover:bg-[#6bfe9c]"
+                    >
+                      Open team
+                    </Link>
+                  ) : (
+                    <div className="bg-[#12324d] px-6 py-4 text-center text-sm font-black uppercase tracking-[0.22em] text-[#d4e3ff]">
+                      Free agent
+                    </div>
+                  )}
+                  <Link
+                    href="/stats"
+                    className="bg-[#1b3656] px-6 py-4 text-center text-sm font-black uppercase tracking-[0.22em] text-white transition hover:bg-[#234669]"
+                  >
+                    Open leaderboards
                   </Link>
-                )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[
+                  { value: careerStats?.matchesPlayed || 0, label: "Matches" },
+                  { value: careerStats?.runs || 0, label: "Runs" },
+                  { value: careerStats?.wickets || 0, label: "Wickets" },
+                  { value: player.awards.length, label: "Awards" },
+                ].map((stat) => (
+                  <div key={stat.label} className="border border-white/10 bg-[#001c3a] px-4 py-4">
+                    <p className="font-[var(--font-display)] text-3xl font-black text-white">{stat.value}</p>
+                    <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">{stat.label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="border border-white/10 bg-[#001c3a] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#7f9abd]">City</p>
+                <p className="mt-2 text-sm font-bold uppercase tracking-[0.14em] text-white">{player.user.city || "Not listed"}</p>
+              </div>
+              <div className="border border-white/10 bg-[#001c3a] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#7f9abd]">Team</p>
+                <p className="mt-2 text-sm font-bold uppercase tracking-[0.14em] text-white">{player.team?.name || "Unassigned"}</p>
+              </div>
+              <div className="border border-white/10 bg-[#001c3a] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#7f9abd]">Batting style</p>
+                <p className="mt-2 text-sm font-bold uppercase tracking-[0.14em] text-white">{player.user.battingStyle || player.battingHand}</p>
+              </div>
+              <div className="border border-white/10 bg-[#001c3a] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#7f9abd]">Bowling style</p>
+                <p className="mt-2 text-sm font-bold uppercase tracking-[0.14em] text-white">
+                  {player.user.bowlingStyle || player.bowlingType || "Not listed"}
+                </p>
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-          {/* Career Stats */}
-          {careerStats && (
-            <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Career Statistics</h2>
+        <section className="sticky top-[72px] z-30 border-y border-white/10 bg-[rgba(0,20,43,0.94)] px-4 py-3 backdrop-blur-xl sm:px-6">
+          <div className="mx-auto flex max-w-screen-xl gap-2 overflow-x-auto">
+            {sections.map((section) => (
+              <a key={section.id} href={`#${section.id}`} className="whitespace-nowrap bg-[#001c3a] px-4 py-3 text-xs font-black uppercase tracking-[0.18em] text-[#d4e3ff] transition hover:bg-[#0b2747]">
+                {section.label}
+              </a>
+            ))}
+          </div>
+        </section>
 
-              {/* Summary Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 mb-4">
+        <div className="mx-auto max-w-screen-xl px-4 py-10 sm:px-6 lg:py-12">
+          <section id="overview" className="grid gap-6 lg:grid-cols-[1.02fr_0.98fr]">
+            <div className="space-y-4">
+              <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
+                Player
+                <span className="block text-[#4ae183]">overview</span>
+              </h2>
+              <div className="grid gap-3 sm:grid-cols-2">
                 {[
-                  { label: "Matches", value: careerStats.matchesPlayed, color: "bg-blue-50 border-blue-100" },
-                  { label: "Runs", value: careerStats.runs, color: "bg-[#F7FBFC] border-[#D6E6F2]" },
-                  { label: "Average", value: careerStats.average.toFixed(1), color: "bg-yellow-50 border-yellow-100" },
-                  { label: "Strike Rate", value: careerStats.strikeRate.toFixed(1), color: "bg-orange-50 border-orange-100" },
-                  { label: "Wickets", value: careerStats.wickets, color: "bg-red-50 border-red-100" },
-                  { label: "Economy", value: careerStats.economy.toFixed(2), color: "bg-purple-50 border-purple-100" },
-                ].map((s) => (
-                  <div key={s.label} className={`border rounded-xl p-3 text-center ${s.color}`}>
-                    <div className="text-2xl font-bold text-gray-900">{s.value}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">{s.label}</div>
+                  { icon: Trophy, label: "Best score", value: `${careerStats?.highestScore || 0}` },
+                  { icon: ShieldCheck, label: "Best bowling", value: careerStats?.bestBowling || "-" },
+                  { icon: Users, label: "Strike rate", value: `${careerStats?.strikeRate.toFixed(1) || "0.0"}` },
+                  { icon: CalendarDays, label: "Bowling economy", value: `${careerStats?.economy.toFixed(2) || "0.00"}` },
+                ].map((item) => (
+                  <div key={item.label} className="border border-white/10 bg-[#001c3a] p-5">
+                    <item.icon className="h-5 w-5 text-[#4ae183]" />
+                    <p className="mt-4 text-[10px] font-black uppercase tracking-[0.22em] text-[#7f9abd]">{item.label}</p>
+                    <p className="mt-2 text-sm font-bold uppercase tracking-[0.14em] text-white">{item.value}</p>
                   </div>
                 ))}
               </div>
+            </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader>
-                    <h3 className="font-semibold text-gray-900">🏏 Batting</h3>
-                  </CardHeader>
-                  <CardBody>
-                    <div className="grid grid-cols-3 gap-3 text-center">
-                      {[
-                        { label: "Matches", value: careerStats.matchesPlayed },
-                        { label: "Innings", value: careerStats.innings },
-                        { label: "Runs", value: careerStats.runs },
-                        { label: "HS", value: careerStats.highestScore },
-                        { label: "Not Outs", value: careerStats.notOuts },
-                        { label: "Average", value: careerStats.average.toFixed(1) },
-                        { label: "SR", value: careerStats.strikeRate.toFixed(1) },
-                        { label: "Fours", value: careerStats.fours },
-                        { label: "Sixes", value: careerStats.sixes },
-                        { label: "Balls", value: careerStats.ballsFaced },
-                      ].map((s) => (
-                        <div key={s.label} className="bg-gray-50 rounded-xl p-3">
-                          <div className="text-xl font-bold text-gray-900">{s.value}</div>
-                          <div className="text-xs text-gray-500">{s.label}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardBody>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <h3 className="font-semibold text-gray-900">🎳 Bowling & Fielding</h3>
-                  </CardHeader>
-                  <CardBody>
-                    <div className="grid grid-cols-3 gap-3 text-center">
-                      {[
-                        { label: "Wickets", value: careerStats.wickets },
-                        { label: "Overs", value: careerStats.oversBowled.toFixed(1) },
-                        { label: "Economy", value: careerStats.economy.toFixed(2) },
-                        { label: "Bowl Avg", value: careerStats.bowlingAverage.toFixed(2) },
-                        { label: "Bowl SR", value: careerStats.bowlingStrikeRate.toFixed(2) },
-                        { label: "Maidens", value: careerStats.maidens },
-                        { label: "Runs Conc.", value: careerStats.runsConceded },
-                        { label: "Best", value: careerStats.bestBowling || "-" },
-                        { label: "Catches", value: careerStats.catches },
-                        { label: "Stumpings", value: careerStats.stumpings },
-                        { label: "Run Outs", value: careerStats.runOuts },
-                      ].map((s) => (
-                        <div key={s.label} className="bg-gray-50 rounded-xl p-3">
-                          <div className="text-xl font-bold text-gray-900">{s.value}</div>
-                          <div className="text-xs text-gray-500">{s.label}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardBody>
-                </Card>
-              </div>
-            </section>
-          )}
-
-          {leagueStats.length > 0 && (
-            <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">League-wise Statistics</h2>
-              <Card>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-gray-50 border-b">
-                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">League</th>
-                        <th className="px-3 py-3 text-xs font-medium text-gray-500">M</th>
-                        <th className="px-3 py-3 text-xs font-medium text-gray-500">R</th>
-                        <th className="px-3 py-3 text-xs font-medium text-gray-500">Avg</th>
-                        <th className="px-3 py-3 text-xs font-medium text-gray-500">SR</th>
-                        <th className="px-3 py-3 text-xs font-medium text-gray-500">W</th>
-                        <th className="px-3 py-3 text-xs font-medium text-gray-500">Eco</th>
-                        <th className="px-3 py-3 text-xs font-medium text-gray-500">B Avg</th>
-                        <th className="px-3 py-3 text-xs font-medium text-gray-500">B SR</th>
-                        <th className="px-3 py-3 text-xs font-medium text-gray-500">Best</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {leagueStats
-                        .slice()
-                        .sort((a, b) => b.runs - a.runs || b.wickets - a.wickets)
-                        .map((s) => (
-                          <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50">
-                            <td className="px-4 py-2 text-xs font-medium text-gray-800">
-                              {leagueNames.get(s.leagueId || "") || "Unknown League"}
-                            </td>
-                            <td className="px-3 py-2 text-center">{s.matchesPlayed}</td>
-                            <td className="px-3 py-2 text-center">{s.runs}</td>
-                            <td className="px-3 py-2 text-center">{s.average.toFixed(2)}</td>
-                            <td className="px-3 py-2 text-center">{s.strikeRate.toFixed(2)}</td>
-                            <td className="px-3 py-2 text-center">{s.wickets}</td>
-                            <td className="px-3 py-2 text-center">{s.economy.toFixed(2)}</td>
-                            <td className="px-3 py-2 text-center">{s.bowlingAverage.toFixed(2)}</td>
-                            <td className="px-3 py-2 text-center">{s.bowlingStrikeRate.toFixed(2)}</td>
-                            <td className="px-3 py-2 text-center">{s.bestBowling || "-"}</td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
+            <div className="space-y-4">
+              <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
+                Awards
+                <span className="block text-[#c8c8b0]">and honours</span>
+              </h2>
+              {player.awards.length === 0 ? (
+                <div className="border border-white/10 bg-[#001c3a] p-6 text-sm text-[#9bb2d1]">
+                  No public awards are listed for this player yet.
                 </div>
-              </Card>
-            </section>
-          )}
-
-          {/* Charts */}
-          {(battingChartData.length > 1 || bowlingChartData.length > 1) && (
-            <PlayerStatsCharts battingData={battingChartData} bowlingData={bowlingChartData} />
-          )}
-
-          {/* Awards */}
-          {player.awards.length > 0 && (
-            <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Awards & Recognition</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {player.awards.map((award) => (
-                  <div key={award.id} className="flex items-center gap-3 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl p-3">
-                    <div className="text-2xl">
-                      {award.awardType === "MAN_OF_MATCH" ? "🏅" :
-                       award.awardType === "BEST_BATSMAN" ? "🏏" :
-                       award.awardType === "BEST_BOWLER" ? "🎳" :
-                       award.awardType === "PLAYER_OF_TOURNAMENT" ? "🏆" : "⭐"}
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">{award.awardType.replace(/_/g, " ")}</p>
-                      <Link href={`/leagues/${award.league.id}`} className="text-xs text-[#769FCD] hover:underline">
+              ) : (
+                <div className="grid gap-4">
+                  {player.awards.map((award) => (
+                    <div key={award.id} className="border border-white/10 bg-[#001c3a] p-5">
+                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#c8c8b0]">{formatLabel(award.awardType)}</p>
+                      <Link href={`/leagues/${award.league.id}`} className="mt-2 block font-[var(--font-display)] text-2xl font-black uppercase tracking-tight text-white">
                         {award.league.name}
                       </Link>
                     </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+
+          {careerStats && (
+            <section id="career" className="mt-14">
+              <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
+                Career
+                <span className="block text-[#4ae183]">numbers</span>
+              </h2>
+
+              <div className="mt-6 grid gap-6 lg:grid-cols-2">
+                <div className="border border-white/10 bg-[#001c3a] p-5">
+                  <h3 className="font-[var(--font-display)] text-2xl font-black uppercase tracking-tight text-white">Batting</h3>
+                  <div className="mt-5 grid grid-cols-3 gap-3">
+                    {[
+                      { label: "Matches", value: careerStats.matchesPlayed },
+                      { label: "Innings", value: careerStats.innings },
+                      { label: "Runs", value: careerStats.runs },
+                      { label: "Average", value: careerStats.average.toFixed(1) },
+                      { label: "Strike rate", value: careerStats.strikeRate.toFixed(1) },
+                      { label: "Highest", value: careerStats.highestScore },
+                      { label: "Fours", value: careerStats.fours },
+                      { label: "Sixes", value: careerStats.sixes },
+                      { label: "Not outs", value: careerStats.notOuts },
+                    ].map((item) => (
+                      <div key={item.label} className="border border-white/10 bg-[#00142b] px-3 py-3">
+                        <p className="font-[var(--font-display)] text-2xl font-black text-white">{item.value}</p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">{item.label}</p>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </div>
+
+                <div className="border border-white/10 bg-[#001c3a] p-5">
+                  <h3 className="font-[var(--font-display)] text-2xl font-black uppercase tracking-tight text-white">Bowling and fielding</h3>
+                  <div className="mt-5 grid grid-cols-3 gap-3">
+                    {[
+                      { label: "Wickets", value: careerStats.wickets },
+                      { label: "Overs", value: careerStats.oversBowled.toFixed(1) },
+                      { label: "Economy", value: careerStats.economy.toFixed(2) },
+                      { label: "Bowl avg", value: careerStats.bowlingAverage.toFixed(2) },
+                      { label: "Bowl SR", value: careerStats.bowlingStrikeRate.toFixed(2) },
+                      { label: "Maidens", value: careerStats.maidens },
+                      { label: "Catches", value: careerStats.catches },
+                      { label: "Run outs", value: careerStats.runOuts },
+                      { label: "Stumpings", value: careerStats.stumpings },
+                    ].map((item) => (
+                      <div key={item.label} className="border border-white/10 bg-[#00142b] px-3 py-3">
+                        <p className="font-[var(--font-display)] text-2xl font-black text-white">{item.value}</p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">{item.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
+
+              {(battingChartData.length > 1 || bowlingChartData.length > 1) && (
+                <div className="mt-6">
+                  <PlayerStatsCharts battingData={battingChartData} bowlingData={bowlingChartData} />
+                </div>
+              )}
             </section>
           )}
 
-          {/* Recent Batting */}
-          {player.battingScores.length > 0 && (
-            <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Recent Batting</h2>
-              <Card>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-gray-50 border-b">
-                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Match</th>
-                        <th className="px-3 py-3 text-xs font-medium text-gray-500">R</th>
-                        <th className="px-3 py-3 text-xs font-medium text-gray-500">B</th>
-                        <th className="px-3 py-3 text-xs font-medium text-gray-500">4s</th>
-                        <th className="px-3 py-3 text-xs font-medium text-gray-500">6s</th>
-                        <th className="px-3 py-3 text-xs font-medium text-gray-500">SR</th>
-                        <th className="px-3 py-3 text-xs font-medium text-gray-500">Dismissal</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {player.battingScores.map((bat) => (
-                        <tr key={bat.id} className="border-b border-gray-50 hover:bg-gray-50">
-                          <td className="px-4 py-2 text-xs">
-                            <Link href={`/matches/${bat.innings.matchId}`} className="text-[#769FCD] hover:underline">
-                              {bat.innings.match.homeTeam.shortName} vs {bat.innings.match.awayTeam.shortName}
-                            </Link>
-                          </td>
-                          <td className="px-3 py-2 text-center font-bold">{bat.runs}</td>
-                          <td className="px-3 py-2 text-center text-gray-600">{bat.balls}</td>
-                          <td className="px-3 py-2 text-center text-gray-600">{bat.fours}</td>
-                          <td className="px-3 py-2 text-center text-gray-600">{bat.sixes}</td>
-                          <td className="px-3 py-2 text-center text-gray-600">
-                            {bat.balls > 0 ? ((bat.runs / bat.balls) * 100).toFixed(1) : "-"}
-                          </td>
-                          <td className="px-3 py-2 text-center text-xs text-gray-500">
-                            {bat.isOut ? bat.wicketType?.replace("_", " ").toLowerCase() : "not out"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
-            </section>
-          )}
+          <section id="league-stats" className="mt-14">
+            <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
+              League
+              <span className="block text-[#c8c8b0]">breakdown</span>
+            </h2>
 
-          {/* Recent Bowling */}
-          {player.bowlingScores.length > 0 && (
-            <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Recent Bowling</h2>
-              <Card>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-gray-50 border-b">
-                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Match</th>
-                        <th className="px-3 py-3 text-xs font-medium text-gray-500">O</th>
-                        <th className="px-3 py-3 text-xs font-medium text-gray-500">M</th>
-                        <th className="px-3 py-3 text-xs font-medium text-gray-500">R</th>
-                        <th className="px-3 py-3 text-xs font-medium text-gray-500">W</th>
-                        <th className="px-3 py-3 text-xs font-medium text-gray-500">Eco</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {player.bowlingScores.map((bowl) => (
-                        <tr key={bowl.id} className="border-b border-gray-50 hover:bg-gray-50">
-                          <td className="px-4 py-2 text-xs">
-                            <Link href={`/matches/${bowl.innings.matchId}`} className="text-[#769FCD] hover:underline">
-                              {bowl.innings.match.homeTeam.shortName} vs {bowl.innings.match.awayTeam.shortName}
-                            </Link>
+            {leagueStats.length === 0 ? (
+              <div className="mt-6 border border-white/10 bg-[#001c3a] p-6 text-sm text-[#9bb2d1]">
+                League-by-league stats are not available yet.
+              </div>
+            ) : (
+              <div className="mt-6 overflow-x-auto border border-white/10 bg-[#001c3a]">
+                <table className="min-w-full text-sm">
+                  <thead className="border-b border-white/10 bg-[#00142b] text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
+                    <tr>
+                      <th className="px-4 py-4 text-left">League</th>
+                      <th className="px-3 py-4 text-center">M</th>
+                      <th className="px-3 py-4 text-center">Runs</th>
+                      <th className="px-3 py-4 text-center">Avg</th>
+                      <th className="px-3 py-4 text-center">SR</th>
+                      <th className="px-3 py-4 text-center">W</th>
+                      <th className="px-3 py-4 text-center">Eco</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {leagueStats
+                      .slice()
+                      .sort((a, b) => b.runs - a.runs || b.wickets - a.wickets)
+                      .map((stats) => (
+                        <tr key={stats.id} className="border-b border-white/10 last:border-b-0">
+                          <td className="px-4 py-4 font-bold uppercase tracking-[0.06em] text-white">
+                            {leagueNames.get(stats.leagueId || "") || "Unknown league"}
                           </td>
-                          <td className="px-3 py-2 text-center text-gray-600">{bowl.overs.toFixed(1)}</td>
-                          <td className="px-3 py-2 text-center text-gray-600">{bowl.maidens}</td>
-                          <td className="px-3 py-2 text-center text-gray-600">{bowl.runs}</td>
-                          <td className="px-3 py-2 text-center font-bold">{bowl.wickets}</td>
-                          <td className="px-3 py-2 text-center text-gray-600">
-                            {bowl.overs > 0 ? (bowl.runs / bowl.overs).toFixed(2) : "-"}
-                          </td>
+                          <td className="px-3 py-4 text-center text-[#d4e3ff]">{stats.matchesPlayed}</td>
+                          <td className="px-3 py-4 text-center font-black text-white">{stats.runs}</td>
+                          <td className="px-3 py-4 text-center text-[#d4e3ff]">{stats.average.toFixed(2)}</td>
+                          <td className="px-3 py-4 text-center text-[#d4e3ff]">{stats.strikeRate.toFixed(2)}</td>
+                          <td className="px-3 py-4 text-center font-black text-white">{stats.wickets}</td>
+                          <td className="px-3 py-4 text-center text-[#d4e3ff]">{stats.economy.toFixed(2)}</td>
                         </tr>
                       ))}
-                    </tbody>
-                  </table>
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <section id="recent" className="mt-14 grid gap-6 lg:grid-cols-2">
+            <div className="space-y-4">
+              <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
+                Recent
+                <span className="block text-[#4ae183]">batting</span>
+              </h2>
+              {player.battingScores.length === 0 ? (
+                <div className="border border-white/10 bg-[#001c3a] p-6 text-sm text-[#9bb2d1]">No recent batting entries.</div>
+              ) : (
+                <div className="grid gap-4">
+                  {player.battingScores.map((bat) => (
+                    <Link key={bat.id} href={`/matches/${bat.innings.matchId}`} className="block border border-white/10 bg-[#001c3a] p-5 transition hover:bg-[#0b2747]">
+                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7f9abd]">
+                        {bat.innings.match.league.name}
+                      </p>
+                      <p className="mt-2 font-[var(--font-display)] text-2xl font-black uppercase tracking-tight text-white">
+                        {bat.innings.match.homeTeam.shortName} vs {bat.innings.match.awayTeam.shortName}
+                      </p>
+                      <div className="mt-4 grid grid-cols-4 gap-3">
+                        {[
+                          { label: "Runs", value: bat.runs },
+                          { label: "Balls", value: bat.balls },
+                          { label: "4s", value: bat.fours },
+                          { label: "6s", value: bat.sixes },
+                        ].map((item) => (
+                          <div key={item.label} className="border border-white/10 bg-[#00142b] px-3 py-3">
+                            <p className="font-[var(--font-display)] text-2xl font-black text-white">{item.value}</p>
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">{item.label}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </Link>
+                  ))}
                 </div>
-              </Card>
-            </section>
-          )}
+              )}
+            </div>
+
+            <div className="space-y-4">
+              <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
+                Recent
+                <span className="block text-[#c8c8b0]">bowling</span>
+              </h2>
+              {player.bowlingScores.length === 0 ? (
+                <div className="border border-white/10 bg-[#001c3a] p-6 text-sm text-[#9bb2d1]">No recent bowling entries.</div>
+              ) : (
+                <div className="grid gap-4">
+                  {player.bowlingScores.map((bowl) => (
+                    <Link key={bowl.id} href={`/matches/${bowl.innings.matchId}`} className="block border border-white/10 bg-[#001c3a] p-5 transition hover:bg-[#0b2747]">
+                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7f9abd]">
+                        {bowl.innings.match.league.name}
+                      </p>
+                      <p className="mt-2 font-[var(--font-display)] text-2xl font-black uppercase tracking-tight text-white">
+                        {bowl.innings.match.homeTeam.shortName} vs {bowl.innings.match.awayTeam.shortName}
+                      </p>
+                      <div className="mt-4 grid grid-cols-4 gap-3">
+                        {[
+                          { label: "Overs", value: bowl.overs.toFixed(1) },
+                          { label: "Runs", value: bowl.runs },
+                          { label: "Wickets", value: bowl.wickets },
+                          { label: "Eco", value: bowl.overs > 0 ? (bowl.runs / bowl.overs).toFixed(2) : "-" },
+                        ].map((item) => (
+                          <div key={item.label} className="border border-white/10 bg-[#00142b] px-3 py-3">
+                            <p className="font-[var(--font-display)] text-2xl font-black text-white">{item.value}</p>
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">{item.label}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
         </div>
-      </main>
-      <Footer />
-    </div>
+      </div>
+    </PublicShell>
   );
 }

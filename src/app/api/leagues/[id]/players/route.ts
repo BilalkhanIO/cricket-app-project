@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { canManageLeaguePlayers } from "@/lib/permissions";
+import { isAdminRole, ROLE } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -39,10 +41,10 @@ export async function POST(
     const { id } = await params;
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const canManage = ["SUPER_ADMIN", "LEAGUE_ADMIN", "TEAM_MANAGER", "PLAYER"].includes(
-      session.user.role
-    );
+    const canManage =
+      canManageLeaguePlayers(session.user.role) || session.user.role === ROLE.PLAYER;
     if (!canManage) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const canBypassRegistrationWindow = isAdminRole(session.user.role) || session.user.role === ROLE.LEAGUE_STAFF;
 
     const body = await req.json();
     const playerId = body.playerId;
@@ -54,6 +56,27 @@ export async function POST(
 
     const league = await prisma.league.findUnique({ where: { id } });
     if (!league) return NextResponse.json({ error: "League not found" }, { status: 404 });
+    if (!canBypassRegistrationWindow) {
+      const now = new Date();
+      if (league.playerRegistrationStatus !== "OPEN") {
+        return NextResponse.json(
+          { error: "Player registration is currently closed for this league season" },
+          { status: 400 }
+        );
+      }
+      if (league.registrationOpenDate && now < league.registrationOpenDate) {
+        return NextResponse.json(
+          { error: "Player registration has not opened yet for this league season" },
+          { status: 400 }
+        );
+      }
+      if (league.registrationCloseDate && now > league.registrationCloseDate) {
+        return NextResponse.json(
+          { error: "Player registration is closed for this league season" },
+          { status: 400 }
+        );
+      }
+    }
 
     const player = await prisma.player.findUnique({
       where: { id: playerId },
@@ -64,6 +87,12 @@ export async function POST(
     if (session.user.role === "PLAYER" && player.user.id !== session.user.id) {
       return NextResponse.json(
         { error: "Players can only register their own profile" },
+        { status: 403 }
+      );
+    }
+    if (session.user.role === "PLAYER" && body.status && body.status !== "PENDING") {
+      return NextResponse.json(
+        { error: "Players cannot set their own approval status" },
         { status: 403 }
       );
     }
@@ -87,43 +116,38 @@ export async function POST(
       }
     }
 
+    const nextStatus = canBypassRegistrationWindow ? body.status || "PENDING" : "PENDING";
+
     const registration = await prisma.playerLeagueRegistration.upsert({
       where: { leagueId_playerId: { leagueId: id, playerId } },
       update: {
         teamId,
         notes: body.notes || null,
-        status: body.status || "PENDING",
-        ...(body.status === "APPROVED" && { approvedAt: new Date() }),
-        ...(body.status === "REJECTED" && { rejectedAt: new Date() }),
-        ...(body.status === "WAITLISTED" && { waitlistedAt: new Date() }),
+        status: nextStatus,
+        approvedAt: nextStatus === "APPROVED" ? new Date() : null,
+        rejectedAt: nextStatus === "REJECTED" ? new Date() : null,
+        waitlistedAt: nextStatus === "WAITLISTED" ? new Date() : null,
       },
       create: {
         leagueId: id,
         playerId,
         teamId,
         notes: body.notes || null,
-        status: body.status || "PENDING",
-        ...(body.status === "APPROVED" && { approvedAt: new Date() }),
-        ...(body.status === "REJECTED" && { rejectedAt: new Date() }),
-        ...(body.status === "WAITLISTED" && { waitlistedAt: new Date() }),
+        status: nextStatus,
+        approvedAt: nextStatus === "APPROVED" ? new Date() : null,
+        rejectedAt: nextStatus === "REJECTED" ? new Date() : null,
+        waitlistedAt: nextStatus === "WAITLISTED" ? new Date() : null,
       },
       include: {
         player: {
           include: {
-            user: { select: { id: true, name: true, email: true } },
+            user: { select: { id: true, name: true, email: true, profileImage: true } },
+            team: { select: { id: true, name: true, shortName: true } },
           },
         },
         team: { select: { id: true, name: true, shortName: true } },
       },
     });
-
-    // Optional: sync player's base team assignment when a team is chosen.
-    if (teamId && player.teamId !== teamId) {
-      await prisma.player.update({
-        where: { id: playerId },
-        data: { teamId },
-      });
-    }
 
     return NextResponse.json({ registration }, { status: 201 });
   } catch (error) {

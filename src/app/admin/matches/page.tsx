@@ -1,18 +1,16 @@
 import Link from "next/link";
 import prisma from "@/lib/prisma";
-import { Card } from "@/components/ui/Card";
-import { StatusBadge } from "@/components/ui/Badge";
 import { formatDateTime } from "@/lib/utils";
 import AssignScorerInline from "./AssignScorerInline";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 async function getMatches() {
   return prisma.match.findMany({
     include: {
-      homeTeam: { select: { name: true, shortName: true } },
-      awayTeam: { select: { name: true, shortName: true } },
-      league: { select: { name: true } },
+      homeTeam: { select: { id: true, name: true, shortName: true, jerseyColor: true } },
+      awayTeam: { select: { id: true, name: true, shortName: true, jerseyColor: true } },
+      league: { select: { id: true, name: true } },
       venue: { select: { name: true, city: true } },
       scorer: { select: { id: true, name: true } },
     },
@@ -28,138 +26,130 @@ async function getScorers() {
   });
 }
 
+function getStatusTone(status: string) {
+  if (status === "LIVE" || status === "INNINGS_BREAK") return "bg-[#93000a] text-[#ffdad6]";
+  if (status === "COMPLETED") return "bg-[#4ae183] text-[#003919]";
+  if (status === "TOSS") return "bg-[#c8c8b0] text-[#303221]";
+  return "bg-[#12324d] text-[#d4e3ff]";
+}
+
 export default async function AdminMatchesPage() {
   const [matches, scorers] = await Promise.all([getMatches(), getScorers()]);
+  const live = matches.filter((match) => match.status === "LIVE" || match.status === "INNINGS_BREAK");
+  const upcoming = matches.filter((match) => match.status === "UPCOMING" || match.status === "TOSS");
+  const completed = matches.filter((match) => match.status === "COMPLETED");
 
   return (
-    <div className="space-y-4 sm:space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Match Management</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {matches.length} matches · {scorers.length} scorer{scorers.length !== 1 ? "s" : ""} available
-          </p>
-        </div>
-        <Link href="/admin/matches/new" className="inline-flex items-center justify-center bg-blue-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-700">
-          + Schedule Match
-        </Link>
-      </div>
-
-      {scorers.length === 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 text-sm text-yellow-700">
-          No users with SCORER role found.{" "}
-          <Link href="/admin/users" className="font-medium underline">
-            Assign SCORER role to a user
-          </Link>{" "}
-          before you can assign scorers to matches.
-        </div>
-      )}
-
-      {matches.length === 0 && (
-        <Card>
-          <p className="text-center py-10 text-gray-400">No matches found</p>
-        </Card>
-      )}
-
-      {matches.length > 0 && (
-        <>
-          <div className="grid grid-cols-1 gap-3 md:hidden">
-            {matches.map((m) => (
-              <Card key={m.id}>
-                <div className="p-4 space-y-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">
-                        {m.homeTeam.shortName} vs {m.awayTeam.shortName}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-0.5">{m.league.name}</p>
-                    </div>
-                    <StatusBadge status={m.status} />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 text-xs text-gray-600">
-                    <div>
-                      <p className="text-[11px] uppercase tracking-wide text-gray-400">Date</p>
-                      <p>{formatDateTime(m.matchDate)}</p>
-                    </div>
-                    <div>
-                      <p className="text-[11px] uppercase tracking-wide text-gray-400">Venue</p>
-                      <p>{m.venue?.name || "-"}{m.venue?.city ? `, ${m.venue.city}` : ""}</p>
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-gray-400 mb-1">Scorer</p>
-                    <AssignScorerInline
-                      matchId={m.id}
-                      currentScorerId={m.scorerId}
-                      currentScorerName={m.scorer?.name ?? null}
-                      scorers={scorers}
-                    />
-                  </div>
-
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    <Link href={`/matches/${m.id}`} className="text-xs font-medium text-blue-600 hover:underline">View</Link>
-                    {["UPCOMING", "TOSS", "LIVE", "INNINGS_BREAK"].includes(m.status) && (
-                      <Link href={`/scorer/${m.id}`} className="text-xs font-medium text-red-600 hover:underline">Score</Link>
-                    )}
-                    <Link href={`/admin/matches/${m.id}/playing-xi`} className="text-xs font-medium text-[#769FCD] hover:underline">XI</Link>
-                    <Link href={`/admin/matches/${m.id}/officials`} className="text-xs font-medium text-purple-600 hover:underline">Officials</Link>
-                  </div>
-                </div>
-              </Card>
-            ))}
+    <div className="space-y-8">
+      <section className="border border-white/10 bg-[#0d2030] p-6 text-white">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#9bb2d1]">Match management</p>
+            <h1 className="font-[var(--font-display)] text-4xl font-black uppercase tracking-tight">Fixtures, scorers, and live control</h1>
+            <p className="max-w-2xl text-sm leading-7 text-[#9bb2d1]">
+              Assign scorers, review live fixtures, prepare toss-ready matches, and jump into editing or scoring from one management board.
+            </p>
           </div>
 
-          <Card className="hidden md:block">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 border-b">
-                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Match</th>
-                    <th className="px-3 py-3 text-xs font-medium text-gray-500">League</th>
-                    <th className="px-3 py-3 text-xs font-medium text-gray-500">Date</th>
-                    <th className="px-3 py-3 text-xs font-medium text-gray-500">Venue</th>
-                    <th className="px-3 py-3 text-xs font-medium text-gray-500">Status</th>
-                    <th className="px-3 py-3 text-xs font-medium text-gray-500">Scorer</th>
-                    <th className="px-3 py-3 text-xs font-medium text-gray-500">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {matches.map((m) => (
-                    <tr key={m.id} className="border-b border-gray-50 hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium text-gray-900">
-                        {m.homeTeam.shortName} vs {m.awayTeam.shortName}
-                      </td>
-                      <td className="px-3 py-3 text-gray-600 text-xs">{m.league.name}</td>
-                      <td className="px-3 py-3 text-gray-600 text-xs">{formatDateTime(m.matchDate)}</td>
-                      <td className="px-3 py-3 text-gray-600 text-xs">{m.venue?.city || "-"}</td>
-                      <td className="px-3 py-3"><StatusBadge status={m.status} /></td>
-                      <td className="px-3 py-3">
-                        <AssignScorerInline
-                          matchId={m.id}
-                          currentScorerId={m.scorerId}
-                          currentScorerName={m.scorer?.name ?? null}
-                          scorers={scorers}
-                        />
-                      </td>
-                      <td className="px-3 py-3">
-                        <div className="flex gap-2">
-                          <Link href={`/matches/${m.id}`} className="text-xs text-blue-600 hover:underline">View</Link>
-                          {["UPCOMING", "TOSS", "LIVE", "INNINGS_BREAK"].includes(m.status) && (
-                            <Link href={`/scorer/${m.id}`} className="text-xs text-red-600 hover:underline">Score</Link>
-                          )}
-                          <Link href={`/admin/matches/${m.id}/playing-xi`} className="text-xs text-[#769FCD] hover:underline">XI</Link>
-                          <Link href={`/admin/matches/${m.id}/officials`} className="text-xs text-purple-600 hover:underline">Officials</Link>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <div className="flex flex-wrap gap-3">
+            <Link href="/admin/matches/new" className="bg-[#4ae183] px-4 py-3 text-sm font-black uppercase tracking-[0.18em] text-[#003919]">
+              Schedule match
+            </Link>
+          </div>
+        </div>
+
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            { label: "All fixtures", value: matches.length },
+            { label: "Live", value: live.length },
+            { label: "Upcoming", value: upcoming.length },
+            { label: "Scorers", value: scorers.length },
+          ].map((item) => (
+            <div key={item.label} className="border border-white/10 bg-[#00142b] px-4 py-4">
+              <p className="font-[var(--font-display)] text-3xl font-black text-white">{item.value}</p>
+              <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">{item.label}</p>
             </div>
-          </Card>
-        </>
+          ))}
+        </div>
+      </section>
+
+      {scorers.length === 0 && (
+        <div className="border border-yellow-700/50 bg-yellow-900/20 px-4 py-3 text-sm text-yellow-200">
+          No users with `SCORER` role found. Assign the role from <Link href="/admin/users" className="font-bold underline">users</Link> before assigning scorers.
+        </div>
+      )}
+
+      {matches.length === 0 ? (
+        <div className="border border-white/10 bg-[#0d2030] px-6 py-12 text-center">
+          <p className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">No matches scheduled</p>
+        </div>
+      ) : (
+        <div className="space-y-10">
+          {[
+            { title: "Live fixtures", items: live },
+            { title: "Upcoming fixtures", items: upcoming },
+            { title: "Completed fixtures", items: completed },
+          ].map((group) =>
+            group.items.length > 0 ? (
+              <section key={group.title}>
+                <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
+                  {group.title}
+                </h2>
+                <div className="mt-6 grid gap-4">
+                  {group.items.map((match) => (
+                    <div key={match.id} className="border border-white/10 bg-[#0d2030] p-5 text-white">
+                      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-3">
+                            <p className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight">
+                              {match.homeTeam.shortName} vs {match.awayTeam.shortName}
+                            </p>
+                            <span className={`px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${getStatusTone(match.status)}`}>
+                              {match.status.replace(/_/g, " ")}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
+                            {match.league.name} · {formatDateTime(match.matchDate)}
+                            {match.venue ? ` · ${match.venue.name}, ${match.venue.city}` : ""}
+                          </p>
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-[minmax(0,220px)_auto] xl:min-w-[28rem]">
+                          <div className="border border-white/10 bg-[#00142b] px-4 py-4">
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1] mb-2">Assigned scorer</p>
+                            <AssignScorerInline
+                              matchId={match.id}
+                              currentScorerId={match.scorerId}
+                              currentScorerName={match.scorer?.name ?? null}
+                              scorers={scorers}
+                            />
+                          </div>
+
+                          <div className="flex flex-wrap gap-2 xl:justify-end">
+                            <Link href={`/matches/${match.id}`} className="bg-[#12324d] px-4 py-3 text-xs font-black uppercase tracking-[0.18em] text-[#d4e3ff]">
+                              View
+                            </Link>
+                            {["UPCOMING", "TOSS", "LIVE", "INNINGS_BREAK"].includes(match.status) && (
+                              <Link href={`/scorer/${match.id}`} className="bg-[#4ae183] px-4 py-3 text-xs font-black uppercase tracking-[0.18em] text-[#003919]">
+                                Score
+                              </Link>
+                            )}
+                            <Link href={`/admin/matches/${match.id}/playing-xi`} className="bg-[#1b3656] px-4 py-3 text-xs font-black uppercase tracking-[0.18em] text-white">
+                              Playing XI
+                            </Link>
+                            <Link href={`/admin/matches/${match.id}/officials`} className="bg-[#12324d] px-4 py-3 text-xs font-black uppercase tracking-[0.18em] text-[#d4e3ff]">
+                              Officials
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : null
+          )}
+        </div>
       )}
     </div>
   );

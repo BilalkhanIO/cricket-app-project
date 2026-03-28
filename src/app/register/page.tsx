@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Input, Select } from "@/components/ui/Input";
+import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { ROLE, SELF_REGISTRATION_ROLES, getRoleLabel } from "@/lib/roles";
 
 export default function RegisterPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    name: "", email: "", password: "", phone: "", role: "FAN",
+    name: "", email: "", password: "", phone: "", role: ROLE.FAN,
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -38,37 +39,42 @@ export default function RegisterPage() {
     }
   };
 
-  const roles = [
-    { value: "FAN",          label: "Fan / Viewer",   icon: "👀", desc: "Follow leagues and matches" },
-    { value: "PLAYER",       label: "Player",          icon: "🏏", desc: "View your stats and performance" },
-    { value: "TEAM_MANAGER", label: "Team Manager",    icon: "👥", desc: "Manage your team and players" },
-    { value: "SCORER",       label: "Scorer",          icon: "📊", desc: "Record live match scores" },
-    { value: "LEAGUE_ADMIN", label: "League Admin",    icon: "🏆", desc: "Create and manage leagues" },
-  ];
+  const roleCards: Record<string, { icon: string; desc: string }> = {
+    [ROLE.FAN]: { icon: "👀", desc: "Follow leagues and matches" },
+    [ROLE.PLAYER]: { icon: "🏏", desc: "View your stats and season records" },
+    [ROLE.TEAM_MANAGER]: { icon: "👥", desc: "Manage team operations and squads" },
+    [ROLE.COACH]: { icon: "🎯", desc: "Support squad planning and match prep" },
+    [ROLE.ANALYST]: { icon: "📈", desc: "Track performance and cricket insights" },
+    [ROLE.SCORER]: { icon: "📊", desc: "Record live match scoring" },
+    [ROLE.UMPIRE]: { icon: "🧢", desc: "Join match-official workflows" },
+  };
+  const roles = SELF_REGISTRATION_ROLES.map((role) => ({
+    value: role,
+    label: getRoleLabel(role),
+    icon: roleCards[role]?.icon || "👤",
+    desc: roleCards[role]?.desc || "Create an account",
+  }));
 
   return (
-    <div
-      className="min-h-screen flex"
-      style={{ background: "linear-gradient(135deg, #1B3A5C 0%, #2D5484 60%, #769FCD 100%)" }}
-    >
+    <div className="min-h-screen flex bg-[linear-gradient(135deg,#102433_0%,#17364e_55%,#1f6f50_100%)]">
       {/* Left panel */}
       <div className="hidden lg:flex lg:w-5/12 flex-col justify-between p-12 relative overflow-hidden">
         <div className="absolute inset-0 opacity-5 text-[200px] flex items-center justify-center select-none pointer-events-none">🏏</div>
         <Link href="/home" className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-[#769FCD] rounded-xl flex items-center justify-center text-2xl">🏏</div>
+          <div className="w-10 h-10 bg-[color:var(--primary)] rounded-xl flex items-center justify-center text-2xl">🏏</div>
           <div>
             <span className="font-bold text-xl text-white block">CricketLeague</span>
-            <span className="text-[10px] text-[#B9D7EA] tracking-widest uppercase">Pro Platform</span>
+            <span className="text-[10px] text-[#9a8569] tracking-widest uppercase">Pro Platform</span>
           </div>
         </Link>
 
         <div>
           <h1 className="text-4xl font-bold text-white leading-tight mb-4">
             Join the<br />
-            <span className="text-[#B9D7EA]">Cricket Community</span>
+            <span className="text-[#9a8569]">Cricket Community</span>
           </h1>
-          <p className="text-[#D6E6F2] leading-relaxed max-w-sm">
-            Whether you&apos;re a fan, player, or league organizer — there&apos;s a place for you here.
+          <p className="text-[#d6cab7] leading-relaxed max-w-sm">
+            Whether you&apos;re a fan, player, team staff member, or match official, there&apos;s a place for you here.
           </p>
 
           <div className="mt-8 space-y-2">
@@ -77,31 +83,32 @@ export default function RegisterPage() {
                 <span className="text-xl">{r.icon}</span>
                 <div>
                   <p className="text-sm font-semibold text-white">{r.label}</p>
-                  <p className="text-xs text-[#B9D7EA]">{r.desc}</p>
+                  <p className="text-xs text-[#9a8569]">{r.desc}</p>
                 </div>
-                {formData.role === r.value && <span className="ml-auto text-[#769FCD]">✓</span>}
+                {formData.role === r.value && <span className="ml-auto text-[color:var(--primary)]">✓</span>}
               </div>
             ))}
           </div>
         </div>
 
-        <p className="text-[#769FCD] text-xs">© {new Date().getFullYear()} CricketLeague App</p>
+        <p className="text-[color:var(--primary)] text-xs">© {new Date().getFullYear()} CricketLeague App</p>
       </div>
 
       {/* Right panel - form */}
-      <div className="w-full lg:w-7/12 flex items-center justify-center p-6 lg:p-12 bg-[#F7FBFC] overflow-y-auto">
+      <div className="w-full lg:w-7/12 flex items-center justify-center p-6 lg:p-12 bg-[color:var(--card-muted)] overflow-y-auto">
         <div className="w-full max-w-md py-4">
           {/* Mobile logo */}
           <div className="lg:hidden text-center mb-8">
-            <div className="w-14 h-14 bg-[#769FCD] rounded-2xl flex items-center justify-center text-3xl mx-auto mb-3">🏏</div>
-            <h1 className="text-2xl font-bold text-[#1B3A5C]">Join CricketLeague</h1>
+            <div className="w-14 h-14 bg-[color:var(--primary)] rounded-2xl flex items-center justify-center text-3xl mx-auto mb-3">🏏</div>
+            <h1 className="text-2xl font-bold text-[color:var(--color-ink)]">Join CricketLeague</h1>
           </div>
 
           <div className="mb-6">
-            <h2 className="text-2xl font-bold text-[#1B3A5C]">Create account</h2>
-            <p className="text-[#4A7098] mt-1 text-sm">Fill in your details to get started</p>
+            <h2 className="text-2xl font-bold text-[color:var(--color-ink)]">Create account</h2>
+            <p className="text-[color:var(--color-ink-soft)] mt-1 text-sm">Fill in your details to get started</p>
           </div>
 
+          <div className="page-shell rounded-[2rem] p-6 sm:p-8">
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input label="Full Name" name="name" value={formData.name} onChange={handleChange} placeholder="Your full name" required />
             <Input label="Email Address" type="email" name="email" value={formData.email} onChange={handleChange} placeholder="you@example.com" required />
@@ -110,15 +117,15 @@ export default function RegisterPage() {
 
             {/* Role selector */}
             <div>
-              <label className="text-sm font-semibold text-[#1B3A5C] block mb-2">Account Role</label>
+              <label className="text-sm font-semibold text-[color:var(--color-ink)] block mb-2">Account Role</label>
               <div className="grid grid-cols-1 gap-2">
                 {roles.map((r) => (
                   <label
                     key={r.value}
                     className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 cursor-pointer transition-all ${
                       formData.role === r.value
-                        ? "border-[#769FCD] bg-[#D6E6F2]"
-                        : "border-[#B9D7EA] bg-white hover:border-[#769FCD] hover:bg-[#F7FBFC]"
+                        ? "border-[color:var(--primary)] bg-[color:var(--card-muted)]"
+                        : "border-[color:var(--border-color)] bg-white hover:border-[color:var(--primary)] hover:bg-[color:var(--card-muted)]"
                     }`}
                   >
                     <input
@@ -131,10 +138,10 @@ export default function RegisterPage() {
                     />
                     <span className="text-xl">{r.icon}</span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-[#1B3A5C]">{r.label}</p>
-                      <p className="text-xs text-[#4A7098]">{r.desc}</p>
+                      <p className="text-sm font-semibold text-[color:var(--color-ink)]">{r.label}</p>
+                      <p className="text-xs text-[color:var(--color-ink-soft)]">{r.desc}</p>
                     </div>
-                    <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${formData.role === r.value ? "border-[#769FCD] bg-[#769FCD]" : "border-[#B9D7EA]"}`}>
+                    <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${formData.role === r.value ? "border-[color:var(--primary)] bg-[color:var(--primary)]" : "border-[color:var(--border-color)]"}`}>
                       {formData.role === r.value && <div className="w-full h-full rounded-full bg-white scale-50" />}
                     </div>
                   </label>
@@ -156,10 +163,11 @@ export default function RegisterPage() {
             </Button>
           </form>
 
-          <p className="text-center text-sm text-[#4A7098] mt-5">
+          <p className="text-center text-sm text-[color:var(--color-ink-soft)] mt-5">
             Already have an account?{" "}
-            <Link href="/login" className="text-[#769FCD] font-semibold hover:underline">Sign in</Link>
+            <Link href="/login" className="text-[color:var(--primary)] font-semibold hover:underline">Sign in</Link>
           </p>
+          </div>
         </div>
       </div>
     </div>

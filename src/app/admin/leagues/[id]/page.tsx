@@ -11,6 +11,11 @@ async function getLeague(id: string) {
   return prisma.league.findUnique({
     where: { id },
     include: {
+      parentLeague: { select: { id: true, name: true, season: true, year: true } },
+      seasons: {
+        select: { id: true, season: true, year: true, status: true },
+        orderBy: [{ year: "desc" }, { createdAt: "desc" }],
+      },
       admin: { select: { name: true } },
       teams: {
         include: {
@@ -34,6 +39,7 @@ async function getLeague(id: string) {
         include: { team: { select: { name: true, shortName: true } } },
         orderBy: [{ points: "desc" }, { netRunRate: "desc" }],
       },
+      playerRegistrations: true,
     },
   });
 }
@@ -42,25 +48,41 @@ export default async function AdminLeagueDetailPage({ params }: { params: Promis
   const { id } = await params;
   const league = await getLeague(id);
   if (!league) notFound();
+  const approvedTeams = league.teams.filter((team) => team.status === "APPROVED").length;
+  const pendingTeams = league.teams.filter((team) => team.status === "PENDING").length;
+  const liveMatches = league.matches.filter((match) => match.status === "LIVE").length;
+  const approvedPlayers = league.playerRegistrations.filter((player) => player.status === "APPROVED").length;
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      <div className="bg-white border rounded-2xl p-4 sm:p-5">
+      <div className="section-banner rounded-[2rem] px-5 py-6 text-white sm:px-6 sm:py-7">
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <Link href="/admin/leagues" className="text-gray-500 text-sm hover:text-gray-700">← Leagues</Link>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{league.name}</h1>
+            <Link href="/admin/leagues" className="text-[#c8c8b0] text-sm hover:text-white">← Leagues</Link>
+            <h1 className="text-xl sm:text-3xl font-bold">{league.name}</h1>
             <StatusBadge status={league.status} />
           </div>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-[#d6d9df]">
             {league.matchFormat} · {league.season} · {formatDate(league.startDate)} to {formatDate(league.endDate)}
           </p>
+          <div className="flex flex-wrap gap-3 text-xs uppercase tracking-[0.14em] text-[#c8c8b0]">
+            <span>Player registration: {league.playerRegistrationStatus}</span>
+            {league.parentLeague && (
+              <span>
+                Parent competition: {league.parentLeague.name}
+              </span>
+            )}
+            {league.seasons.length > 0 && <span>Seasons in series: {league.seasons.length}</span>}
+          </div>
         </div>
         <div className="mt-4 grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
-          <Link href={`/admin/leagues/${league.id}/teams`} className="inline-flex items-center justify-center bg-[#769FCD] text-white px-3 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#1B3A5C]">
+          <Link href={`/admin/leagues/${league.id}/teams`} className="inline-flex items-center justify-center bg-[color:var(--primary)] text-white px-3 py-2.5 rounded-xl text-sm font-semibold hover:bg-[color:var(--primary-dark)]">
             Team Registrations
           </Link>
-          <Link href={`/admin/leagues/${league.id}/fixtures`} className="inline-flex items-center justify-center bg-[#1B3A5C] text-white px-3 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#2D5484]">
+          <Link href={`/admin/leagues/${league.id}/players`} className="inline-flex items-center justify-center bg-emerald-600 text-white px-3 py-2.5 rounded-xl text-sm font-semibold hover:bg-emerald-700">
+            Player Management
+          </Link>
+          <Link href={`/admin/leagues/${league.id}/fixtures`} className="inline-flex items-center justify-center bg-[color:var(--primary-dark)] text-white px-3 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#17364e]">
             Generate Fixtures
           </Link>
           <Link href={`/admin/matches/new?leagueId=${league.id}`} className="inline-flex items-center justify-center bg-blue-600 text-white px-3 py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-700">
@@ -72,7 +94,7 @@ export default async function AdminLeagueDetailPage({ params }: { params: Promis
           <Link href={`/admin/leagues/${league.id}/sponsors`} className="inline-flex items-center justify-center bg-purple-600 text-white px-3 py-2.5 rounded-xl text-sm font-semibold hover:bg-purple-700">
             Sponsors
           </Link>
-          <Link href={`/leagues/${league.id}`} className="inline-flex items-center justify-center bg-gray-100 text-gray-700 px-3 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-200">
+          <Link href={`/leagues/${league.id}`} className="inline-flex items-center justify-center bg-white/10 text-white px-3 py-2.5 rounded-xl text-sm font-semibold hover:bg-white/15">
             Public View →
           </Link>
         </div>
@@ -80,10 +102,10 @@ export default async function AdminLeagueDetailPage({ params }: { params: Promis
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         {[
-          { label: "Teams", value: league.teams.length, sub: `${league.maxTeams} max` },
-          { label: "Matches", value: league.matches.length },
-          { label: "Format", value: league.matchFormat },
-          { label: "Season", value: league.season },
+          { label: "Approved Teams", value: approvedTeams, sub: `${pendingTeams} pending` },
+          { label: "Matches", value: league.matches.length, sub: `${liveMatches} live` },
+          { label: "Players", value: league.playerRegistrations.length, sub: `${approvedPlayers} approved` },
+          { label: "Season", value: league.season, sub: league.parentLeague ? league.parentLeague.name : league.matchFormat },
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-xl border p-4">
             <div className="text-2xl font-bold text-gray-900">{s.value}</div>
@@ -108,7 +130,7 @@ export default async function AdminLeagueDetailPage({ params }: { params: Promis
               league.teams.map((tl) => (
                 <div key={tl.id} className="flex items-center justify-between px-4 py-3 border-b border-gray-50 last:border-0">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-[#D6E6F2] rounded-full flex items-center justify-center text-xs font-bold text-[#2D5484]">
+                    <div className="w-8 h-8 bg-[color:var(--card-muted)] rounded-full flex items-center justify-center text-xs font-bold text-[#17364e]">
                       {tl.team.shortName?.charAt(0)}
                     </div>
                     <div>
@@ -143,9 +165,9 @@ export default async function AdminLeagueDetailPage({ params }: { params: Promis
                     </div>
                     <div className="mt-1 grid grid-cols-4 text-xs text-gray-500">
                       <span>M {pt.matchesPlayed}</span>
-                      <span className="text-[#2D5484]">W {pt.wins}</span>
+                      <span className="text-[#17364e]">W {pt.wins}</span>
                       <span className="text-red-600">L {pt.losses}</span>
-                      <span className={pt.netRunRate >= 0 ? "text-[#2D5484]" : "text-red-600"}>
+                      <span className={pt.netRunRate >= 0 ? "text-[#17364e]" : "text-red-600"}>
                         NRR {pt.netRunRate > 0 ? "+" : ""}{pt.netRunRate.toFixed(3)}
                       </span>
                     </div>
@@ -174,10 +196,10 @@ export default async function AdminLeagueDetailPage({ params }: { params: Promis
                           </div>
                         </td>
                         <td className="px-2 py-2 text-center">{pt.matchesPlayed}</td>
-                        <td className="px-2 py-2 text-center text-[#2D5484]">{pt.wins}</td>
+                        <td className="px-2 py-2 text-center text-[#17364e]">{pt.wins}</td>
                         <td className="px-2 py-2 text-center text-red-600">{pt.losses}</td>
                         <td className="px-2 py-2 text-center font-bold">{pt.points}</td>
-                        <td className={`px-2 py-2 text-center font-medium ${pt.netRunRate >= 0 ? "text-[#2D5484]" : "text-red-600"}`}>
+                        <td className={`px-2 py-2 text-center font-medium ${pt.netRunRate >= 0 ? "text-[#17364e]" : "text-red-600"}`}>
                           {pt.netRunRate > 0 ? "+" : ""}{pt.netRunRate.toFixed(3)}
                         </td>
                       </tr>
@@ -195,7 +217,7 @@ export default async function AdminLeagueDetailPage({ params }: { params: Promis
         <CardHeader>
           <div className="flex items-center justify-between">
             <h2 className="font-bold text-gray-900">Fixtures ({league.matches.length})</h2>
-            <Link href={`/admin/matches/new?leagueId=${league.id}`} className="text-[#769FCD] text-sm hover:underline">+ Add Match</Link>
+            <Link href={`/admin/matches/new?leagueId=${league.id}`} className="text-[color:var(--primary)] text-sm hover:underline">+ Add Match</Link>
           </div>
         </CardHeader>
         {league.matches.length === 0 && (

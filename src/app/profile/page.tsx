@@ -1,37 +1,28 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useState } from "react";
-import { Input, Select } from "@/components/ui/Input";
-import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
+import PublicShell from "@/components/layout/PublicShell";
 
 export const dynamic = 'force-dynamic';
 
 export default function ProfilePage() {
   const { data: session } = useSession();
-  const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState(false);
 
   if (!session) {
     return (
-      <div className="flex flex-col min-h-screen">
-        <Navbar />
-        <main className="flex-1 flex items-center justify-center">
+      <PublicShell>
+        <div className="flex min-h-[50vh] items-center justify-center">
           <p className="text-gray-500">Please login to view your profile.</p>
-        </main>
-        <Footer />
-      </div>
+        </div>
+      </PublicShell>
     );
   }
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <Navbar />
-      <main className="flex-1">
-        <div className="bg-[#1B3A5C] text-white py-8">
+    <PublicShell>
+      <div>
+        <div className="bg-[color:var(--primary-dark)] text-white py-8">
           <div className="max-w-4xl mx-auto px-4">
             <h1 className="text-2xl font-bold">My Profile</h1>
           </div>
@@ -42,13 +33,13 @@ export default function ProfilePage() {
             {/* Profile Card */}
             <Card>
               <CardBody className="text-center">
-                <div className="w-20 h-20 bg-[#D6E6F2] rounded-full flex items-center justify-center text-3xl font-bold text-[#1B3A5C] mx-auto mb-3">
+                <div className="w-20 h-20 bg-[color:var(--card-muted)] rounded-full flex items-center justify-center text-3xl font-bold text-[color:var(--color-ink)] mx-auto mb-3">
                   {session.user.name.charAt(0)}
                 </div>
                 <h2 className="font-bold text-xl text-gray-900">{session.user.name}</h2>
                 <p className="text-gray-500 text-sm">{session.user.email}</p>
                 <div className="mt-3">
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-[#D6E6F2] text-[#1B3A5C]">
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-[color:var(--card-muted)] text-[color:var(--color-ink)]">
                     {session.user.role.replace("_", " ")}
                   </span>
                 </div>
@@ -79,7 +70,7 @@ export default function ProfilePage() {
                   <div className="grid grid-cols-2 gap-2">
                     {session.user.role === "SUPER_ADMIN" || session.user.role === "LEAGUE_ADMIN" ? (
                       <>
-                        <a href="/admin" className="p-3 bg-[#D6E6F2] hover:bg-[#B9D7EA] rounded-lg text-sm font-medium text-[#1B3A5C] text-center transition-colors">
+                        <a href="/admin" className="p-3 bg-[color:var(--card-muted)] hover:bg-[color:var(--border-color)] rounded-lg text-sm font-medium text-[color:var(--color-ink)] text-center transition-colors">
                           Admin Dashboard
                         </a>
                         <a href="/admin/leagues/new" className="p-3 bg-blue-50 hover:bg-blue-100 rounded-lg text-sm font-medium text-blue-800 text-center transition-colors">
@@ -104,8 +95,7 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
-      </main>
-      <Footer />
-    </div>
+      </div>
+    </PublicShell>
   );
 }

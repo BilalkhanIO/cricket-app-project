@@ -122,7 +122,7 @@ export default function EditPlayerPage({ params }: { params: Promise<{ id: strin
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="animate-spin w-8 h-8 border-4 border-[#769FCD] border-t-transparent rounded-full"></div>
+        <div className="animate-spin w-8 h-8 border-4 border-[color:var(--primary)] border-t-transparent rounded-full"></div>
       </div>
     );
   }
@@ -131,7 +131,7 @@ export default function EditPlayerPage({ params }: { params: Promise<{ id: strin
     return (
       <div className="text-center py-20">
         <p className="text-gray-500">Player not found</p>
-        <Link href="/admin/players" className="text-[#769FCD] hover:underline mt-2 block">
+        <Link href="/admin/players" className="text-[color:var(--primary)] hover:underline mt-2 block">
           Back to Players
         </Link>
       </div>
@@ -151,7 +151,7 @@ export default function EditPlayerPage({ params }: { params: Promise<{ id: strin
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-[#D6E6F2] rounded-full flex items-center justify-center font-bold text-[#1B3A5C] text-lg">
+            <div className="w-12 h-12 bg-[color:var(--card-muted)] rounded-full flex items-center justify-center font-bold text-[color:var(--color-ink)] text-lg">
               {player.user?.name?.charAt(0)}
             </div>
             <div>
@@ -169,7 +169,7 @@ export default function EditPlayerPage({ params }: { params: Promise<{ id: strin
                 <select
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD]"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[color:var(--primary)]"
                 >
                   {ROLES.map((r) => (
                     <option key={r} value={r}>{r.replace("_", " ")}</option>
@@ -183,7 +183,7 @@ export default function EditPlayerPage({ params }: { params: Promise<{ id: strin
                 <select
                   value={battingHand}
                   onChange={(e) => setBattingHand(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD]"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[color:var(--primary)]"
                 >
                   {BATTING_HANDS.map((h) => (
                     <option key={h} value={h}>{h}</option>
@@ -199,7 +199,7 @@ export default function EditPlayerPage({ params }: { params: Promise<{ id: strin
               <select
                 value={bowlingType}
                 onChange={(e) => setBowlingType(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD]"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[color:var(--primary)]"
               >
                 <option value="">None / Unknown</option>
                 {BOWLING_TYPES.map((t) => (
@@ -217,7 +217,7 @@ export default function EditPlayerPage({ params }: { params: Promise<{ id: strin
                 max={999}
                 value={jerseyNumber}
                 onChange={(e) => setJerseyNumber(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD]"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[color:var(--primary)]"
                 placeholder="e.g. 10"
               />
               {errors.jerseyNumber && <p className="text-red-500 text-xs mt-1">{errors.jerseyNumber}</p>}
@@ -230,7 +230,7 @@ export default function EditPlayerPage({ params }: { params: Promise<{ id: strin
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
                 rows={3}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD]"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[color:var(--primary)]"
                 placeholder="Short player bio..."
               />
             </div>
@@ -242,7 +242,7 @@ export default function EditPlayerPage({ params }: { params: Promise<{ id: strin
                 type="url"
                 value={profileImage}
                 onChange={(e) => setProfileImage(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD]"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[color:var(--primary)]"
                 placeholder="https://example.com/photo.jpg"
               />
               {errors.profileImage && <p className="text-red-500 text-xs mt-1">{errors.profileImage}</p>}
@@ -255,7 +255,7 @@ export default function EditPlayerPage({ params }: { params: Promise<{ id: strin
                 type="url"
                 value={photoUrl}
                 onChange={(e) => setPhotoUrl(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD]"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[color:var(--primary)]"
                 placeholder="https://example.com/player.jpg"
               />
             </div>
@@ -267,7 +267,7 @@ export default function EditPlayerPage({ params }: { params: Promise<{ id: strin
                 <select
                   value={availabilityStatus}
                   onChange={(e) => setAvailabilityStatus(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD]"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[color:var(--primary)]"
                 >
                   {["AVAILABLE", "UNAVAILABLE", "INJURED", "SUSPENDED", "ON_TOUR"].map((s) => (
                     <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
@@ -280,7 +280,7 @@ export default function EditPlayerPage({ params }: { params: Promise<{ id: strin
                   type="text"
                   value={medicalStatus}
                   onChange={(e) => setMedicalStatus(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD]"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[color:var(--primary)]"
                   placeholder="e.g. Fit, Hamstring strain..."
                 />
               </div>
@@ -293,7 +293,7 @@ export default function EditPlayerPage({ params }: { params: Promise<{ id: strin
                   type="checkbox"
                   checked={isCaptain}
                   onChange={(e) => setIsCaptain(e.target.checked)}
-                  className="w-4 h-4 text-[#769FCD] border-gray-300 rounded"
+                  className="w-4 h-4 text-[color:var(--primary)] border-gray-300 rounded"
                 />
                 <span className="text-sm text-gray-700">Captain</span>
               </label>
@@ -302,7 +302,7 @@ export default function EditPlayerPage({ params }: { params: Promise<{ id: strin
                   type="checkbox"
                   checked={isViceCaptain}
                   onChange={(e) => setIsViceCaptain(e.target.checked)}
-                  className="w-4 h-4 text-[#769FCD] border-gray-300 rounded"
+                  className="w-4 h-4 text-[color:var(--primary)] border-gray-300 rounded"
                 />
                 <span className="text-sm text-gray-700">Vice Captain</span>
               </label>
@@ -311,14 +311,14 @@ export default function EditPlayerPage({ params }: { params: Promise<{ id: strin
                   type="checkbox"
                   checked={isWicketkeeper}
                   onChange={(e) => setIsWicketkeeper(e.target.checked)}
-                  className="w-4 h-4 text-[#769FCD] border-gray-300 rounded"
+                  className="w-4 h-4 text-[color:var(--primary)] border-gray-300 rounded"
                 />
                 <span className="text-sm text-gray-700">Wicketkeeper</span>
               </label>
             </div>
 
             {message && (
-              <div className={`p-3 rounded-lg text-sm ${message.includes("success") ? "bg-[#D6E6F2] text-[#1B3A5C]" : "bg-red-50 text-red-700"}`}>
+              <div className={`p-3 rounded-lg text-sm ${message.includes("success") ? "bg-[color:var(--card-muted)] text-[color:var(--color-ink)]" : "bg-red-50 text-red-700"}`}>
                 {message}
               </div>
             )}

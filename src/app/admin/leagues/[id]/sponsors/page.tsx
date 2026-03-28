@@ -92,7 +92,7 @@ export default function SponsorsPage({ params }: { params: Promise<{ id: string 
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD] focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[color:var(--primary)] focus:border-transparent"
                   placeholder="e.g. Acme Corporation"
                   required
                 />
@@ -103,7 +103,7 @@ export default function SponsorsPage({ params }: { params: Promise<{ id: string 
                 <select
                   value={tier}
                   onChange={(e) => setTier(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD] focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[color:var(--primary)] focus:border-transparent"
                 >
                   {TIERS.map((t) => (
                     <option key={t} value={t}>{t}</option>
@@ -117,7 +117,7 @@ export default function SponsorsPage({ params }: { params: Promise<{ id: string 
                   type="url"
                   value={logo}
                   onChange={(e) => setLogo(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD] focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[color:var(--primary)] focus:border-transparent"
                   placeholder="https://example.com/logo.png"
                 />
               </div>
@@ -128,13 +128,13 @@ export default function SponsorsPage({ params }: { params: Promise<{ id: string 
                   type="url"
                   value={website}
                   onChange={(e) => setWebsite(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#769FCD] focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[color:var(--primary)] focus:border-transparent"
                   placeholder="https://example.com"
                 />
               </div>
 
               {message && (
-                <p className={`text-sm ${message.includes("success") ? "text-[#769FCD]" : "text-red-600"}`}>
+                <p className={`text-sm ${message.includes("success") ? "text-[color:var(--primary)]" : "text-red-600"}`}>
                   {message}
                 </p>
               )}

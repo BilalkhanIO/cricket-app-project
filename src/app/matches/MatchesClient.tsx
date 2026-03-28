@@ -76,14 +76,14 @@ function CalendarView({ matches }: { matches: Match[] }) {
         {/* Calendar Grid */}
         <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 overflow-hidden">
           {/* Month nav */}
-          <div className="flex items-center justify-between px-6 py-4 bg-[#1B3A5C]">
-            <button onClick={prevMonth} className="text-white hover:text-[#B9D7EA] p-1">
+          <div className="flex items-center justify-between px-6 py-4 bg-[color:var(--primary-dark)]">
+            <button onClick={prevMonth} className="text-white hover:text-[#9a8569] p-1">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
             <h2 className="text-white font-bold text-lg">{MONTH_NAMES[month]} {year}</h2>
-            <button onClick={nextMonth} className="text-white hover:text-[#B9D7EA] p-1">
+            <button onClick={nextMonth} className="text-white hover:text-[#9a8569] p-1">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
@@ -116,12 +116,12 @@ function CalendarView({ matches }: { matches: Match[] }) {
                 <button
                   key={day}
                   onClick={() => setSelectedDay(day === selectedDay ? null : day)}
-                  className={`h-16 border-b border-r border-gray-50 p-1 text-left transition-colors hover:bg-[#F7FBFC] ${
-                    isSelected ? "bg-[#D6E6F2]" : ""
+                  className={`h-16 border-b border-r border-gray-50 p-1 text-left transition-colors hover:bg-[color:var(--card-muted)] ${
+                    isSelected ? "bg-[color:var(--card-muted)]" : ""
                   }`}
                 >
                   <span className={`text-xs font-medium inline-flex items-center justify-center w-6 h-6 rounded-full ${
-                    isToday ? "bg-[#769FCD] text-white" : "text-gray-700"
+                    isToday ? "bg-[color:var(--primary)] text-white" : "text-gray-700"
                   }`}>{day}</span>
                   {dayMatches.length > 0 && (
                     <div className="mt-0.5 space-y-0.5">
@@ -130,7 +130,7 @@ function CalendarView({ matches }: { matches: Match[] }) {
                           key={m.id}
                           className={`text-[9px] rounded px-1 truncate font-medium leading-tight ${
                             m.status === "LIVE" ? "bg-red-100 text-red-700" :
-                            m.status === "COMPLETED" ? "bg-[#D6E6F2] text-[#1B3A5C]" :
+                            m.status === "COMPLETED" ? "bg-[color:var(--card-muted)] text-[color:var(--color-ink)]" :
                             "bg-gray-100 text-gray-600"
                           }`}
                         >
@@ -172,7 +172,7 @@ function CalendarView({ matches }: { matches: Match[] }) {
                   const inn2 = m.innings.find(i => i.inningsNumber === 2);
                   return (
                     <Link key={m.id} href={`/matches/${m.id}`}>
-                      <div className="border border-gray-100 rounded-lg p-3 hover:bg-[#F7FBFC] transition-colors">
+                      <div className="border border-gray-100 rounded-lg p-3 hover:bg-[color:var(--card-muted)] transition-colors">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs text-gray-500">{m.league.name}</span>
                           <StatusBadge status={m.status} />
@@ -183,7 +183,7 @@ function CalendarView({ matches }: { matches: Match[] }) {
                         ].map(({ team, inn }) => (
                           <div key={team.id} className="flex items-center justify-between py-0.5">
                             <div className="flex items-center gap-1.5">
-                              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: team.jerseyColor || "#769FCD" }} />
+                              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: team.jerseyColor || "var(--primary)" }} />
                               <span className="text-sm font-medium text-gray-900">{team.shortName}</span>
                             </div>
                             {inn ? (
@@ -194,7 +194,7 @@ function CalendarView({ matches }: { matches: Match[] }) {
                           </div>
                         ))}
                         {m.result && (
-                          <p className="text-xs text-[#769FCD] font-medium mt-1">{m.result}</p>
+                          <p className="text-xs text-[color:var(--primary)] font-medium mt-1">{m.result}</p>
                         )}
                         <p className="text-xs text-gray-400 mt-1">
                           {new Date(m.matchDate).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
@@ -211,13 +211,13 @@ function CalendarView({ matches }: { matches: Match[] }) {
           </div>
 
           {/* Month summary */}
-          <div className="bg-[#F7FBFC] border border-[#D6E6F2] rounded-xl p-4">
-            <h3 className="font-semibold text-[#1B3A5C] mb-3 text-sm">This Month</h3>
+          <div className="bg-[color:var(--card-muted)] border border-[color:var(--border-color)] rounded-xl p-4">
+            <h3 className="font-semibold text-[color:var(--color-ink)] mb-3 text-sm">This Month</h3>
             <div className="grid grid-cols-3 gap-2 text-center">
               {[
                 { label: "Total", value: Object.values(matchesByDay).flat().length, color: "text-gray-900" },
                 { label: "Live", value: Object.values(matchesByDay).flat().filter(m => m.status === "LIVE").length, color: "text-red-600" },
-                { label: "Done", value: Object.values(matchesByDay).flat().filter(m => m.status === "COMPLETED").length, color: "text-[#769FCD]" },
+                { label: "Done", value: Object.values(matchesByDay).flat().filter(m => m.status === "COMPLETED").length, color: "text-[color:var(--primary)]" },
               ].map((s) => (
                 <div key={s.label}>
                   <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
@@ -275,13 +275,13 @@ export default function MatchesClient({ allMatches }: { allMatches: Match[] }) {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by team or league name..."
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-[#769FCD] focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-[color:var(--primary)] focus:border-transparent"
             />
           </div>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-[#769FCD] bg-white"
+            className="px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-[color:var(--primary)] bg-white"
           >
             {STATUS_OPTIONS.map((s) => (
               <option key={s} value={s}>{s === "ALL" ? "All Statuses" : s}</option>
@@ -293,7 +293,7 @@ export default function MatchesClient({ allMatches }: { allMatches: Match[] }) {
               onClick={() => setView("list")}
               className={`px-4 py-2.5 text-sm font-medium flex items-center gap-1.5 transition-colors ${
                 view === "list"
-                  ? "bg-[#1B3A5C] text-white"
+                  ? "bg-[color:var(--primary-dark)] text-white"
                   : "bg-white text-gray-600 hover:bg-gray-50"
               }`}
             >
@@ -306,7 +306,7 @@ export default function MatchesClient({ allMatches }: { allMatches: Match[] }) {
               onClick={() => setView("calendar")}
               className={`px-4 py-2.5 text-sm font-medium flex items-center gap-1.5 transition-colors border-l border-gray-300 ${
                 view === "calendar"
-                  ? "bg-[#1B3A5C] text-white"
+                  ? "bg-[color:var(--primary-dark)] text-white"
                   : "bg-white text-gray-600 hover:bg-gray-50"
               }`}
             >
@@ -348,7 +348,7 @@ export default function MatchesClient({ allMatches }: { allMatches: Match[] }) {
                           <Card hoverable className="h-full">
                             <div className={`px-4 py-2 flex items-center justify-between border-b ${
                               match.status === "LIVE" ? "bg-red-50 border-red-100" :
-                              match.status === "COMPLETED" ? "bg-[#F7FBFC] border-[#D6E6F2]" :
+                              match.status === "COMPLETED" ? "bg-[color:var(--card-muted)] border-[color:var(--border-color)]" :
                               "bg-gray-50 border-gray-100"
                             }`}>
                               <span className="text-xs text-gray-500">{match.league.name}</span>
@@ -362,7 +362,7 @@ export default function MatchesClient({ allMatches }: { allMatches: Match[] }) {
                                 ].map(({ team, innings: inn }) => (
                                   <div key={team.id} className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: team.jerseyColor || "#769FCD" }} />
+                                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: team.jerseyColor || "var(--primary)" }} />
                                       <span className="font-medium text-sm text-gray-900">{team.name}</span>
                                     </div>
                                     {inn ? (
@@ -377,7 +377,7 @@ export default function MatchesClient({ allMatches }: { allMatches: Match[] }) {
                                 ))}
                               </div>
                               {match.result ? (
-                                <div className="bg-[#F7FBFC] rounded-lg px-3 py-2 text-xs font-medium text-[#1B3A5C]">
+                                <div className="bg-[color:var(--card-muted)] rounded-lg px-3 py-2 text-xs font-medium text-[color:var(--color-ink)]">
                                   {match.result}
                                 </div>
                               ) : (

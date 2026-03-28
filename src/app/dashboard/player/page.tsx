@@ -6,6 +6,7 @@ import Link from "next/link";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { OVERALL_LEAGUE_KEY } from "@/lib/constants";
+import { canAccessPlayerDashboard } from "@/lib/permissions";
 
 export const dynamic = 'force-dynamic';
 
@@ -61,7 +62,7 @@ async function getPlayerData(userId: string) {
 
 export default async function PlayerDashboard() {
   const session = await getServerSession(authOptions);
-  if (!session) redirect("/login");
+  if (!session || !canAccessPlayerDashboard(session.user.role)) redirect("/login");
 
   const player = await getPlayerData(session.user.id);
 
@@ -91,7 +92,7 @@ export default async function PlayerDashboard() {
       <Navbar />
       <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
         {/* Profile Header */}
-        <div className="bg-gradient-to-br from-[#1B3A5C] to-[#2D5484] rounded-2xl p-6 text-white mb-8">
+        <div className="bg-gradient-to-br from-[color:var(--primary-dark)] to-[#17364e] rounded-2xl p-6 text-white mb-8">
           <div className="flex items-center gap-5">
             {player.user.profileImage ? (
               <img src={player.user.profileImage} alt={player.user.name}

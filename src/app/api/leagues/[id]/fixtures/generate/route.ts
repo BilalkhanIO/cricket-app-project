@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { canGenerateFixtures } from "@/lib/permissions";
 
 // Round-robin scheduler using rotation algorithm
 function generateRoundRobin(teamIds: string[]): [string, string][][] {
@@ -40,7 +41,7 @@ function generateKnockout(teamIds: string[]): [string, string][] {
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
-  if (!session || !["SUPER_ADMIN", "LEAGUE_ADMIN"].includes(session.user.role)) {
+  if (!session || !canGenerateFixtures(session.user.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -63,6 +64,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const league = await prisma.league.findUnique({ where: { id } });
   if (!league) return NextResponse.json({ error: "League not found" }, { status: 404 });
+
+  const approvedEntries = await prisma.teamLeague.findMany({
+    where: { leagueId: id, status: "APPROVED" },
+    select: { teamId: true },
+  });
+  const approvedTeamIds = new Set(approvedEntries.map((entry) => entry.teamId));
+  if (!teamIds.every((teamId: string) => approvedTeamIds.has(teamId))) {
+    return NextResponse.json(
+      { error: "All selected teams must be approved for this league" },
+      { status: 400 }
+    );
+  }
+  if (new Set(teamIds).size !== teamIds.length) {
+    return NextResponse.json({ error: "Duplicate teams are not allowed" }, { status: 400 });
+  }
 
   let matchPairs: [string, string][] = [];
 
