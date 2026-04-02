@@ -9,6 +9,20 @@ import { ROLE } from "@/lib/roles";
 
 export const dynamic = 'force-dynamic';
 
+function buildBallCommentary(
+  commentary: string | null | undefined,
+  dismissedBatsmanId: string | null,
+  dismissedBatsmanOrder: number | null
+) {
+  if (!dismissedBatsmanId) return commentary || null;
+
+  return `__meta__${JSON.stringify({
+    text: commentary || null,
+    dismissedBatsmanId,
+    dismissedBatsmanOrder,
+  })}`;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -24,6 +38,9 @@ export async function POST(req: NextRequest) {
       ballNumber,
       overNumber,
       batsmanId,
+      batsmanOrder,
+      dismissedBatsmanId,
+      dismissedBatsmanOrder,
       bowlerId,
       runs,
       isWicket,
@@ -93,6 +110,9 @@ export async function POST(req: NextRequest) {
         ? inningsMeta.match.awayTeamId
         : inningsMeta.match.homeTeamId;
 
+    const wicketPlayerId = dismissedBatsmanId || batsmanId;
+    const wicketPlayerOrder = dismissedBatsmanOrder || batsmanOrder || 99;
+
     if (batsmanId) {
       const batter = await prisma.player.findUnique({
         where: { id: batsmanId },
@@ -100,6 +120,15 @@ export async function POST(req: NextRequest) {
       });
       if (!batter || batter.teamId !== inningsMeta.teamId) {
         return NextResponse.json({ error: "Invalid batsman for batting team" }, { status: 400 });
+      }
+    }
+    if (isWicket && wicketPlayerId) {
+      const dismissedPlayer = await prisma.player.findUnique({
+        where: { id: wicketPlayerId },
+        select: { teamId: true },
+      });
+      if (!dismissedPlayer || dismissedPlayer.teamId !== inningsMeta.teamId) {
+        return NextResponse.json({ error: "Invalid dismissed batter for batting team" }, { status: 400 });
       }
     }
     if (bowlerId) {
@@ -160,7 +189,11 @@ export async function POST(req: NextRequest) {
         extraRuns: extraRuns || 0,
         isBoundary: isBoundary || false,
         isSix: isSix || false,
-        commentary: commentary || null,
+        commentary: buildBallCommentary(
+          commentary,
+          isWicket ? wicketPlayerId || null : null,
+          isWicket ? wicketPlayerOrder : null
+        ),
       },
     });
 
@@ -249,6 +282,9 @@ export async function POST(req: NextRequest) {
       });
 
       const batRuns = isSix ? 6 : isBoundary ? 4 : (runs || 0);
+      const nextBatRuns = (existingBatting?.runs || 0) + batRuns;
+      const nextBatBalls = (existingBatting?.balls || 0) + 1;
+      const nextStrikeRate = nextBatBalls > 0 ? Number(((nextBatRuns / nextBatBalls) * 100).toFixed(2)) : 0;
 
       if (existingBatting) {
         await prisma.battingScorecard.update({
@@ -256,9 +292,10 @@ export async function POST(req: NextRequest) {
           data: {
             runs: { increment: batRuns },
             balls: { increment: 1 },
+            strikeRate: nextStrikeRate,
             fours: isBoundary && !isSix ? { increment: 1 } : undefined,
             sixes: isSix ? { increment: 1 } : undefined,
-            ...(isWicket && {
+            ...(isWicket && wicketPlayerId === batsmanId && {
               isOut: batterIsOut,
               wicketType: wicketType || null,
               bowlerId: bowlerId || null,
@@ -273,9 +310,40 @@ export async function POST(req: NextRequest) {
             playerId: batsmanId,
             runs: batRuns,
             balls: 1,
+            strikeRate: nextStrikeRate,
             fours: isBoundary && !isSix ? 1 : 0,
             sixes: isSix ? 1 : 0,
-            battingOrder: 1,
+            battingOrder: batsmanOrder || 99,
+            isOut: isWicket && wicketPlayerId === batsmanId ? batterIsOut : false,
+            wicketType: isWicket && wicketPlayerId === batsmanId ? wicketType || null : null,
+            bowlerId: isWicket && wicketPlayerId === batsmanId ? bowlerId || null : null,
+            fielderId: isWicket && wicketPlayerId === batsmanId ? fielderIds || null : null,
+          },
+        });
+      }
+    }
+
+    if (isWicket && wicketPlayerId) {
+      const dismissedBatting = await prisma.battingScorecard.findFirst({
+        where: { inningsId, playerId: wicketPlayerId },
+      });
+
+      if (dismissedBatting) {
+        await prisma.battingScorecard.update({
+          where: { id: dismissedBatting.id },
+          data: {
+            isOut: batterIsOut,
+            wicketType: wicketType || null,
+            bowlerId: bowlerId || null,
+            fielderId: fielderIds || null,
+          },
+        });
+      } else {
+        await prisma.battingScorecard.create({
+          data: {
+            inningsId,
+            playerId: wicketPlayerId,
+            battingOrder: wicketPlayerOrder,
             isOut: batterIsOut,
             wicketType: wicketType || null,
             bowlerId: bowlerId || null,
@@ -314,22 +382,21 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      // Update bowler's overs (recalculate from all legal balls in innings)
-      if (isLegalBall) {
-        const bowlerBalls = await prisma.ballEvent.findMany({
-          where: { inningsId, bowlerId },
-          select: { isExtra: true, extraType: true },
-        });
-        const legalBowled = bowlerBalls.filter(
-          (b) => !b.isExtra || b.extraType === "BYE" || b.extraType === "LEG_BYE"
-        ).length;
-        const bowlerOvers = Math.floor(legalBowled / 6) + (legalBowled % 6) / 10;
+      const bowlerBalls = await prisma.ballEvent.findMany({
+        where: { inningsId, bowlerId },
+        select: { runs: true, extraRuns: true, isExtra: true, extraType: true },
+      });
+      const legalBowled = bowlerBalls.filter(
+        (b) => !b.isExtra || b.extraType === "BYE" || b.extraType === "LEG_BYE"
+      ).length;
+      const bowlerOvers = Math.floor(legalBowled / 6) + (legalBowled % 6) / 10;
+      const bowlerRuns = bowlerBalls.reduce((sum, b) => sum + b.runs + b.extraRuns, 0);
+      const bowlerEconomy = legalBowled > 0 ? Number((((bowlerRuns * 6) / legalBowled)).toFixed(2)) : 0;
 
-        await prisma.bowlingScorecard.updateMany({
-          where: { inningsId, playerId: bowlerId },
-          data: { overs: bowlerOvers },
-        });
-      }
+      await prisma.bowlingScorecard.updateMany({
+        where: { inningsId, playerId: bowlerId },
+        data: { overs: bowlerOvers, economy: bowlerEconomy },
+      });
     }
 
     // --- Auto-detect match completion ---
@@ -462,15 +529,26 @@ export async function POST(req: NextRequest) {
               const runsConceded = bowlingInnings.totalRuns;
               const oversBowled = bowlingInnings.totalBalls / 6;
 
-              if (oversFaced > 0 && oversBowled > 0) {
+              const updatedPointsEntry = await prisma.pointsTable.update({
+                where: { leagueId_teamId: { leagueId: match.leagueId, teamId } },
+                data: {
+                  runsScored: { increment: runsScored },
+                  oversFaced: { increment: oversFaced },
+                  runsConceded: { increment: runsConceded },
+                  oversBowled: { increment: oversBowled },
+                },
+              });
+
+              if (updatedPointsEntry.oversFaced > 0 && updatedPointsEntry.oversBowled > 0) {
                 await prisma.pointsTable.update({
-                  where: { leagueId_teamId: { leagueId: match.leagueId, teamId } },
+                  where: { id: updatedPointsEntry.id },
                   data: {
-                    runsScored: { increment: runsScored },
-                    oversFaced: { increment: oversFaced },
-                    runsConceded: { increment: runsConceded },
-                    oversBowled: { increment: oversBowled },
-                    netRunRate: calcNRR(runsScored, oversFaced, runsConceded, oversBowled),
+                    netRunRate: calcNRR(
+                      updatedPointsEntry.runsScored,
+                      updatedPointsEntry.oversFaced,
+                      updatedPointsEntry.runsConceded,
+                      updatedPointsEntry.oversBowled,
+                    ),
                   },
                 });
               }

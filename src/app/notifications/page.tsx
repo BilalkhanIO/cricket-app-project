@@ -29,15 +29,6 @@ const typeIcon: Record<string, string> = {
   MATCH_REMINDER:    "⏰",
 };
 
-const typeColor: Record<string, string> = {
-  MATCH_COMPLETED: "bg-yellow-100 text-yellow-700",
-  MATCH_STARTED:   "bg-blue-100 text-blue-700",
-  WICKET_ALERT:    "bg-red-100 text-red-700",
-  RESULT_DECLARED: "bg-emerald-100 text-emerald-700",
-  ANNOUNCEMENT:    "bg-purple-100 text-purple-700",
-  MATCH_REMINDER:  "bg-orange-100 text-orange-700",
-};
-
 function formatTime(dateStr: string) {
   const d = new Date(dateStr);
   const diff = Date.now() - d.getTime();
@@ -79,12 +70,21 @@ export default function NotificationsPage() {
 
   if (!session) {
     return (
-      <PublicShell>
-        <div className="flex min-h-[50vh] items-center justify-center">
-          <div className="text-center p-10">
-            <div className="text-5xl mb-3">🔔</div>
-            <h2 className="text-xl font-bold text-[color:var(--color-ink)] mb-2">Sign in to view notifications</h2>
-            <Link href="/login" className="text-[color:var(--primary)] hover:underline font-medium">Login →</Link>
+      <PublicShell mainClassName="overflow-hidden">
+        <div className="flex min-h-[60vh] items-center justify-center bg-[#00142b] text-[#d4e3ff]">
+          <div className="text-center">
+            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#9bb2d1]">Sign in required</p>
+            <h2 className="mt-3 font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
+              View your notifications
+            </h2>
+            <div className="mt-6">
+              <Link
+                href="/login"
+                className="inline-block bg-[#4ae183] px-6 py-3 text-sm font-black uppercase tracking-[0.18em] text-[#00142b] transition hover:bg-white"
+              >
+                Login
+              </Link>
+            </div>
           </div>
         </div>
       </PublicShell>
@@ -92,44 +92,54 @@ export default function NotificationsPage() {
   }
 
   return (
-    <PublicShell mainClassName="bg-[#061727] text-[#d4e3ff]">
-      <div>
+    <PublicShell mainClassName="overflow-hidden">
+      <div className="bg-[#00142b] text-[#d4e3ff]">
         {/* Header */}
-        <div className="section-banner py-8">
-          <div className="max-w-3xl mx-auto px-4 sm:px-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#06bb63] rounded-xl flex items-center justify-center text-xl text-[#00142b]">🔔</div>
-                <div>
-                  <h1 className="text-2xl font-bold tracking-tight">NOTIFICATIONS</h1>
-                  <p className="text-[#c4c6cf] text-sm mt-0.5 uppercase tracking-[0.18em]">
-                    {unreadCount > 0 ? `${unreadCount} unread` : "All caught up!"}
-                  </p>
-                </div>
+        <section className="relative overflow-hidden px-4 pb-8 pt-10 sm:px-6 lg:pb-10 lg:pt-12">
+          <div
+            className="absolute inset-0 opacity-30"
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(74,225,131,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(74,225,131,0.06) 1px, transparent 1px)",
+              backgroundSize: "40px 40px",
+            }}
+          />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(27,54,86,0.95),transparent_52%),linear-gradient(180deg,rgba(0,20,43,0.22),#00142b_76%)]" />
+
+          <div className="relative mx-auto max-w-screen-xl">
+            <div className="inline-flex items-center gap-2 bg-[#1b3656] px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-[#d4e3ff]">
+              Inbox
+            </div>
+            <div className="mt-6 flex items-end justify-between gap-6">
+              <div>
+                <h1 className="font-[var(--font-display)] text-5xl font-black uppercase tracking-tight text-white sm:text-6xl">
+                  Notifications
+                  <span className="block text-[#4ae183]">{unreadCount > 0 ? `${unreadCount} unread` : "all clear"}</span>
+                </h1>
               </div>
               {unreadCount > 0 && (
                 <button
                   onClick={markAllRead}
-                  className="text-sm text-[#e4e4cc] hover:text-white border border-white/10 hover:border-[#06bb63] px-4 py-2 rounded-lg transition-colors"
+                  className="shrink-0 border border-white/10 bg-[#001c3a] px-4 py-2 text-sm font-black uppercase tracking-[0.14em] text-[#d4e3ff] transition hover:border-[#4ae183] hover:text-[#4ae183]"
                 >
                   Mark all read
                 </button>
               )}
             </div>
           </div>
-        </div>
+        </section>
 
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
+        <div className="mx-auto max-w-screen-xl px-4 py-10 sm:px-6 lg:py-12">
           {/* Filter tabs */}
-          <div className="flex gap-2 mb-6">
+          <div className="mb-6 flex gap-2">
             {(["all", "unread"] as const).map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                className={`px-4 py-2 text-sm font-black uppercase tracking-[0.14em] transition ${
                   filter === f
-                    ? "bg-[#06bb63] text-[#00142b] shadow-sm"
-                    : "bg-[#012040] border border-white/10 text-[#c4c6cf] hover:border-[#06bb63]"
+                    ? "bg-[#4ae183] text-[#00142b]"
+                    : "border border-white/10 bg-[#001c3a] text-[#9bb2d1] hover:border-[#4ae183] hover:text-[#4ae183]"
                 }`}
               >
                 {f === "all" ? `All (${notifications.length})` : `Unread (${unreadCount})`}
@@ -140,25 +150,27 @@ export default function NotificationsPage() {
           {loading ? (
             <div className="space-y-3">
               {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="bg-[#012040] rounded-2xl border border-white/10 p-4 animate-pulse">
+                <div key={i} className="border border-white/10 bg-[#001c3a] p-4 animate-pulse">
                   <div className="flex gap-4">
-                    <div className="w-10 h-10 bg-[#1b3656] rounded-xl" />
+                    <div className="h-10 w-10 bg-[#1b3656]" />
                     <div className="flex-1 space-y-2">
-                      <div className="h-3 bg-[#1b3656] rounded w-1/2" />
-                      <div className="h-3 bg-[#1b3656] rounded w-3/4" />
-                      <div className="h-2 bg-[#1b3656] rounded w-1/4" />
+                      <div className="h-3 w-1/2 bg-[#1b3656]" />
+                      <div className="h-3 w-3/4 bg-[#1b3656]" />
+                      <div className="h-2 w-1/4 bg-[#1b3656]" />
                     </div>
                   </div>
                 </div>
               ))}
             </div>
           ) : visible.length === 0 ? (
-            <div className="text-center py-16 bg-[#012040] rounded-2xl border border-white/10">
-              <div className="text-5xl mb-3">🔔</div>
-              <h3 className="text-lg font-semibold text-white mb-1">
-                {filter === "unread" ? "No unread notifications" : "No notifications yet"}
-              </h3>
-              <p className="text-[#c4c6cf] text-sm">
+            <div className="border border-white/10 bg-[#001c3a] p-10 text-center">
+              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#4ae183]">
+                {filter === "unread" ? "All caught up" : "No notifications"}
+              </p>
+              <p className="mt-3 font-[var(--font-display)] text-2xl font-black uppercase text-white">
+                {filter === "unread" ? "No unread notifications" : "Nothing here yet"}
+              </p>
+              <p className="mt-2 text-sm text-[#9bb2d1]">
                 {filter === "unread" ? "You're all caught up!" : "Notifications will appear here as activity happens."}
               </p>
             </div>
@@ -168,39 +180,41 @@ export default function NotificationsPage() {
                 <div
                   key={notif.id}
                   onClick={() => markRead(notif.id)}
-                  className={`bg-[#012040] rounded-2xl border transition-all cursor-pointer hover:bg-[#0e2b4b] ${
+                  className={`border bg-[#001c3a] transition cursor-pointer hover:bg-[#0b2747] ${
                     !notif.isRead
-                      ? "border-[#06bb63] border-l-4"
+                      ? "border-l-4 border-[#4ae183]"
                       : "border-white/10"
                   }`}
                 >
                   <div className="flex gap-4 p-4">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0 ${typeColor[notif.type] || "bg-[#1b3656] text-[#d4e3ff]"}`}>
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-[#1b3656] text-xl">
                       {typeIcon[notif.type] || "🔔"}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <p className={`text-sm font-semibold ${!notif.isRead ? "text-white" : "text-[#c4c6cf]"}`}>
+                        <p className={`text-sm font-bold ${!notif.isRead ? "text-white" : "text-[#9bb2d1]"}`}>
                           {notif.title}
                         </p>
-                        <span className="text-[10px] text-[#8e9198] flex-shrink-0 uppercase tracking-[0.16em]">{formatTime(notif.createdAt)}</span>
+                        <span className="shrink-0 text-[10px] font-black uppercase tracking-[0.16em] text-[#9bb2d1]">
+                          {formatTime(notif.createdAt)}
+                        </span>
                       </div>
-                      <p className="text-sm text-[#c4c6cf] mt-0.5 line-clamp-2">{notif.message}</p>
-                      <div className="flex items-center gap-3 mt-2">
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${typeColor[notif.type] || "bg-[#1b3656] text-[#d4e3ff]"}`}>
+                      <p className="mt-0.5 text-sm text-[#9bb2d1] line-clamp-2">{notif.message}</p>
+                      <div className="mt-2 flex items-center gap-3">
+                        <span className="bg-[#1b3656] px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] text-[#d4e3ff]">
                           {notif.type.replace(/_/g, " ")}
                         </span>
                         {notif.matchId && (
                           <Link
                             href={`/matches/${notif.matchId}`}
-                            className="text-xs text-[#6bfe9c] hover:underline font-medium"
+                            className="text-xs font-bold text-[#4ae183] hover:underline"
                             onClick={(e) => e.stopPropagation()}
                           >
                             View match →
                           </Link>
                         )}
                         {!notif.isRead && (
-                          <span className="ml-auto text-[10px] text-[#6bfe9c] font-semibold uppercase tracking-[0.16em]">New</span>
+                          <span className="ml-auto text-[10px] font-black uppercase tracking-[0.16em] text-[#4ae183]">New</span>
                         )}
                       </div>
                     </div>

@@ -94,6 +94,9 @@ export default async function AdminLeagueDetailPage({ params }: { params: Promis
           <Link href={`/admin/leagues/${league.id}/sponsors`} className="inline-flex items-center justify-center bg-purple-600 text-white px-3 py-2.5 rounded-xl text-sm font-semibold hover:bg-purple-700">
             Sponsors
           </Link>
+          <Link href={`/admin/leagues/${league.id}/media`} className="inline-flex items-center justify-center bg-rose-600 text-white px-3 py-2.5 rounded-xl text-sm font-semibold hover:bg-rose-700">
+            Media
+          </Link>
           <Link href={`/leagues/${league.id}`} className="inline-flex items-center justify-center bg-white/10 text-white px-3 py-2.5 rounded-xl text-sm font-semibold hover:bg-white/15">
             Public View →
           </Link>

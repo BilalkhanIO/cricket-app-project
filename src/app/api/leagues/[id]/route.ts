@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { jsonWithCors, optionsWithCors } from "@/lib/api-cors";
 import prisma from "@/lib/prisma";
 import { canEditLeague } from "@/lib/permissions";
 import { ROLE } from "@/lib/roles";
 
 export const dynamic = 'force-dynamic';
+
+export function OPTIONS(req: NextRequest) {
+  return optionsWithCors(req);
+}
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -62,10 +67,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       },
     });
 
-    if (!league) return NextResponse.json({ error: "League not found" }, { status: 404 });
-    return NextResponse.json({ league });
+    if (!league) return jsonWithCors(req, { error: "League not found" }, { status: 404 });
+    return jsonWithCors(req, { league });
   } catch (error) {
-    return NextResponse.json({ error: "Failed to fetch league" }, { status: 500 });
+    return jsonWithCors(req, { error: "Failed to fetch league" }, { status: 500 });
   }
 }
 

@@ -20,7 +20,7 @@ async function getMatches() {
 
 async function getScorers() {
   return prisma.user.findMany({
-    where: { role: "SCORER", isActive: true },
+    where: { role: { in: ["SCORER", "LEAGUE_ADMIN", "SUPER_ADMIN"] }, isActive: true },
     select: { id: true, name: true, email: true },
     orderBy: { name: "asc" },
   });
@@ -68,6 +68,21 @@ export default async function AdminMatchesPage() {
             <div key={item.label} className="border border-white/10 bg-[#00142b] px-4 py-4">
               <p className="font-[var(--font-display)] text-3xl font-black text-white">{item.value}</p>
               <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">{item.label}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-6 grid gap-3 lg:grid-cols-4">
+          {[
+            { step: "1", title: "Create the fixture", body: "League admin schedules the match under the correct league and teams." },
+            { step: "2", title: "Assign the scorer", body: "Pick a user with scorer permissions from the fixture board or match form." },
+            { step: "3", title: "Lock operations", body: "Set officials, confirm playing XIs, and hand the private console to the scorer." },
+            { step: "4", title: "Publish live board", body: "Public match page shows scorecards, commentary, scorer, and officials automatically." },
+          ].map((item) => (
+            <div key={item.step} className="border border-white/10 bg-[#00142b] p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#7f9abd]">Step {item.step}</p>
+              <p className="mt-2 font-[var(--font-display)] text-xl font-black uppercase tracking-tight text-white">{item.title}</p>
+              <p className="mt-2 text-sm leading-6 text-[#9bb2d1]">{item.body}</p>
             </div>
           ))}
         </div>

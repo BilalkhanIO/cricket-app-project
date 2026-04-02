@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { jsonWithCors, optionsWithCors } from "@/lib/api-cors";
 import prisma from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
+
+export function OPTIONS(req: NextRequest) {
+  return optionsWithCors(req);
+}
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -92,10 +97,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       },
     });
 
-    if (!match) return NextResponse.json({ error: "Match not found" }, { status: 404 });
-    return NextResponse.json({ match });
+    if (!match) return jsonWithCors(req, { error: "Match not found" }, { status: 404 });
+    return jsonWithCors(req, { match });
   } catch (error) {
-    return NextResponse.json({ error: "Failed to fetch match" }, { status: 500 });
+    return jsonWithCors(req, { error: "Failed to fetch match" }, { status: 500 });
   }
 }
 
@@ -204,5 +209,39 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ match: updated });
   } catch (error) {
     return NextResponse.json({ error: "Failed to update match" }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    const session = await getServerSession(authOptions);
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const isAdmin = ["SUPER_ADMIN", "LEAGUE_ADMIN"].includes(session.user.role);
+    if (!isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+    const match = await prisma.match.findUnique({ where: { id } });
+    if (!match) return NextResponse.json({ error: "Match not found" }, { status: 404 });
+
+    await prisma.match.update({
+      where: { id },
+      data: { status: "CANCELED" },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: session.user.id,
+        matchId: id,
+        action: "DELETE",
+        entity: "Match",
+        entityId: id,
+        newValue: JSON.stringify({ status: "CANCELED" }),
+      },
+    }).catch(() => {});
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to delete match" }, { status: 500 });
   }
 }

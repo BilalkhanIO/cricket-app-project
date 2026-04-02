@@ -2,6 +2,7 @@ import Link from "next/link";
 import prisma from "@/lib/prisma";
 import { Card } from "@/components/ui/Card";
 import { StatusBadge } from "@/components/ui/Badge";
+import AdminDeleteButton from "@/app/admin/AdminDeleteButton";
 
 export const dynamic = 'force-dynamic';
 
@@ -70,7 +71,11 @@ export default async function AdminTeamsPage() {
                     ) : "-"}
                   </td>
                   <td className="px-3 py-3">
-                    <Link href={`/teams/${t.id}`} className="text-xs text-blue-600 hover:underline">View</Link>
+                    <div className="flex items-center gap-2">
+                      <Link href={`/teams/${t.id}`} className="text-xs text-blue-600 hover:underline">View</Link>
+                      <Link href={`/admin/teams/${t.id}/edit`} className="text-xs text-[color:var(--primary)] hover:underline">Edit</Link>
+                      <AdminDeleteButton endpoint={`/api/teams/${t.id}`} confirmMessage={`Delete ${t.name}?`} label="Delete" />
+                    </div>
                   </td>
                 </tr>
               ))}

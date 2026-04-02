@@ -163,8 +163,8 @@ export default async function ScorerDashboard() {
                                   View match
                                 </Link>
                                 {match.status === "UPCOMING" && (
-                                  <Link href={`/admin/matches/${match.id}/playing-xi`} className="bg-[#1b3656] px-4 py-3 text-center text-sm font-black uppercase tracking-[0.18em] text-white">
-                                    Set playing XI
+                                  <Link href={`/scorer/${match.id}`} className="bg-[#1b3656] px-4 py-3 text-center text-sm font-black uppercase tracking-[0.18em] text-white">
+                                    Open setup
                                   </Link>
                                 )}
                               </div>

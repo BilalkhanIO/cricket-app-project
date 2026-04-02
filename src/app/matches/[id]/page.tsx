@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   CalendarDays,
-  CircleAlert,
   ShieldCheck,
   Trophy,
   Users,
@@ -10,7 +9,7 @@ import {
 import prisma from "@/lib/prisma";
 import { formatDateTime } from "@/lib/utils";
 import PublicShell from "@/components/layout/PublicShell";
-import LiveCommentary from "./LiveCommentary";
+import PublicMatchTabs from "./PublicMatchTabs";
 
 export const dynamic = "force-dynamic";
 
@@ -81,10 +80,6 @@ function getStatusTone(status: string) {
   return "bg-[#12324d] text-[#d4e3ff]";
 }
 
-function getInning(match: any, teamId: string) {
-  return match.innings.find((inning: any) => inning.teamId === teamId);
-}
-
 function formatScore(inning: any) {
   if (!inning) return "--";
   return `${inning.totalRuns}/${inning.totalWickets}`;
@@ -107,6 +102,15 @@ function BallDot({ ball }: { ball: any }) {
   return <span className={`flex h-7 w-7 items-center justify-center text-[10px] font-black ${className}`}>{label}</span>;
 }
 
+function describeBall(ball: any) {
+  if (ball.isWicket) return `Wicket · ${formatLabel(ball.wicketType || "OUT")}`;
+  if (ball.isSix) return "Six runs";
+  if (ball.isBoundary) return "Four runs";
+  if (ball.isExtra) return `${formatLabel(ball.extraType || "EXTRA")} · ${ball.extraRuns}`;
+  if (ball.runs === 0) return "Dot ball";
+  return `${ball.runs} run${ball.runs === 1 ? "" : "s"}`;
+}
+
 export default async function MatchDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const match = await getMatch(id);
@@ -116,7 +120,6 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
   const homeInning2 = match.innings.find((inning) => inning.inningsNumber === 2 && inning.teamId === match.homeTeamId);
   const awayInning1 = match.innings.find((inning) => inning.inningsNumber === 1 && inning.teamId === match.awayTeamId);
   const awayInning2 = match.innings.find((inning) => inning.inningsNumber === 2 && inning.teamId === match.awayTeamId);
-  const isLive = ["LIVE", "INNINGS_BREAK"].includes(match.status);
   const activeInnings = match.innings.find((inning) => !inning.isCompleted);
   const currentRunRate =
     activeInnings && activeInnings.totalBalls > 0 ? ((activeInnings.totalRuns / activeInnings.totalBalls) * 6).toFixed(2) : null;
@@ -133,12 +136,23 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
         })()
       : null;
 
-  const sections = [
-    { id: "overview", label: "Overview" },
-    { id: "innings", label: "Innings" },
-    { id: "overs", label: "Over Log" },
-    { id: "officials", label: "Officials" },
-  ];
+  const liveBatters = activeInnings?.battingScores.filter((batter) => !batter.isOut) || [];
+  const currentOver =
+    activeInnings?.overs.length && !activeInnings.overs[activeInnings.overs.length - 1].isCompleted
+      ? activeInnings.overs[activeInnings.overs.length - 1]
+      : null;
+  const lastCompletedOver =
+    activeInnings?.overs
+      .slice()
+      .reverse()
+      .find((over) => over.isCompleted) || null;
+  const currentBowler =
+    currentOver?.bowlerId ? activeInnings?.bowlingScores.find((bowler) => bowler.playerId === currentOver.bowlerId) : null;
+  const lastOverBowler =
+    lastCompletedOver?.bowlerId ? activeInnings?.bowlingScores.find((bowler) => bowler.playerId === lastCompletedOver.bowlerId) : null;
+  const ballHistory = activeInnings
+    ? activeInnings.overs.flatMap((over) => over.balls.map((ball) => ({ ...ball, overNumber: over.overNumber }))).slice(-18).reverse()
+    : [];
 
   return (
     <PublicShell mainClassName="overflow-hidden">
@@ -164,356 +178,228 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
               </Link>
             </div>
 
-            <div className="mt-6 grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
+            <div className="mt-6 space-y-5">
               <div className="space-y-5">
                 <div className="grid items-center gap-4 sm:grid-cols-[1fr_auto_1fr]">
-                  <div className="text-center sm:text-left">
-                    <p className="font-[var(--font-display)] text-4xl font-black uppercase tracking-tight text-white sm:text-5xl">
-                      {match.homeTeam.shortName}
-                    </p>
-                    <p className="mt-2 text-sm font-bold uppercase tracking-[0.14em] text-[#9bb2d1]">{match.homeTeam.name}</p>
-                    <p className="mt-3 font-[var(--font-display)] text-4xl font-black text-white">
-                      {formatScore(homeInning1)}
-                    </p>
-                    {homeInning2 && <p className="mt-1 font-[var(--font-display)] text-3xl font-black text-[#c8c8b0]">{formatScore(homeInning2)}</p>}
+                  <div className="space-y-2">
+                    <div className="flex items-end gap-4">
+                      <p className="font-[var(--font-display)] text-4xl font-black uppercase tracking-tight text-white sm:text-5xl">
+                        {match.homeTeam.shortName}
+                      </p>
+                      <div>
+                        <p className="font-[var(--font-display)] text-4xl font-black text-white">
+                          {formatScore(homeInning1)}
+                        </p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
+                          {homeInning1 ? `${homeInning1.totalOvers.toFixed(1)}/${match.overs} ov` : `--/${match.overs} ov`}
+                        </p>
+                      </div>
+                    </div>
+                    {homeInning2 && <p className="font-[var(--font-display)] text-2xl font-black text-[#c8c8b0]">{formatScore(homeInning2)}</p>}
                   </div>
 
                   <div className="text-center">
                     <p className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-[#4ae183]">VS</p>
                   </div>
 
-                  <div className="text-center sm:text-right">
-                    <p className="font-[var(--font-display)] text-4xl font-black uppercase tracking-tight text-white sm:text-5xl">
-                      {match.awayTeam.shortName}
-                    </p>
-                    <p className="mt-2 text-sm font-bold uppercase tracking-[0.14em] text-[#9bb2d1]">{match.awayTeam.name}</p>
-                    <p className="mt-3 font-[var(--font-display)] text-4xl font-black text-white">
-                      {formatScore(awayInning1)}
-                    </p>
-                    {awayInning2 && <p className="mt-1 font-[var(--font-display)] text-3xl font-black text-[#c8c8b0]">{formatScore(awayInning2)}</p>}
+                  <div className="space-y-2">
+                    <div className="flex items-end gap-4">
+                      <p className="font-[var(--font-display)] text-4xl font-black uppercase tracking-tight text-white sm:text-5xl">
+                        {match.awayTeam.shortName}
+                      </p>
+                      <div>
+                        <p className="font-[var(--font-display)] text-4xl font-black text-white">
+                          {formatScore(awayInning1)}
+                        </p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
+                          {awayInning1 ? `${awayInning1.totalOvers.toFixed(1)}/${match.overs} ov` : `--/${match.overs} ov`}
+                        </p>
+                      </div>
+                    </div>
+                    {awayInning2 && <p className="font-[var(--font-display)] text-2xl font-black text-[#c8c8b0]">{formatScore(awayInning2)}</p>}
                   </div>
                 </div>
 
-                <p className="max-w-2xl text-sm leading-7 text-[#9bb2d1]">
-                  {match.result ||
-                    `${match.matchFormat} fixture in ${match.league.name}. Follow scorecards, over history, playing XIs, officials, and live commentary from one public match hub.`}
-                </p>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Link
-                    href={`/scorer/${match.id}`}
-                    className="bg-[#4ae183] px-6 py-4 text-center text-sm font-black uppercase tracking-[0.22em] text-[#003919] transition hover:bg-[#6bfe9c]"
-                  >
-                    Open scoring panel
-                  </Link>
-                  <Link
-                    href={`/leagues/${match.league.id}`}
-                    className="bg-[#1b3656] px-6 py-4 text-center text-sm font-black uppercase tracking-[0.22em] text-white transition hover:bg-[#234669]"
-                  >
-                    Back to league
-                  </Link>
-                </div>
+                {match.result && (
+                  <p className="max-w-2xl text-sm leading-7 text-[#9bb2d1]">{match.result}</p>
+                )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="flex flex-wrap gap-x-6 gap-y-3 border-t border-white/10 pt-4">
                 {[
                   { value: match.overs, label: "Overs" },
                   { value: match.innings.length, label: "Innings" },
                   { value: match.playingXIs.length, label: "XI entries" },
                   { value: match.officials.length + (match.scorer ? 1 : 0), label: "Officials" },
                 ].map((stat) => (
-                  <div key={stat.label} className="border border-white/10 bg-[#001c3a] px-4 py-4">
-                    <p className="font-[var(--font-display)] text-3xl font-black text-white">{stat.value}</p>
+                  <div key={stat.label} className="min-w-[88px]">
+                    <p className="font-[var(--font-display)] text-2xl font-black text-white">{stat.value}</p>
                     <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">{stat.label}</p>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="border border-white/10 bg-[#001c3a] p-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#7f9abd]">Schedule</p>
-                <p className="mt-2 text-sm font-bold uppercase tracking-[0.14em] text-white">{formatDateTime(match.matchDate)}</p>
-              </div>
-              <div className="border border-white/10 bg-[#001c3a] p-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#7f9abd]">Venue</p>
-                <p className="mt-2 text-sm font-bold uppercase tracking-[0.14em] text-white">
-                  {match.venue ? `${match.venue.name}, ${match.venue.city}` : "Venue pending"}
-                </p>
-              </div>
-              <div className="border border-white/10 bg-[#001c3a] p-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#7f9abd]">Toss</p>
-                <p className="mt-2 text-sm font-bold uppercase tracking-[0.14em] text-white">
-                  {match.tossWinnerId
+              <div className="mt-6 flex flex-wrap gap-x-8 gap-y-4 border-t border-white/10 pt-4">
+                {[
+                  { label: "Schedule", value: formatDateTime(match.matchDate) },
+                  { label: "Venue", value: match.venue ? `${match.venue.name}, ${match.venue.city}` : "Venue pending" },
+                  {
+                  label: "Toss",
+                  value: match.tossWinnerId
                     ? `${match.tossWinnerId === match.homeTeamId ? match.homeTeam.shortName : match.awayTeam.shortName} chose ${match.tossDecision}`
-                    : "Pending"}
-                </p>
-              </div>
-              <div className="border border-white/10 bg-[#001c3a] p-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#7f9abd]">Live rates</p>
-                <p className="mt-2 text-sm font-bold uppercase tracking-[0.14em] text-white">
-                  {currentRunRate ? `CRR ${currentRunRate}${requiredRunRate ? ` · RRR ${requiredRunRate}` : ""}` : "Not live"}
-                </p>
-              </div>
+                    : "Pending",
+                },
+                { label: "Live rates", value: currentRunRate ? `CRR ${currentRunRate}${requiredRunRate ? ` · RRR ${requiredRunRate}` : ""}` : "Not live" },
+              ].map((item) => (
+                <div key={item.label} className="min-w-[180px]">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#7f9abd]">{item.label}</p>
+                  <p className="mt-1 text-sm font-bold uppercase tracking-[0.14em] text-white">{item.value}</p>
+                </div>
+              ))}
             </div>
-          </div>
-        </section>
-
-        <section className="sticky top-[72px] z-30 border-y border-white/10 bg-[rgba(0,20,43,0.94)] px-4 py-3 backdrop-blur-xl sm:px-6">
-          <div className="mx-auto flex max-w-screen-xl gap-2 overflow-x-auto">
-            {sections.map((section) => (
-              <a key={section.id} href={`#${section.id}`} className="whitespace-nowrap bg-[#001c3a] px-4 py-3 text-xs font-black uppercase tracking-[0.18em] text-[#d4e3ff] transition hover:bg-[#0b2747]">
-                {section.label}
-              </a>
-            ))}
           </div>
         </section>
 
         <div className="mx-auto max-w-screen-xl px-4 py-10 sm:px-6 lg:py-12">
-          {isLive && match.innings.length > 0 && (
-            <section className="mb-10">
-              <LiveCommentary matchId={match.id} initialInnings={match.innings as any} />
-            </section>
-          )}
+          <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr_0.9fr]">
+            <div className="border border-white/10 bg-[#001c3a] p-5">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#7f9abd]">Batters on ground</p>
+              <div className="mt-4 space-y-4">
+                {liveBatters.length > 0 ? (
+                  liveBatters.map((batter) => (
+                    <div key={batter.id} className="border border-white/10 bg-[#00142b] p-4">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="font-[var(--font-display)] text-2xl font-black uppercase tracking-tight text-white">
+                            {batter.player.user.name}
+                          </p>
+                          <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">Not out</p>
+                        </div>
+                        <p className="font-[var(--font-display)] text-3xl font-black text-white">{batter.runs}</p>
+                      </div>
+                      <p className="mt-3 text-sm font-bold uppercase tracking-[0.14em] text-[#d4e3ff]">
+                        {batter.balls} balls · {batter.fours} fours · {batter.sixes} sixes
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-[#9bb2d1]">No active batters recorded yet.</p>
+                )}
+              </div>
+            </div>
 
-          <section id="overview" className="grid gap-6 lg:grid-cols-[1.04fr_0.96fr]">
-            <div className="space-y-4">
-              <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
-                Match
-                <span className="block text-[#4ae183]">overview</span>
-              </h2>
-              <div className="grid gap-3 sm:grid-cols-2">
+            <div className="border border-white/10 bg-[#001c3a] p-5">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#7f9abd]">Bowling control</p>
+              <div className="mt-4 space-y-4">
+                <div className="border border-white/10 bg-[#00142b] p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">Current bowler</p>
+                  {currentBowler ? (
+                    <>
+                      <p className="mt-2 font-[var(--font-display)] text-2xl font-black uppercase tracking-tight text-white">
+                        {currentBowler.player.user.name}
+                      </p>
+                      <p className="mt-3 text-sm font-bold uppercase tracking-[0.14em] text-[#d4e3ff]">
+                        {currentBowler.overs.toFixed(1)} overs · {currentBowler.runs} runs · {currentBowler.wickets} wickets
+                      </p>
+                    </>
+                  ) : (
+                    <p className="mt-2 text-sm text-[#9bb2d1]">Over not started.</p>
+                  )}
+                </div>
+                <div className="border border-white/10 bg-[#00142b] p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">Last over bowler</p>
+                  {lastOverBowler ? (
+                    <>
+                      <p className="mt-2 font-[var(--font-display)] text-2xl font-black uppercase tracking-tight text-white">
+                        {lastOverBowler.player.user.name}
+                      </p>
+                      <p className="mt-3 text-sm font-bold uppercase tracking-[0.14em] text-[#d4e3ff]">
+                        Over {lastCompletedOver?.overNumber} · {lastOverBowler.overs.toFixed(1)} overs · {lastOverBowler.runs} runs · {lastOverBowler.wickets} wickets
+                      </p>
+                    </>
+                  ) : (
+                    <p className="mt-2 text-sm text-[#9bb2d1]">No completed over yet.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="border border-white/10 bg-[#001c3a] p-5">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#7f9abd]">Match records</p>
+              <div className="mt-4 grid gap-3">
                 {[
                   { icon: CalendarDays, label: "Format", value: `${match.matchFormat} · ${match.overs} overs` },
                   { icon: Users, label: "League season", value: `${match.league.name} · ${match.league.season}` },
-                  { icon: ShieldCheck, label: "Target", value: targetRuns ? `${targetRuns}` : "Not set" },
+                  { icon: ShieldCheck, label: "Scorer", value: match.scorer?.name || "Not assigned" },
                   { icon: Trophy, label: "Result", value: match.result || "In progress" },
                 ].map((item) => (
-                  <div key={item.label} className="border border-white/10 bg-[#001c3a] p-5">
+                  <div key={item.label} className="border border-white/10 bg-[#00142b] p-4">
                     <item.icon className="h-5 w-5 text-[#4ae183]" />
-                    <p className="mt-4 text-[10px] font-black uppercase tracking-[0.22em] text-[#7f9abd]">{item.label}</p>
+                    <p className="mt-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#7f9abd]">{item.label}</p>
                     <p className="mt-2 text-sm font-bold uppercase tracking-[0.14em] text-white">{item.value}</p>
                   </div>
                 ))}
               </div>
-            </div>
 
-            <div className="space-y-4">
-              <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
-                Playing
-                <span className="block text-[#c8c8b0]">XIs</span>
-              </h2>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {[match.homeTeam, match.awayTeam].map((team) => {
-                  const xi = match.playingXIs.filter((entry) => entry.teamId === team.id);
-
-                  return (
-                    <div key={team.id} className="border border-white/10 bg-[#001c3a] p-5">
-                      <p className="font-[var(--font-display)] text-2xl font-black uppercase tracking-tight text-white">{team.name}</p>
-                      <div className="mt-4 space-y-2">
-                        {xi.length > 0 ? (
-                          xi.map((entry, index) => (
-                            <p key={entry.id} className="text-sm font-bold uppercase tracking-[0.08em] text-[#d4e3ff]">
-                              {index + 1}. {entry.player.user.name}
-                            </p>
-                          ))
-                        ) : (
-                          <p className="text-sm text-[#9bb2d1]">Playing XI not confirmed.</p>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </section>
-
-          <section id="innings" className="mt-14 space-y-8">
-            <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
-              Innings
-              <span className="block text-[#4ae183]">scorecards</span>
-            </h2>
-
-            {match.innings.map((innings) => (
-              <div key={innings.id} className="space-y-4">
+              <div className="mt-6 grid gap-4 border-t border-white/10 pt-5 lg:grid-cols-[1.2fr_0.8fr]">
                 <div className="border border-white/10 bg-[#001c3a] p-5">
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7f9abd]">
-                        Innings {innings.inningsNumber}
-                      </p>
-                      <p className="mt-2 font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
-                        {innings.team.name}
-                      </p>
-                    </div>
-                    <p className="font-[var(--font-display)] text-4xl font-black text-white">
-                      {innings.totalRuns}/{innings.totalWickets}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <div className="border border-white/10 bg-[#001c3a]">
-                    <div className="border-b border-white/10 px-5 py-4">
-                      <h3 className="font-[var(--font-display)] text-2xl font-black uppercase tracking-tight text-white">Batting</h3>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full text-sm">
-                        <thead className="border-b border-white/10 bg-[#00142b] text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
-                          <tr>
-                            <th className="px-4 py-3 text-left">Batter</th>
-                            <th className="px-3 py-3 text-center">R</th>
-                            <th className="px-3 py-3 text-center">B</th>
-                            <th className="px-3 py-3 text-center">4s</th>
-                            <th className="px-3 py-3 text-center">6s</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {innings.battingScores.map((bat) => (
-                            <tr key={bat.id} className="border-b border-white/10 last:border-b-0">
-                              <td className="px-4 py-3">
-                                <p className="font-bold uppercase tracking-[0.06em] text-white">{bat.player.user.name}</p>
-                                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
-                                  {bat.isOut ? formatLabel(bat.wicketType || "OUT") : "Not out"}
-                                </p>
-                              </td>
-                              <td className="px-3 py-3 text-center font-black text-white">{bat.runs}</td>
-                              <td className="px-3 py-3 text-center text-[#d4e3ff]">{bat.balls}</td>
-                              <td className="px-3 py-3 text-center text-[#d4e3ff]">{bat.fours}</td>
-                              <td className="px-3 py-3 text-center text-[#d4e3ff]">{bat.sixes}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  <div className="border border-white/10 bg-[#001c3a]">
-                    <div className="border-b border-white/10 px-5 py-4">
-                      <h3 className="font-[var(--font-display)] text-2xl font-black uppercase tracking-tight text-white">Bowling</h3>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full text-sm">
-                        <thead className="border-b border-white/10 bg-[#00142b] text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
-                          <tr>
-                            <th className="px-4 py-3 text-left">Bowler</th>
-                            <th className="px-3 py-3 text-center">O</th>
-                            <th className="px-3 py-3 text-center">R</th>
-                            <th className="px-3 py-3 text-center">W</th>
-                            <th className="px-3 py-3 text-center">Eco</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {innings.bowlingScores.map((bowl) => (
-                            <tr key={bowl.id} className="border-b border-white/10 last:border-b-0">
-                              <td className="px-4 py-3 font-bold uppercase tracking-[0.06em] text-white">{bowl.player.user.name}</td>
-                              <td className="px-3 py-3 text-center text-[#d4e3ff]">{bowl.overs.toFixed(1)}</td>
-                              <td className="px-3 py-3 text-center text-[#d4e3ff]">{bowl.runs}</td>
-                              <td className="px-3 py-3 text-center font-black text-white">{bowl.wickets}</td>
-                              <td className="px-3 py-3 text-center text-[#d4e3ff]">{bowl.economy.toFixed(2)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </section>
-
-          <section id="overs" className="mt-14 space-y-6">
-            <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
-              Over
-              <span className="block text-[#c8c8b0]">history</span>
-            </h2>
-
-            {match.innings.map((innings) => (
-              <div key={`${innings.id}-overs`} className="border border-white/10 bg-[#001c3a]">
-                <div className="border-b border-white/10 px-5 py-4">
-                  <p className="font-[var(--font-display)] text-2xl font-black uppercase tracking-tight text-white">{innings.team.name}</p>
-                </div>
-                <div className="space-y-0">
-                  {innings.overs.length > 0 ? (
-                    [...innings.overs].reverse().map((over) => (
-                      <div key={over.id} className="flex flex-col gap-3 border-b border-white/10 px-5 py-4 last:border-b-0 lg:flex-row lg:items-center lg:justify-between">
-                        <div>
-                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#7f9abd]">Over {over.overNumber}</p>
-                          <p className="mt-1 text-sm font-bold uppercase tracking-[0.14em] text-white">
-                            {over.runs} runs · {over.wickets} wickets
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap gap-1">
-                          {over.balls.map((ball) => (
-                            <BallDot key={ball.id} ball={ball} />
-                          ))}
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="px-5 py-6 text-sm text-[#9bb2d1]">No over history recorded yet.</div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </section>
-
-          <section id="officials" className="mt-14 grid gap-6 lg:grid-cols-[1fr_1fr]">
-            <div className="space-y-4">
-              <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
-                Match
-                <span className="block text-[#4ae183]">officials</span>
-              </h2>
-              <div className="border border-white/10 bg-[#001c3a] p-5">
-                <div className="space-y-3">
-                  {match.officials.map((official) => (
-                    <div key={official.id} className="flex items-center justify-between gap-4 border-b border-white/10 pb-3 last:border-b-0 last:pb-0">
-                      <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">{official.role}</span>
-                      <span className="text-sm font-bold uppercase tracking-[0.08em] text-white">{official.name}</span>
-                    </div>
-                  ))}
-                  {match.scorer && (
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">Scorer</span>
-                      <span className="text-sm font-bold uppercase tracking-[0.08em] text-white">{match.scorer.name}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
-                Match
-                <span className="block text-[#c8c8b0]">notes</span>
-              </h2>
-              <div className="border border-white/10 bg-[#4ae183] p-6 text-[#003919]">
-                <div className="flex items-start gap-3">
-                  <CircleAlert className="mt-0.5 h-5 w-5" />
-                  <div>
-                    <p className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight">Public match hub</p>
-                    <p className="mt-3 text-sm font-medium leading-6">
-                      This page now carries the full public match story: scoreboard, innings, over log, playing XIs, live commentary, and officials in one place.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {match.awards[0]?.player && (
-                <div className="border border-white/10 bg-[#001c3a] p-5">
-                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#c8c8b0]">Man of the match</p>
-                  <p className="mt-2 font-[var(--font-display)] text-2xl font-black uppercase tracking-tight text-white">
-                    {match.awards[0].player.user.name}
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#c8c8b0]">Public match center</p>
+                  <p className="mt-3 text-sm leading-7 text-[#d4e3ff]">
+                    Fans see scorecards, commentary, officials, and the assigned scorer here. The scoring console itself remains private to the assigned scorer and authorized match admins.
                   </p>
-                  {match.awards[0].player.team && (
-                    <p className="mt-2 text-sm font-bold uppercase tracking-[0.14em] text-[#9bb2d1]">
-                      {match.awards[0].player.team.name}
-                    </p>
-                  )}
                 </div>
+                <div className="border border-white/10 bg-[#001c3a] p-5">
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#c8c8b0]">Scoring desk</p>
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#7f9abd]">Assigned scorer</span>
+                      <span className="text-sm font-bold uppercase tracking-[0.08em] text-white">{match.scorer?.name || "Not assigned"}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#7f9abd]">Access model</span>
+                      <span className="text-sm font-bold uppercase tracking-[0.08em] text-[#4ae183]">Private console</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="mt-14 space-y-6">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
+                Ball
+                <span className="block text-[#c8c8b0]">history</span>
+              </h2>
+              {activeInnings && (
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
+                  {activeInnings.team.shortName} innings {activeInnings.inningsNumber}
+                </p>
               )}
             </div>
+            <div className="border border-white/10 bg-[#001c3a]">
+              <div className="space-y-0">
+                {ballHistory.length > 0 ? (
+                  ballHistory.map((ball) => (
+                    <div key={ball.id} className="flex items-center gap-4 border-b border-white/10 px-5 py-4 last:border-b-0">
+                      <BallDot ball={ball} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold uppercase tracking-[0.14em] text-white">
+                          Over {ball.overNumber}.{ball.ballNumber}
+                        </p>
+                        <p className="mt-1 text-sm text-[#d4e3ff]">{describeBall(ball)}</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="px-5 py-6 text-sm text-[#9bb2d1]">No ball history recorded yet.</div>
+                )}
+              </div>
+            </div>
           </section>
+
+          <PublicMatchTabs match={match as any} />
         </div>
       </div>
     </PublicShell>

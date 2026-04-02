@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { jsonWithCors, optionsWithCors } from "@/lib/api-cors";
 import prisma from "@/lib/prisma";
 import { OVERALL_LEAGUE_KEY } from "@/lib/constants";
 
 export const dynamic = 'force-dynamic';
+
+export function OPTIONS(req: NextRequest) {
+  return optionsWithCors(req);
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -27,9 +32,9 @@ export async function GET(req: NextRequest) {
       orderBy: { user: { name: "asc" } },
     });
 
-    return NextResponse.json({ players });
+    return jsonWithCors(req, { players });
   } catch (error) {
-    return NextResponse.json({ error: "Failed to fetch players" }, { status: 500 });
+    return jsonWithCors(req, { error: "Failed to fetch players" }, { status: 500 });
   }
 }
 

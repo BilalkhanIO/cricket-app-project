@@ -1,6 +1,7 @@
 import Link from "next/link";
 import prisma from "@/lib/prisma";
 import { Card } from "@/components/ui/Card";
+import AdminDeleteButton from "@/app/admin/AdminDeleteButton";
 
 export const dynamic = 'force-dynamic';
 
@@ -39,6 +40,16 @@ export default async function AdminVenuesPage() {
                 {venue.pitchType && <span>⚡ {venue.pitchType}</span>}
                 {venue.boundarySize && <span>📏 {venue.boundarySize}</span>}
                 <span>📅 {venue._count.matches} matches</span>
+              </div>
+              <div className="mt-4 flex items-center gap-2">
+                <Link href={`/admin/venues/${venue.id}/edit`} className="text-xs text-[color:var(--primary)] hover:underline">
+                  Edit
+                </Link>
+                <AdminDeleteButton
+                  endpoint={`/api/venues/${venue.id}`}
+                  confirmMessage={`Delete ${venue.name}?`}
+                  label="Delete"
+                />
               </div>
             </div>
           </Card>

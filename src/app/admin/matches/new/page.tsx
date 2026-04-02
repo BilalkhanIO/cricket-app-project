@@ -34,7 +34,7 @@ export default function NewMatchPage() {
     fetch("/api/leagues").then(r => r.json()).then(d => setLeagues(d.leagues || []));
     fetch("/api/venues").then(r => r.json()).then(d => setVenues(d.venues || []));
 
-    fetch("/api/users?role=SCORER").then(r => r.json()).then(d => setScorers(d.users || [])).catch(() => {});
+    fetch("/api/users?roles=SCORER,LEAGUE_ADMIN,SUPER_ADMIN").then(r => r.json()).then(d => setScorers(d.users || [])).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -90,6 +90,16 @@ export default function NewMatchPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="rounded-2xl border border-[color:var(--border-color)] bg-[color:var(--card-muted)] px-4 py-4 text-sm text-[color:var(--color-ink)]">
+          Flow:
+          <div className="mt-2 grid gap-1 text-xs text-[color:var(--color-ink-soft)]">
+            <p>1. Select a league and two approved teams.</p>
+            <p>2. Pick a scorer now or leave it unassigned.</p>
+            <p>3. Use the matches board to reassign the scorer any time.</p>
+            <p>4. The scorer console stays private; the public match center updates automatically.</p>
+          </div>
+        </div>
+
         <Card>
           <CardHeader><h2 className="font-semibold">Match Details</h2></CardHeader>
           <CardBody className="space-y-4">
@@ -155,15 +165,18 @@ export default function NewMatchPage() {
               ]}
             />
             <Select
-              label="Scorer"
+              label="Assigned Scorer"
               name="scorerId"
               value={form.scorerId}
               onChange={handleChange}
               options={[
-                { value: "", label: "Select scorer..." },
-                ...scorers.map((s) => ({ value: s.id, label: s.name })),
+                { value: "", label: "Leave unassigned for now" },
+                ...scorers.map((s) => ({ value: s.id, label: `${s.name} (${s.role.replace(/_/g, " ")})` })),
               ]}
             />
+            <p className="text-xs text-gray-500">
+              Only the assigned scorer or an authorized admin can use the private scoring console.
+            </p>
           </CardBody>
         </Card>
 

@@ -2,6 +2,7 @@ import Link from "next/link";
 import prisma from "@/lib/prisma";
 import { Card, CardBody } from "@/components/ui/Card";
 import { formatDateTime } from "@/lib/utils";
+import AdminDeleteButton from "@/app/admin/AdminDeleteButton";
 
 export const dynamic = 'force-dynamic';
 
@@ -43,6 +44,16 @@ export default async function AdminAnnouncementsPage() {
                       {ann.isPublic ? "Public" : "Private"}
                     </span>
                   </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Link href={`/admin/announcements/${ann.id}/edit`} className="text-xs text-[color:var(--primary)] hover:underline">
+                    Edit
+                  </Link>
+                  <AdminDeleteButton
+                    endpoint={`/api/announcements/${ann.id}`}
+                    confirmMessage={`Delete announcement "${ann.title}"?`}
+                    label="Delete"
+                  />
                 </div>
               </div>
             </CardBody>

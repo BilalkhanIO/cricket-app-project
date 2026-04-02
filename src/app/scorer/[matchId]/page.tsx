@@ -150,6 +150,10 @@ function oversNotationToBalls(overs: number) {
   return whole * 6 + Math.max(0, Math.min(5, balls));
 }
 
+function countLegalBalls(balls: BallEvent[]) {
+  return balls.filter((ball) => !ball.isExtra || ball.extraType === "BYE" || ball.extraType === "LEG_BYE").length;
+}
+
 function BallDot({ ball }: { ball: BallEvent }) {
   const label = ball.isWicket ? "W" : ball.isExtra ? (ball.extraType?.charAt(0) || "E") : ball.runs;
   const color = ball.isWicket
@@ -186,6 +190,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
   const [showWicketModal, setShowWicketModal] = useState(false);
   const [selectedWicketType, setSelectedWicketType] = useState("");
   const [fielder, setFielder] = useState("");
+  const [dismissedBatter, setDismissedBatter] = useState<"STRIKER" | "NON_STRIKER">("STRIKER");
   const [recentBalls, setRecentBalls] = useState<BallEvent[]>([]);
   const [phase, setPhase] = useState<"toss" | "playing_xi" | "start_innings" | "scoring">("toss");
   const [matchResult, setMatchResult] = useState<string | null>(null);
@@ -257,10 +262,13 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
       const lastOver = activeInnings.overs[activeInnings.overs.length - 1];
       if (lastOver && !lastOver.isCompleted) {
         setCurrentOverId(lastOver.id);
-        setBallInOver(lastOver.balls?.length || 0);
+        setBallInOver(countLegalBalls(lastOver.balls || []));
+        setCurrentBowler(lastOver.bowlerId || "");
         setRecentBalls(lastOver.balls || []);
       } else {
         setCurrentOverId(null);
+        setBallInOver(0);
+        setCurrentBowler("");
         setRecentBalls([]);
       }
       setPhase("scoring");
@@ -412,12 +420,26 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
     [battingTeamPlayers, currentInnings]
   );
 
+  const getBattingOrder = useCallback(
+    (playerId: string) => battingTeamPlayers.find((player) => player.playerId === playerId)?.battingOrder || 99,
+    [battingTeamPlayers]
+  );
+
   useEffect(() => {
     if (!match || !currentInnings || phase !== "scoring" || match.status === "COMPLETED") return;
 
     if (!striker || !nonStriker || striker === nonStriker) {
-      const first = striker || getNextBatter([nonStriker]);
-      const second = nonStriker || getNextBatter([first]);
+      const liveBatters = currentInnings.battingScores
+        .filter((batter) => !batter.isOut)
+        .sort((a, b) => a.battingOrder - b.battingOrder)
+        .map((batter) => batter.playerId);
+
+      const first = liveBatters.find((playerId) => playerId !== nonStriker) || striker || getNextBatter([nonStriker]);
+      const second =
+        liveBatters.find((playerId) => playerId !== first) ||
+        nonStriker ||
+        getNextBatter([first]);
+
       if (first && first !== striker) setStriker(first);
       if (second && second !== nonStriker && second !== first) setNonStriker(second);
     }
@@ -446,6 +468,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
     isWicket?: boolean,
     wtParam?: string,
     fielderParam?: string,
+    dismissedBatterParam?: "STRIKER" | "NON_STRIKER",
   ) => {
     if (!currentInnings || !currentOverId) return;
     if (!striker) { const message = "Select striker before recording a ball"; setError(message); showToast(message, "error"); return; }
@@ -456,16 +479,24 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
     setSubmitting(true);
     setExtraMode(null);
 
+    const dismissedPlayerId =
+      isWicket && dismissedBatterParam === "NON_STRIKER"
+        ? nonStriker
+        : striker;
+
     const body = {
       inningsId: currentInnings.id,
       overId: currentOverId,
       ballNumber: ballInOver + 1,
       overNumber: Math.floor(currentInnings.totalBalls / 6) + 1,
       batsmanId: striker,
+      batsmanOrder: getBattingOrder(striker),
       bowlerId: currentBowler,
       runs,
       isWicket: isWicket || false,
       wicketType: isWicket ? (wtParam || "") : null,
+      dismissedBatsmanId: isWicket ? dismissedPlayerId : null,
+      dismissedBatsmanOrder: isWicket ? getBattingOrder(dismissedPlayerId) : null,
       isExtra: !!extras,
       extraType: extras?.type || null,
       extraRuns: extras?.runs || 0,
@@ -506,18 +537,18 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
       setRecentBalls((prev) => [...prev, newBall]);
 
       const isLegalBall = !extras || ["BYE", "LEG_BYE"].includes(extras.type);
+      const completesOver = isLegalBall && ballInOver + 1 >= 6;
+      let nextStriker = striker;
+      let nextNonStriker = nonStriker;
+
       if (isLegalBall) {
         setPartnershipBalls((prev) => prev + 1);
         const newBallInOver = ballInOver + 1;
-        if (newBallInOver >= 6) {
+        if (completesOver) {
           setBallInOver(0);
           setCurrentOverId(null);
           setCurrentBowler("");
           setRecentBalls([]);
-          // Swap batsmen at end of over
-          const temp = striker;
-          setStriker(nonStriker);
-          setNonStriker(temp);
         } else {
           setBallInOver(newBallInOver);
         }
@@ -529,19 +560,32 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
         setShowWicketModal(false);
         setSelectedWicketType("");
         setFielder("");
+        setDismissedBatter("STRIKER");
+        const outPlayer = dismissedBatterParam === "NON_STRIKER" ? nonStriker : striker;
+        const survivor = dismissedBatterParam === "NON_STRIKER" ? striker : nonStriker;
         const nextBatter = getNextBatter([striker, nonStriker]);
-        setStriker(nextBatter);
+        if (outPlayer === striker) {
+          nextStriker = nextBatter;
+          nextNonStriker = survivor;
+        } else {
+          nextStriker = striker;
+          nextNonStriker = nextBatter;
+        }
         setPartnershipRuns(0);
         setPartnershipBalls(0);
       } else {
         const strikeRuns =
           extras && ["BYE", "LEG_BYE"].includes(extras.type) ? extras.runs : runs;
-        if (isLegalBall && strikeRuns % 2 === 1) {
-          const temp = striker;
-          setStriker(nonStriker);
-          setNonStriker(temp);
+        if (strikeRuns % 2 === 1) {
+          [nextStriker, nextNonStriker] = [nextNonStriker, nextStriker];
         }
       }
+      if (completesOver) {
+        [nextStriker, nextNonStriker] = [nextNonStriker, nextStriker];
+      }
+
+      setStriker(nextStriker);
+      setNonStriker(nextNonStriker);
 
       if (data.matchCompleted && data.result) {
         setMatchResult(data.result);
@@ -567,7 +611,6 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
 
     if (res.ok) {
       setRecentBalls((prev) => prev.slice(0, -1));
-      if (ballInOver > 0) setBallInOver((prev) => prev - 1);
       await fetchMatch();
     }
     setSubmitting(false);
@@ -1293,7 +1336,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
                 <p className="text-xs text-gray-400 mb-2 font-medium">WICKET</p>
                 {!showWicketModal ? (
                   <button
-                    onClick={() => { setShowWicketModal(true); setSelectedWicketType(""); setFielder(""); }}
+                    onClick={() => { setShowWicketModal(true); setSelectedWicketType(""); setFielder(""); setDismissedBatter("STRIKER"); }}
                     disabled={submitting || !!extraMode}
                     className="w-full bg-red-700 hover:bg-red-600 disabled:opacity-50 px-4 py-4 font-bold text-xl transition-colors"
                   >
@@ -1308,7 +1351,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
                       {WICKET_TYPES.map((wt) => (
                         <button
                           key={wt}
-                          onClick={() => { setSelectedWicketType(wt); setFielder(""); }}
+                          onClick={() => { setSelectedWicketType(wt); setFielder(""); setDismissedBatter("STRIKER"); }}
                           className={`px-2 py-2.5 rounded-lg text-xs font-semibold transition-colors ${
                             selectedWicketType === wt
                               ? "bg-red-600 ring-2 ring-red-400"
@@ -1342,6 +1385,26 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
                       </div>
                     )}
 
+                    {selectedWicketType === "RUN_OUT" && (
+                      <div>
+                        <label className="text-xs text-gray-400 mb-1 block">
+                          Which batter is out?
+                        </label>
+                        <select
+                          value={dismissedBatter}
+                          onChange={(e) => setDismissedBatter(e.target.value as "STRIKER" | "NON_STRIKER")}
+                          className={fieldSelectClass}
+                        >
+                          <option value="STRIKER">
+                            Striker{striker ? ` - ${battingTeamPlayers.find((p) => p.playerId === striker)?.player.user.name || ""}` : ""}
+                          </option>
+                          <option value="NON_STRIKER">
+                            Non-striker{nonStriker ? ` - ${battingTeamPlayers.find((p) => p.playerId === nonStriker)?.player.user.name || ""}` : ""}
+                          </option>
+                        </select>
+                      </div>
+                    )}
+
                     {/* Runs on same ball (e.g., no-ball + wicket) */}
 
                     {/* Confirm & Cancel */}
@@ -1349,7 +1412,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
                       <button
                         onClick={() => {
                           if (selectedWicketType) {
-                            addBall(0, undefined, true, selectedWicketType, fielder || undefined);
+                            addBall(0, undefined, true, selectedWicketType, fielder || undefined, dismissedBatter);
                           }
                         }}
                         disabled={!selectedWicketType || submitting}
@@ -1358,7 +1421,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
                         Confirm Out — {selectedWicketType ? selectedWicketType.replace(/_/g, " ") : "Select type"}
                       </button>
                       <button
-                        onClick={() => { setShowWicketModal(false); setSelectedWicketType(""); setFielder(""); }}
+                        onClick={() => { setShowWicketModal(false); setSelectedWicketType(""); setFielder(""); setDismissedBatter("STRIKER"); }}
                         className="px-4 py-3 bg-[#12324d] hover:bg-[#1b3656] text-sm transition-colors"
                       >
                         Cancel

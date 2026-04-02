@@ -7,6 +7,20 @@ import { ROLE } from "@/lib/roles";
 
 export const dynamic = 'force-dynamic';
 
+function parseBallMeta(commentary: string | null | undefined) {
+  if (!commentary?.startsWith("__meta__")) return null;
+
+  try {
+    return JSON.parse(commentary.slice("__meta__".length)) as {
+      dismissedBatsmanId?: string | null;
+      dismissedBatsmanOrder?: number | null;
+      text?: string | null;
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function DELETE(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -40,6 +54,8 @@ export async function DELETE(req: NextRequest) {
 
     // Delete the ball event
     await prisma.ballEvent.delete({ where: { id: lastBall.id } });
+    const lastBallMeta = parseBallMeta(lastBall.commentary);
+    const dismissedPlayerId = lastBallMeta?.dismissedBatsmanId || lastBall.batsmanId;
 
     // Recalculate innings totals from remaining ball events
     const remainingBalls = await prisma.ballEvent.findMany({
@@ -81,6 +97,10 @@ export async function DELETE(req: NextRequest) {
       const overLegalBalls = over.balls.filter(
         (b) => !b.isExtra || b.extraType === "BYE" || b.extraType === "LEG_BYE"
       ).length;
+      const overBowlerRuns = over.balls.reduce((sum, b) => {
+        if (b.extraType === "BYE" || b.extraType === "LEG_BYE") return sum;
+        return sum + b.runs + b.extraRuns;
+      }, 0);
 
       await prisma.over.update({
         where: { id: lastBall.overId },
@@ -88,33 +108,56 @@ export async function DELETE(req: NextRequest) {
           runs: overRuns,
           wickets: overWickets,
           isCompleted: overLegalBalls >= 6,
+          isMaiden: overLegalBalls >= 6 && overBowlerRuns === 0,
         },
       });
     }
 
-    // Recalculate batting scorecard for the batsman
-    if (lastBall.batsmanId) {
-      const batsmanBalls = remainingBalls.filter((b) => b.batsmanId === lastBall.batsmanId);
-      const batRuns = batsmanBalls
-        .filter((b) => !b.isExtra || b.extraType === "NO_BALL")
-        .reduce((s, b) => s + b.runs, 0);
-      const batBalls = batsmanBalls.filter(
-        (b) => !b.isExtra || b.extraType === "NO_BALL"
+    const syncBattingScorecard = async (playerId: string | null | undefined) => {
+      if (!playerId) return;
+
+      const playerBalls = remainingBalls.filter((ball) => ball.batsmanId === playerId);
+      const batRuns = playerBalls
+        .filter((ball) => !ball.isExtra || ball.extraType === "NO_BALL")
+        .reduce((sum, ball) => sum + ball.runs, 0);
+      const batBalls = playerBalls.filter(
+        (ball) => !ball.isExtra || ball.extraType === "NO_BALL"
       ).length;
-      const batFours = batsmanBalls.filter((b) => b.isBoundary && !b.isSix).length;
-      const batSixes = batsmanBalls.filter((b) => b.isSix).length;
-      const isOut = batsmanBalls.some((b) => b.isWicket && b.wicketType !== "RETIRED_HURT");
+      const batFours = playerBalls.filter((ball) => ball.isBoundary && !ball.isSix).length;
+      const batSixes = playerBalls.filter((ball) => ball.isSix).length;
+      const dismissalBall = [...remainingBalls].reverse().find((ball) => {
+        const ballMeta = parseBallMeta(ball.commentary);
+        const ballDismissedPlayerId = ballMeta?.dismissedBatsmanId || ball.batsmanId;
+        return ballDismissedPlayerId === playerId && ball.isWicket && ball.wicketType !== "RETIRED_HURT";
+      });
+      const isOut = Boolean(dismissalBall);
+      const strikeRate = batBalls > 0 ? Number((((batRuns * 100) / batBalls)).toFixed(2)) : 0;
 
       const existingBatting = await prisma.battingScorecard.findFirst({
-        where: { inningsId, playerId: lastBall.batsmanId },
+        where: { inningsId, playerId },
       });
 
       if (existingBatting) {
         await prisma.battingScorecard.update({
           where: { id: existingBatting.id },
-          data: { runs: batRuns, balls: batBalls, fours: batFours, sixes: batSixes, isOut },
+          data: {
+            runs: batRuns,
+            balls: batBalls,
+            strikeRate,
+            fours: batFours,
+            sixes: batSixes,
+            isOut,
+            wicketType: dismissalBall?.wicketType || null,
+            bowlerId: dismissalBall?.bowlerId || null,
+            fielderId: dismissalBall?.fielderIds || null,
+          },
         });
       }
+    };
+
+    await syncBattingScorecard(lastBall.batsmanId);
+    if (dismissedPlayerId !== lastBall.batsmanId) {
+      await syncBattingScorecard(dismissedPlayerId);
     }
 
     // Recalculate bowling scorecard for the bowler
@@ -126,6 +169,26 @@ export async function DELETE(req: NextRequest) {
       ).length;
       const bowlWides = bowlerBalls.filter((b) => b.extraType === "WIDE").length;
       const bowlNoBalls = bowlerBalls.filter((b) => b.extraType === "NO_BALL").length;
+      const legalBowled = bowlerBalls.filter(
+        (b) => !b.isExtra || b.extraType === "BYE" || b.extraType === "LEG_BYE"
+      ).length;
+      const bowlOvers = Math.floor(legalBowled / 6) + (legalBowled % 6) / 10;
+      const bowlEconomy = legalBowled > 0 ? Number((((bowlRuns * 6) / legalBowled)).toFixed(2)) : 0;
+      const bowlerOvers = await prisma.over.findMany({
+        where: { inningsId, bowlerId: lastBall.bowlerId },
+        include: { balls: true },
+      });
+      const maidens = bowlerOvers.filter((currentOver) => {
+        const legalBalls = currentOver.balls.filter(
+          (b) => !b.isExtra || b.extraType === "BYE" || b.extraType === "LEG_BYE"
+        ).length;
+        const bowlerRunsConceded = currentOver.balls.reduce((sum, b) => {
+          if (b.extraType === "BYE" || b.extraType === "LEG_BYE") return sum;
+          return sum + b.runs + b.extraRuns;
+        }, 0);
+
+        return legalBalls >= 6 && bowlerRunsConceded === 0;
+      }).length;
 
       const existingBowling = await prisma.bowlingScorecard.findFirst({
         where: { inningsId, playerId: lastBall.bowlerId },
@@ -134,7 +197,15 @@ export async function DELETE(req: NextRequest) {
       if (existingBowling) {
         await prisma.bowlingScorecard.update({
           where: { id: existingBowling.id },
-          data: { runs: bowlRuns, wickets: bowlWickets, wides: bowlWides, noBalls: bowlNoBalls },
+          data: {
+            overs: bowlOvers,
+            maidens,
+            runs: bowlRuns,
+            wickets: bowlWickets,
+            economy: bowlEconomy,
+            wides: bowlWides,
+            noBalls: bowlNoBalls,
+          },
         });
       }
     }

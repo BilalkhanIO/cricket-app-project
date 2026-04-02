@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { jsonWithCors, optionsWithCors } from "@/lib/api-cors";
 import prisma from "@/lib/prisma";
 import { canCreateLeague } from "@/lib/permissions";
+import { ROLE } from "@/lib/roles";
 
 export const dynamic = 'force-dynamic';
+
+export function OPTIONS(req: NextRequest) {
+  return optionsWithCors(req);
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -40,9 +46,9 @@ export async function GET(req: NextRequest) {
       orderBy: { matchDate: "asc" },
     });
 
-    return NextResponse.json({ matches });
+    return jsonWithCors(req, { matches });
   } catch (error) {
-    return NextResponse.json({ error: "Failed to fetch matches" }, { status: 500 });
+    return jsonWithCors(req, { error: "Failed to fetch matches" }, { status: 500 });
   }
 }
 
@@ -62,6 +68,21 @@ export async function POST(req: NextRequest) {
     }
     if (data.homeTeamId === data.awayTeamId) {
       return NextResponse.json({ error: "A team cannot play against itself" }, { status: 400 });
+    }
+
+    if (data.scorerId) {
+      const scorer = await prisma.user.findUnique({
+        where: { id: data.scorerId },
+        select: { id: true, role: true, isActive: true },
+      });
+
+      if (!scorer || !scorer.isActive) {
+        return NextResponse.json({ error: "Assigned scorer is not available" }, { status: 400 });
+      }
+
+      if (![ROLE.SCORER, ROLE.LEAGUE_ADMIN, ROLE.SUPER_ADMIN].includes(scorer.role as typeof ROLE[keyof typeof ROLE])) {
+        return NextResponse.json({ error: "Assigned user does not have scorer permissions" }, { status: 400 });
+      }
     }
 
     const [teamConflict, venueConflict] = await Promise.all([

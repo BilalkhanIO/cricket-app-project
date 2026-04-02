@@ -1,8 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { jsonWithCors, optionsWithCors } from "@/lib/api-cors";
 import prisma from "@/lib/prisma";
 import { OVERALL_LEAGUE_KEY } from "@/lib/constants";
 
 export const dynamic = 'force-dynamic';
+
+export function OPTIONS(req: NextRequest) {
+  return optionsWithCors(req);
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -27,7 +32,7 @@ export async function GET(req: NextRequest) {
         orderBy: [{ runs: "desc" }, { average: "desc" }],
         take: 20,
       });
-      return NextResponse.json({ data });
+      return jsonWithCors(req, { data });
     }
 
     if (type === "bowling") {
@@ -37,7 +42,7 @@ export async function GET(req: NextRequest) {
         orderBy: [{ wickets: "desc" }, { economy: "asc" }],
         take: 20,
       });
-      return NextResponse.json({ data });
+      return jsonWithCors(req, { data });
     }
 
     if (type === "sixes") {
@@ -47,7 +52,7 @@ export async function GET(req: NextRequest) {
         orderBy: [{ sixes: "desc" }, { strikeRate: "desc" }],
         take: 20,
       });
-      return NextResponse.json({ data });
+      return jsonWithCors(req, { data });
     }
 
     if (type === "fifties") {
@@ -57,7 +62,7 @@ export async function GET(req: NextRequest) {
         orderBy: [{ fifties: "desc" }, { runs: "desc" }],
         take: 20,
       });
-      return NextResponse.json({ data });
+      return jsonWithCors(req, { data });
     }
 
     if (type === "hundreds") {
@@ -67,11 +72,11 @@ export async function GET(req: NextRequest) {
         orderBy: [{ hundreds: "desc" }, { highestScore: "desc" }],
         take: 20,
       });
-      return NextResponse.json({ data });
+      return jsonWithCors(req, { data });
     }
 
-    return NextResponse.json({ error: "Invalid type" }, { status: 400 });
+    return jsonWithCors(req, { error: "Invalid type" }, { status: 400 });
   } catch (error) {
-    return NextResponse.json({ error: "Failed to fetch leaderboard" }, { status: 500 });
+    return jsonWithCors(req, { error: "Failed to fetch leaderboard" }, { status: 500 });
   }
 }

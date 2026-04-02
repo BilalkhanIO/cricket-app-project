@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { jsonWithCors, optionsWithCors } from "@/lib/api-cors";
 import prisma from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
+
+export function OPTIONS(req: NextRequest) {
+  return optionsWithCors(req);
+}
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -52,10 +57,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       },
     });
 
-    if (!player) return NextResponse.json({ error: "Player not found" }, { status: 404 });
-    return NextResponse.json({ player });
+    if (!player) return jsonWithCors(req, { error: "Player not found" }, { status: 404 });
+    return jsonWithCors(req, { player });
   } catch (error) {
-    return NextResponse.json({ error: "Failed to fetch player" }, { status: 500 });
+    return jsonWithCors(req, { error: "Failed to fetch player" }, { status: 500 });
   }
 }
 
@@ -88,5 +93,30 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ player: updated });
   } catch (error) {
     return NextResponse.json({ error: "Failed to update player" }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    const session = await getServerSession(authOptions);
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const player = await prisma.player.findUnique({
+      where: { id },
+      include: { user: true },
+    });
+    if (!player) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    const canDelete =
+      session.user.role === "SUPER_ADMIN" ||
+      session.user.role === "LEAGUE_ADMIN" ||
+      player.user.id === session.user.id;
+    if (!canDelete) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+    await prisma.player.delete({ where: { id } });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to delete player" }, { status: 500 });
   }
 }

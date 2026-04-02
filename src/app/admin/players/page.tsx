@@ -1,6 +1,7 @@
 import Link from "next/link";
 import prisma from "@/lib/prisma";
 import { Card } from "@/components/ui/Card";
+import AdminDeleteButton from "@/app/admin/AdminDeleteButton";
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +22,9 @@ export default async function AdminPlayersPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Players ({players.length})</h1>
+        <Link href="/admin/players/new" className="bg-[color:var(--primary)] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#185a41]">
+          + Create Player
+        </Link>
       </div>
 
       <Card>
@@ -52,6 +56,7 @@ export default async function AdminPlayersPage() {
                     <div className="flex gap-2">
                       <Link href={`/players/${p.id}`} className="text-xs text-blue-600 hover:underline">View</Link>
                       <Link href={`/admin/players/${p.id}/edit`} className="text-xs text-[color:var(--primary)] hover:underline">Edit</Link>
+                      <AdminDeleteButton endpoint={`/api/players/${p.id}`} confirmMessage={`Delete player ${p.user.name}?`} label="Delete" />
                     </div>
                   </td>
                 </tr>

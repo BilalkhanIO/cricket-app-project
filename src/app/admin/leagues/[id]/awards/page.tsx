@@ -3,6 +3,7 @@ import Link from "next/link";
 import prisma from "@/lib/prisma";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import AwardFormClient from "./AwardFormClient";
+import AwardListClient from "./AwardListClient";
 
 export const dynamic = 'force-dynamic';
 
@@ -65,31 +66,7 @@ export default async function LeagueAwardsPage({ params }: { params: Promise<{ i
             <h2 className="font-bold text-gray-900">Awards ({league.awards.length})</h2>
           </CardHeader>
           <CardBody className="p-0">
-            {league.awards.length === 0 ? (
-              <p className="text-center py-8 text-gray-400 text-sm">No awards created yet</p>
-            ) : (
-              league.awards.map((award) => (
-                <div key={award.id} className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-0">
-                  <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center text-xl">
-                    {award.awardType === "MAN_OF_MATCH" ? "🏅" :
-                     award.awardType === "BEST_BATSMAN" ? "🏏" :
-                     award.awardType === "BEST_BOWLER" ? "🎳" :
-                     award.awardType === "PLAYER_OF_TOURNAMENT" ? "🏆" : "⭐"}
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900">
-                      {award.awardType.replace(/_/g, " ")}
-                    </p>
-                    {award.player && (
-                      <p className="text-xs text-gray-500">{award.player.user.name}</p>
-                    )}
-                    {award.description && (
-                      <p className="text-xs text-gray-400 mt-0.5">{award.description}</p>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
+            <AwardListClient leagueId={id} awards={league.awards} players={allPlayers} />
           </CardBody>
         </Card>
       </div>
@@ -99,6 +76,9 @@ export default async function LeagueAwardsPage({ params }: { params: Promise<{ i
         <div className="flex gap-4 mt-2">
           <Link href={`/admin/leagues/${id}/sponsors`} className="text-blue-600 text-sm hover:underline">
             Manage Sponsors →
+          </Link>
+          <Link href={`/admin/leagues/${id}/media`} className="text-blue-600 text-sm hover:underline">
+            Manage Media →
           </Link>
           <Link href={`/admin/leagues/${id}`} className="text-blue-600 text-sm hover:underline">
             League Dashboard →

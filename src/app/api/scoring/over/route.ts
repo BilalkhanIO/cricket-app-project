@@ -36,16 +36,34 @@ export async function POST(req: NextRequest) {
 
     const previousOver = await prisma.over.findFirst({
       where: { inningsId, overNumber: overNumber - 1 },
-      select: { bowlerId: true },
+      include: {
+        balls: {
+          select: { isExtra: true, extraType: true },
+        },
+      },
     });
+    if (overNumber > 1 && !previousOver) {
+      return NextResponse.json({ error: "Previous over is missing" }, { status: 409 });
+    }
     if (previousOver?.bowlerId && previousOver.bowlerId === bowlerId) {
       return NextResponse.json(
         { error: "Same bowler cannot bowl consecutive overs" },
         { status: 400 }
       );
     }
+    if (previousOver) {
+      const legalBalls = previousOver.balls.filter(
+        (ball) => !ball.isExtra || ball.extraType === "BYE" || ball.extraType === "LEG_BYE"
+      ).length;
+      if (legalBalls < 6) {
+        return NextResponse.json(
+          { error: "Previous over is not complete yet" },
+          { status: 409 }
+        );
+      }
+    }
 
-    // Mark previous over as completed
+    // Mark previous over as completed after validating six legal balls.
     await prisma.over.updateMany({
       where: { inningsId, overNumber: overNumber - 1 },
       data: { isCompleted: true },

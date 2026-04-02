@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import AdminDeleteButton from "@/app/admin/AdminDeleteButton";
 
 export const dynamic = 'force-dynamic';
 
@@ -33,7 +34,6 @@ export default function EditPlayerPage({ params }: { params: Promise<{ id: strin
   const [battingHand, setBattingHand] = useState("RIGHT");
   const [bowlingType, setBowlingType] = useState("");
   const [jerseyNumber, setJerseyNumber] = useState("");
-  const [bio, setBio] = useState("");
   const [profileImage, setProfileImage] = useState("");
   const [isCaptain, setIsCaptain] = useState(false);
   const [isViceCaptain, setIsViceCaptain] = useState(false);
@@ -53,7 +53,6 @@ export default function EditPlayerPage({ params }: { params: Promise<{ id: strin
           setBattingHand(p.battingHand || "RIGHT");
           setBowlingType(p.bowlingType || "");
           setJerseyNumber(p.jerseyNumber?.toString() || "");
-          setBio(p.bio || "");
           setProfileImage(p.user?.profileImage || "");
           setIsCaptain(p.isCaptain || false);
           setIsViceCaptain(p.isViceCaptain || false);
@@ -93,7 +92,6 @@ export default function EditPlayerPage({ params }: { params: Promise<{ id: strin
       battingHand,
       bowlingType: bowlingType || null,
       jerseyNumber: jerseyNumber ? parseInt(jerseyNumber) : null,
-      bio: bio || null,
       isCaptain,
       isViceCaptain,
       isWicketkeeper,
@@ -146,6 +144,9 @@ export default function EditPlayerPage({ params }: { params: Promise<{ id: strin
           {player.user?.name}
         </Link>
         <h1 className="text-2xl font-bold text-gray-900">Edit Player</h1>
+        <div className="ml-auto">
+          <AdminDeleteButton endpoint={`/api/players/${id}`} confirmMessage={`Delete player ${player.user?.name}?`} redirectTo="/admin/players" />
+        </div>
       </div>
 
       <Card>
@@ -221,18 +222,6 @@ export default function EditPlayerPage({ params }: { params: Promise<{ id: strin
                 placeholder="e.g. 10"
               />
               {errors.jerseyNumber && <p className="text-red-500 text-xs mt-1">{errors.jerseyNumber}</p>}
-            </div>
-
-            {/* Bio */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
-              <textarea
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                rows={3}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[color:var(--primary)]"
-                placeholder="Short player bio..."
-              />
             </div>
 
             {/* Profile Image URL */}

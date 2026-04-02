@@ -149,9 +149,9 @@ export default async function StatsPage({
                         </div>
                         <div className="text-right">
                           <p className="font-[var(--font-display)] text-2xl font-black text-white">{(stat as any)[board.valueKey]}</p>
-                          {board.subKey && (
+                          {board.subKey && (stat as any)[board.subKey] != null && (
                             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
-                              {board.subKey} {(stat as any)[board.subKey].toFixed(2)}
+                              {board.subKey} {((stat as any)[board.subKey] as number).toFixed(2)}
                             </p>
                           )}
                         </div>

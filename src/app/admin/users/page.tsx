@@ -1,8 +1,10 @@
+import { getServerSession } from "next-auth";
 import prisma from "@/lib/prisma";
+import { authOptions } from "@/lib/auth";
 import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
 import { roleColors } from "@/lib/utils";
 import { formatDate } from "@/lib/utils";
+import UserAccessManager from "./UserAccessManager";
 
 export const dynamic = 'force-dynamic';
 
@@ -23,12 +25,16 @@ async function getUsers() {
 }
 
 export default async function AdminUsersPage() {
+  const session = await getServerSession(authOptions);
   const users = await getUsers();
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Users ({users.length})</h1>
+        <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-2 text-xs text-blue-800">
+          Promote users to <strong>Scorer</strong> here, then assign them from match setup.
+        </div>
       </div>
 
       <Card>
@@ -42,6 +48,7 @@ export default async function AdminUsersPage() {
                 <th className="px-3 py-3 text-xs font-medium text-gray-500">City</th>
                 <th className="px-3 py-3 text-xs font-medium text-gray-500">Status</th>
                 <th className="px-3 py-3 text-xs font-medium text-gray-500">Joined</th>
+                <th className="px-3 py-3 text-xs font-medium text-gray-500">Access Control</th>
               </tr>
             </thead>
             <tbody>
@@ -68,6 +75,9 @@ export default async function AdminUsersPage() {
                     </span>
                   </td>
                   <td className="px-3 py-3 text-gray-400 text-xs">{formatDate(user.createdAt)}</td>
+                  <td className="px-3 py-3 min-w-[220px]">
+                    <UserAccessManager user={user} currentUserRole={session?.user.role || ""} />
+                  </td>
                 </tr>
               ))}
             </tbody>

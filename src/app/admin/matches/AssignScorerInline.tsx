@@ -72,18 +72,21 @@ export default function AssignScorerInline({ matchId, currentScorerId, currentSc
   }
 
   return (
-    <button
-      onClick={() => setEditing(true)}
-      className="group inline-flex items-center gap-1 text-xs min-h-9"
-    >
-      {assignedName ? (
-        <span className="font-medium text-white group-hover:underline">{assignedName}</span>
-      ) : (
-        <span className="text-[#9bb2d1] italic group-hover:text-[#4ae183]">Unassigned</span>
-      )}
-      <svg className="w-3 h-3 text-[#9bb2d1] opacity-0 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-      </svg>
-    </button>
+    <div className="space-y-1">
+      <button
+        onClick={() => setEditing(true)}
+        className="group inline-flex items-center gap-1 text-xs min-h-9"
+      >
+        {assignedName ? (
+          <span className="font-medium text-white group-hover:underline">{assignedName}</span>
+        ) : (
+          <span className="text-[#9bb2d1] italic group-hover:text-[#4ae183]">Unassigned</span>
+        )}
+        <svg className="w-3 h-3 text-[#9bb2d1] opacity-0 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+        </svg>
+      </button>
+      <p className="text-[10px] uppercase tracking-[0.12em] text-[#9bb2d1]">Private scoring console access</p>
+    </div>
   );
 }
