@@ -4,8 +4,7 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Input } from "@/components/ui/Input";
-import { Button } from "@/components/ui/Button";
+import { Eye, EyeOff, Shield } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -37,125 +36,180 @@ export default function LoginPage() {
   ];
 
   return (
-    <div className="min-h-screen flex bg-[linear-gradient(135deg,#102433_0%,#17364e_55%,#1f6f50_100%)]">
-      {/* Left panel - branding */}
-      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-5 text-[200px] flex items-center justify-center select-none pointer-events-none">
-          🏏
+    <div className="flex min-h-screen bg-[#00142b]">
+      {/* Left panel — branding */}
+      <div className="relative hidden flex-col justify-between overflow-hidden bg-[#001c3a] p-12 lg:flex lg:w-5/12">
+        <div
+          className="absolute inset-0 opacity-20"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(74,225,131,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(74,225,131,0.06) 1px, transparent 1px)",
+            backgroundSize: "40px 40px",
+          }}
+        />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(27,54,86,0.9),transparent_60%)]" />
+
+        <div className="relative">
+          <Link href="/home" className="inline-flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center border border-white/10 bg-[#1b3656] text-[#f4d58a]">
+              <Shield className="h-5 w-5" />
+            </div>
+            <div>
+              <span className="block font-[var(--font-display)] text-xl font-black uppercase tracking-tight text-white">
+                CricketLeague
+              </span>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.24em] text-[#9bb2d1]">
+                Pro platform
+              </span>
+            </div>
+          </Link>
         </div>
-        <Link href="/home" className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-[color:var(--primary)] rounded-xl flex items-center justify-center text-2xl">🏏</div>
+
+        <div className="relative space-y-8">
           <div>
-            <span className="font-bold text-xl text-white block">CricketLeague</span>
-            <span className="text-[10px] text-[#9a8569] tracking-widest uppercase">Pro Platform</span>
+            <h1 className="font-[var(--font-display)] text-5xl font-black uppercase leading-tight tracking-tight text-white">
+              Welcome
+              <span className="block text-[#4ae183]">back</span>
+            </h1>
+            <p className="mt-4 max-w-sm text-sm leading-7 text-[#9bb2d1]">
+              Manage leagues, track live scores, and follow your favourite teams — all in one place.
+            </p>
           </div>
-        </Link>
 
-        <div>
-          <h1 className="text-4xl font-bold text-white leading-tight mb-4">
-            Welcome back to<br />
-            <span className="text-[#9a8569]">Cricket League</span>
-          </h1>
-          <p className="text-[#d6cab7] text-lg leading-relaxed max-w-sm">
-            Manage leagues, track live scores, and follow your favorite teams all in one place.
-          </p>
-
-          <div className="mt-8 space-y-3">
+          <div className="space-y-3">
             {[
-              { icon: "⚡", text: "Real-time ball-by-ball scoring" },
-              { icon: "📊", text: "Comprehensive statistics & leaderboards" },
-              { icon: "🏆", text: "Full league & tournament management" },
+              { text: "Real-time ball-by-ball scoring" },
+              { text: "Comprehensive statistics & leaderboards" },
+              { text: "Full league & tournament management" },
             ].map((f) => (
-              <div key={f.text} className="flex items-center gap-3 text-[#d6cab7]">
-                <span className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center text-base flex-shrink-0">{f.icon}</span>
-                <span className="text-sm">{f.text}</span>
+              <div key={f.text} className="flex items-center gap-3">
+                <div className="h-1.5 w-1.5 bg-[#4ae183]" />
+                <span className="text-sm font-bold uppercase tracking-[0.12em] text-[#d4e3ff]">{f.text}</span>
               </div>
             ))}
           </div>
         </div>
 
-        <p className="text-[color:var(--primary)] text-xs">© {new Date().getFullYear()} CricketLeague App</p>
+        <p className="relative text-[10px] font-bold uppercase tracking-[0.18em] text-[#9bb2d1]">
+          © {new Date().getFullYear()} CricketLeague App
+        </p>
       </div>
 
-      {/* Right panel - form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-12 bg-[color:var(--card-muted)]">
-        <div className="w-full max-w-md">
-          {/* Mobile logo */}
-          <div className="lg:hidden text-center mb-8">
-            <div className="w-14 h-14 bg-[color:var(--primary)] rounded-2xl flex items-center justify-center text-3xl mx-auto mb-3">🏏</div>
-            <h1 className="text-2xl font-bold text-[color:var(--color-ink)]">CricketLeague</h1>
+      {/* Right panel — form */}
+      <div className="flex w-full flex-1 flex-col justify-center px-6 py-12 lg:px-16">
+        {/* Mobile logo */}
+        <div className="mb-8 lg:hidden">
+          <Link href="/home" className="inline-flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center bg-[#1b3656] text-[#f4d58a]">
+              <Shield className="h-5 w-5" />
+            </div>
+            <span className="font-[var(--font-display)] text-xl font-black uppercase tracking-tight text-white">
+              CricketLeague
+            </span>
+          </Link>
+        </div>
+
+        <div className="mx-auto w-full max-w-md">
+          <div className="mb-8">
+            <div className="inline-flex bg-[#1b3656] px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-[#d4e3ff]">
+              Sign in
+            </div>
+            <h2 className="mt-4 font-[var(--font-display)] text-4xl font-black uppercase tracking-tight text-white">
+              Your account
+            </h2>
+            <p className="mt-2 text-sm text-[#9bb2d1]">Enter your credentials to access your workspace</p>
           </div>
 
-          <div className="mb-7">
-            <h2 className="text-2xl font-bold text-[color:var(--color-ink)]">Sign in</h2>
-            <p className="text-[color:var(--color-ink-soft)] mt-1 text-sm">Enter your credentials to access your account</p>
-          </div>
-
-          <div className="page-shell rounded-[2rem] p-6 sm:p-8">
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
-              label="Email Address"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              required
-            />
-
+            {/* Email */}
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-sm font-semibold text-[color:var(--color-ink)]">Password</label>
-                <button type="button" className="text-xs text-[color:var(--primary)] hover:underline" onClick={() => setShowPassword(!showPassword)}>
-                  {showPassword ? "Hide" : "Show"}
-                </button>
-              </div>
+              <label className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
+                Email address
+              </label>
               <input
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
                 required
-                className="w-full px-3.5 py-2.5 rounded-xl border border-[color:var(--border-color)] bg-white text-[color:var(--color-ink)] focus:outline-none focus:ring-2 focus:ring-[color:var(--primary)] focus:border-[color:var(--primary)] placeholder:text-[#9a8569] text-sm"
+                className="w-full border border-white/10 bg-[#001c3a] px-4 py-3 text-sm text-white placeholder:text-[#9bb2d1]/50 focus:border-[#4ae183] focus:outline-none"
               />
             </div>
 
+            {/* Password */}
+            <div>
+              <div className="mb-1.5 flex items-center justify-between">
+                <label className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
+                  Password
+                </label>
+                <Link href="/forgot-password" className="text-[10px] font-black uppercase tracking-[0.14em] text-[#4ae183] hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  className="w-full border border-white/10 bg-[#001c3a] px-4 py-3 pr-12 text-sm text-white placeholder:text-[#9bb2d1]/50 focus:border-[#4ae183] focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9bb2d1] hover:text-white"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
             {error && (
-              <div className="flex items-center gap-2.5 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-                <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
+              <div className="border border-[#93000a] bg-[#93000a]/20 px-4 py-3 text-sm font-bold text-[#ffdad6]">
                 {error}
               </div>
             )}
 
-            <Button type="submit" fullWidth size="lg" loading={loading} variant="navy">
-              Sign In
-            </Button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-[#4ae183] py-3 text-sm font-black uppercase tracking-[0.18em] text-[#002613] transition hover:bg-white disabled:opacity-60"
+            >
+              {loading ? "Signing in…" : "Sign In"}
+            </button>
           </form>
 
-          <p className="text-center text-sm text-[color:var(--color-ink-soft)] mt-5">
+          <p className="mt-5 text-center text-sm text-[#9bb2d1]">
             Don&apos;t have an account?{" "}
-            <Link href="/register" className="text-[color:var(--primary)] font-semibold hover:underline">Create account</Link>
+            <Link href="/register" className="font-black text-[#4ae183] hover:underline">
+              Create account
+            </Link>
           </p>
 
           {/* Demo Accounts */}
-          <div className="mt-6 border-t border-[color:var(--border-color)] pt-5">
-            <p className="text-xs font-semibold text-[color:var(--color-ink-soft)] mb-3 uppercase tracking-wide text-center">Quick Demo Access</p>
+          <div className="mt-8 border-t border-white/10 pt-6">
+            <p className="mb-3 text-center text-[10px] font-black uppercase tracking-[0.22em] text-[#9bb2d1]">
+              Quick demo access
+            </p>
             <div className="grid grid-cols-2 gap-2">
               {demoAccounts.map((acc) => (
                 <button
                   key={acc.role}
                   type="button"
                   onClick={() => { setEmail(acc.email); setPassword(acc.password); }}
-                  className="flex flex-col items-start px-3 py-2.5 bg-white border border-[color:var(--border-color)] hover:border-[color:var(--primary)] hover:bg-[color:var(--card-muted)] rounded-xl text-xs transition-all"
+                  className="flex flex-col items-start border border-white/10 bg-[#001c3a] px-3 py-2.5 text-xs transition hover:border-[#4ae183] hover:bg-[#0b2747]"
                 >
-                  <span className="font-semibold text-[color:var(--color-ink)]">{acc.role}</span>
-                  <span className="text-[color:var(--color-ink-soft)] mt-0.5 truncate w-full">{acc.email}</span>
+                  <span className="font-black uppercase tracking-[0.12em] text-white">{acc.role}</span>
+                  <span className="mt-0.5 truncate w-full text-[#9bb2d1]">{acc.email}</span>
                 </button>
               ))}
             </div>
-            <p className="text-[10px] text-[#9a8569] text-center mt-2">All demo accounts use: <span className="font-mono text-[color:var(--primary)]">Password123!</span></p>
-          </div>
+            <p className="mt-2 text-center text-[10px] text-[#9bb2d1]">
+              All accounts use:{" "}
+              <span className="font-black text-[#4ae183]">Password123!</span>
+            </p>
           </div>
         </div>
       </div>

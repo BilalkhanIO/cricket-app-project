@@ -1,241 +1,637 @@
-# Cricket League App Developer Specification
+# Cricket Management App Developer Specification
 
-## 1. Scope
-This document defines implementation requirements for the existing Next.js + Prisma cricket app, using the requested modules and formulas.
+## 1. Product Baseline
 
-## 2. Core Modules
+This document defines the active scope for the cricket platform as a cricket operations system. Payment, subscription, invoicing, and other monetization modules are explicitly out of scope for the current roadmap.
 
-### 2.1 League Module
-Required fields:
-- `name`, `season`, `year`, `matchFormat`, `tournamentType`
-- `startDate`, `endDate`, `maxTeams`, `squadSizeLimit`
-- `oversPerInnings`, `powerplayOvers`, `superOverEnabled`
-- `pointsPerWin`, `pointsPerTie`, `pointsPerNoResult`
-- `status`, `logo`, `banner`
+### 1.1 Included Modules
+- User management
+- League and tournament management
+- Team management
+- Player management
+- Venue management
+- Match scheduling
+- Live scoring
+- Scorecards
+- Points table
+- Stats and reports
+- Notifications
+- Admin panel
+- Public live score and match viewing
 
-Additional fields to add:
-- `dlsEnabled` (boolean)
-- `minimumOversForResult` (int)
-- `tieRule` (string enum)
-- `noResultRule` (string enum)
-- `matchRulesJson` (json/text)
+### 1.2 Excluded for Current Scope
+- Payment gateway
+- Team registration fees
+- Subscriptions and plans
+- Invoicing
+- Refunds
+- Monetization features
 
-Acceptance:
-- League cannot be activated without valid dates, overs config, and points rules.
-- Status lifecycle: `DRAFT -> REGISTRATION -> ACTIVE -> COMPLETED|CANCELED`.
+## 2. User Roles
 
-### 2.2 League Registration
-#### Team registration
-Required:
-- Team identity/contact, manager, city, captain/vice-captain, squad, jersey, sponsor, fee status
+- `SUPER_ADMIN`
+- `LEAGUE_ADMIN`
+- `TEAM_MANAGER`
+- `SCORER`
+- `UMPIRE`
+- `PLAYER`
+- `VIEWER`
 
-Current entities used:
-- `Team`, `TeamLeague`, `Player`
+## 3. Functional Modules
 
-Additional fields to add:
-- `TeamLeague.registrationFeeStatus` (`PENDING|PAID|WAIVED`)
-- `TeamLeague.registrationOpenAt`, `registrationCloseAt` (or league-level if global)
-- `TeamLeague.approvalStatus` (`PENDING|APPROVED|REJECTED|WAITLISTED`)
-- `TeamLeague.approvalNotes`
+### 3.1 Authentication and Roles
 
-#### Player registration
-Required:
-- Full name, DOB, photo, role, batting/bowling style, jersey no., medical/fitness, availability, optional ID proof
+Required features:
+- Signup and login
+- Email or phone verification
+- Forgot password
+- Role-based permissions
+- Profile management
 
-Additional fields to add:
-- `Player.dateOfBirth`
-- `Player.photoUrl`
-- `Player.medicalStatus`
-- `Player.availabilityStatus`
-- `Player.idProofUrl`
+Core rules:
+- Every authenticated user must have a role.
+- Authorization must be enforced on API and UI routes.
+- Public viewers can access public match data without admin privileges.
 
-Validation rules:
-- Same player cannot join 2 teams in same league unless `league.allowMultiTeamPlayers = true`.
-- Squad size must be `<= league.squadSizeLimit`.
-- Registration auto-closes after deadline.
+### 3.2 League and Tournament Management
 
-### 2.3 Matches Module
-Required match metadata:
-- IDs, teams, stage/group, venue, date/time, format/overs, officials, toss, XI, result, status
+Required features:
+- Create tournament or series
+- Define format: knockout, round robin, group stage, league plus playoffs
+- Define overs: T10, T20, ODI, custom
+- Define season
+- Add rules
+- Assign teams
+- Generate fixtures
+- Manage standings
 
-Current entities used:
-- `Match`, `PlayingXI`, `MatchOfficial`, `Innings`, `Over`, `BallEvent`
+Suggested league fields:
+- `name`
+- `season`
+- `format`
+- `oversPerInnings`
+- `stageConfig`
+- `rulesJson`
+- `status`
+- `startDate`
+- `endDate`
 
-Additional fields to add:
-- `Match.stage` (league/group/semi/final)
-- `Match.groupName`
-- `Match.matchNumber`
-- `Match.reserveDay`
-- `Match.delayReason`
-- `Match.revisedTargetDls`
+### 3.3 Team Management
 
-Status support:
-- `UPCOMING`, `LIVE`, `INNINGS_BREAK`, `DELAYED`, `ABANDONED`, `COMPLETED`, `CANCELED`
+Required features:
+- Create team
+- Upload team logo
+- Assign captain
+- Assign manager or coach
+- Maintain squad list
+- Select playing XI
+- Show team records and stats
 
-### 2.4 Timetable / Schedule / Fixtures
-Views:
-- Calendar (day-wise)
-- List (round-wise)
-- Team filter
-- Venue filter
+Suggested fields:
+- `name`
+- `shortName`
+- `logoUrl`
+- `captainId`
+- `managerUserId`
+- `coachName`
+- `homeCity`
 
-Scheduling rules:
-- No team overlap in same time slot.
-- No venue overlap in same time slot.
-- Support reserve day and rescheduled matches.
+### 3.4 Player Management
 
-APIs to add:
-- `POST /api/fixtures/generate`
-- `POST /api/fixtures/validate`
-- `PATCH /api/matches/:id/reschedule`
+Required features:
+- Player profile
+- Role and skill set
+- Batting style
+- Bowling style
+- Player image
+- Season statistics
+- Injury and availability status
+- Team assignment
 
-### 2.5 Point Table
-Columns:
-- Position, team, P/W/L/T/NR, points, NRR, runs/overs for and against
+Suggested fields:
+- `fullName`
+- `playerRole`
+- `battingStyle`
+- `bowlingStyle`
+- `imageUrl`
+- `availabilityStatus`
+- `injuryStatus`
+
+### 3.5 Match Management
+
+Required features:
+- Create and schedule matches
+- Assign teams
+- Assign venue
+- Assign officials
+- Handle toss
+- Select lineup
+- Track match status
+- Publish result
+
+Supported statuses:
+- `UPCOMING`
+- `LIVE`
+- `COMPLETED`
+- `ABANDONED`
+- `POSTPONED`
+
+### 3.6 Live Scoring
+
+This is the highest-priority module in the system.
+
+Required features:
+- Ball-by-ball scoring
+- Extras
+- Wickets
+- Partnerships
+- Strike handling
+- Innings switching
+- Over summary
+- Run rate
+- Required run rate
+- Live scoreboard
+- Undo and edit scoring events
+
+Core principles:
+- Every saved delivery is an event record.
+- Scoreboard, scorecard, and player stats must stay synchronized.
+- Undo and edit must create an audit trail.
+
+### 3.7 Scorecards
+
+Required features:
+- Full batting card
+- Bowling card
+- Extras
+- Fall of wickets
+- Innings summary
+- Match summary
+- Man of the match
+
+### 3.8 Points Table
+
+Required features:
+- Automatic points calculation
+- Wins, losses, ties, no result
+- Net run rate
+- Rank ordering
+- Qualification tracking
 
 Ranking order:
 1. Points
-2. NRR
-3. Head-to-head
-4. Runs scored
+2. Net run rate
+3. Head-to-head when applicable
+4. Runs scored or tournament-defined fallback
 
-Implementation:
-- Recompute standings after match completion and after any scoring correction.
-- Persist sortable metrics in `PointsTable`.
+### 3.9 Statistics
 
-### 2.6 Scorer / Scorecard
-Scorer actions:
-- Start match, toss, XI, ball entry, undo, over edit, innings end, finalize
+Required features:
+- Top run scorers
+- Top wicket takers
+- Best batting averages
+- Best strike rates
+- Best economy
+- Team performance stats
+- Player performance history
+- Head-to-head stats
 
-Ball events:
-- Runs, extras, wickets, dismissal modes, retired hurt
+### 3.10 Venue Management
 
-Scorecard output:
-- Innings totals, batting, bowling, extras, fall of wickets, partnerships, over summary, result, POTM
+Required features:
+- Venue profiles
+- Ground details
+- City and location
+- Pitch type
+- Match history at venue
 
-Critical backend rule:
-- Legal balls exclude wides and no-balls, include byes/leg-byes.
+### 3.11 Officials Management
 
-### 2.7 Economy, Strike Rate, Average
-Formulas:
-- Economy = `runsConceded / oversBowled`
-- Bat SR = `(runs / balls) * 100`
-- Bowl SR = `ballsBowled / wickets`
-- Bat Avg = `runs / dismissals`
-- Bowl Avg = `runsConceded / wickets`
+Required features:
+- Umpire profiles
+- Scorer profiles
+- Assignment to matches
+- Official history
 
-Overs handling rule:
-- Cricket overs notation (`3.2`) is not decimal (`3.2 != 3.333...`).
-- Use ball-based math internally, convert for display.
+### 3.12 Notifications
 
-### 2.8 DLS
-Required support:
-- League-level DLS flag
-- Interruption log (time lost, overs reduced)
-- Par score and revised target storage
-- Result note: "won/lost by DLS"
+Required features:
+- Match reminders
+- Toss updates
+- Live match start
+- Result published
+- Schedule changes
+- Team announcements
 
-Entities to add:
-- `MatchInterruption` (`matchId`, `startAt`, `endAt`, `reason`, `oversLost`, `note`)
-- `DlsRevision` (`matchId`, `inningsNumber`, `resourcesBefore`, `resourcesAfter`, `parScore`, `revisedTarget`)
+### 3.13 Reports and Admin Insights
 
-Note:
-- Full ICC DLS standard edition requires licensed resource tables. MVP can ship as a manual-entry DLS override with audit logging.
+Required features:
+- Tournament summary
+- Team reports
+- Player reports
+- Match reports
+- Admin dashboard KPIs
 
-## 3. Data Model Additions (Prisma)
-Add/extend models for:
-- `League`: `dlsEnabled`, `minimumOversForResult`, rule JSON fields
-- `TeamLeague`: fee and approval workflow fields
-- `Player`: profile/fitness/availability docs
-- `Match`: stage/group/match number/reserve/revision fields
-- New: `MatchInterruption`, `DlsRevision`, optional `FixtureTemplate`
+## 4. Non-Functional Requirements
 
-## 4. API Requirements
+### 4.1 Performance
+- Realtime updates should reach viewers within 2 seconds in normal conditions.
 
-### League/Admin
-- `POST /api/leagues`
-- `PATCH /api/leagues/:id` (rules, DLS, points)
-- `POST /api/leagues/:id/publish-fixtures`
+### 4.2 Scalability
+- The platform should support thousands of matches and concurrent public viewers.
 
-### Registration
-- `POST /api/leagues/:id/teams/register`
-- `PATCH /api/leagues/:id/teams/:teamLeagueId/approve`
-- `POST /api/players/register`
-- `PATCH /api/players/:id/availability`
+### 4.3 Security
+- Use JWT or session-based auth with strict role checks.
+- Protect scoring and admin workflows with server-side authorization.
 
-### Match/Scoring
-- `POST /api/matches`
-- `PATCH /api/matches/:id/toss`
-- `PATCH /api/matches/:id/playing-xi`
-- `POST /api/scoring`
-- `POST /api/scoring/undo`
-- `POST /api/scoring/complete`
-- `POST /api/matches/:id/dls/revise`
+### 4.4 Availability
+- Target 99.9% uptime for production infrastructure.
 
-### Standings/Stats
-- `GET /api/leagues/:id/points-table`
-- `GET /api/stats/leaderboard?leagueId=&type=`
+## 5. Platforms and Architecture
 
-## 5. Frontend Screen Contracts
+Supported surfaces:
+- Mobile app for scorers, managers, players, and viewers
+- Web admin panel
+- Public web viewer
 
-### League screen tabs
-- Overview, Rules, Teams, Fixtures, Points Table, Stats, Media
+Current implementation direction:
+- Frontend: Next.js web app and React Native mobile app
+- Backend: Node.js application services
+- Database: PostgreSQL or Prisma-supported relational database
+- Realtime: WebSockets or equivalent push channel
 
-### Registration
-- Team registration, Player registration, Documents, Fee, Approval status
+## 6. Core Data Model
 
-### Matches
-- Live, Upcoming, Completed, Match detail, Scorecard
+### 6.1 Active Core Tables
+- `users`
+- `roles`
+- `leagues`
+- `seasons`
+- `teams`
+- `players`
+- `team_players`
+- `venues`
+- `matches`
+- `match_officials`
+- `tosses`
+- `innings`
+- `overs`
+- `balls`
+- `batting_stats`
+- `bowling_stats`
+- `fielding_stats`
+- `points_table`
+- `notifications`
+- `announcements`
 
-### Schedule
-- Calendar, List, Team-wise, Venue-wise
+### 6.2 Removed Tables
 
-### Points Table
-- Group-wise and overall, with NRR details
+Do not design or prioritize these in the current phase:
+- `payments`
+- `invoices`
+- `subscription_plans`
+- `transactions`
+- `refunds`
+- `billing_history`
 
-### Admin
-- Approvals, Fixtures, Scorer assignment, Result corrections, Rule config
+### 6.3 Scoring Engine Tables
 
-## 6. Calculation Contracts
+Recommended scoring-specific tables:
+- `matches`
+- `match_lineups`
+- `innings`
+- `overs`
+- `ball_events`
+- `batting_innings_stats`
+- `bowling_innings_stats`
+- `partnerships`
+- `wicket_events`
+- `event_audit_logs`
+- `commentary_events`
 
-### Net Run Rate
-`NRR = (runsScored / oversFaced) - (runsConceded / oversBowled)`
+## 7. API Surface
 
-Implementation notes:
-- Store balls internally where possible.
-- Convert to overs only for display.
-- If continuing float storage for overs notation, always convert notation to balls before rate math.
+Core route groups:
+- `/auth`
+- `/users`
+- `/leagues`
+- `/teams`
+- `/players`
+- `/venues`
+- `/matches`
+- `/scoring`
+- `/stats`
+- `/notifications`
 
-### Minimum precision
-- Rates shown to 2 decimals.
-- Overs shown as cricket notation for UI (`x.y`).
+## 8. UX and Screen Contracts
 
-## 7. MVP Delivery Plan
+### 8.1 Core Screens
+- Login
+- Signup
+- Dashboard
+- League list
+- League details
+- Team profile
+- Player profile
+- Match center
+- Live scoring
+- Scorecard
+- Points table
+- Stats dashboard
+- Notifications
+- Profile and settings
 
-### Phase 1 (must-have)
-- League creation/rules
-- Team and player registration with approval
-- Fixture creation + conflict validation
-- Live scoring + scorecard
-- Auto point table + NRR
-- Batting/bowling leaderboards
-- DLS enable flag + manual revised target
+### 8.2 Scorer Flow
+1. Select match
+2. Enter toss
+3. Select playing XI
+4. Start innings
+5. Score ball by ball
+6. End innings
+7. Complete match
+
+### 8.3 Viewer Flow
+1. Open app or web
+2. View live matches
+3. Open scorecard
+4. Check stats
+
+### 8.4 Live Scoring UX Requirements
+- Large thumb-friendly action buttons
+- Wicket action isolated from normal scoring actions
+- Undo always visible
+- Recent balls always visible
+- Destructive actions require confirmation
+- One-handed use should remain viable on mobile
+
+## 9. Live Scoring Logic
+
+### 9.1 Ball Event Contract
+
+Each delivery should capture:
+- `matchId`
+- `inningsNo`
+- `overNo`
+- `ballIndex`
+- `strikerId`
+- `nonStrikerId`
+- `bowlerId`
+- `deliveryType`
+- `runsOffBat`
+- `extrasType`
+- `extrasRuns`
+- `isLegalDelivery`
+- `wicketFlag`
+- `wicketType`
+- `playerOutId`
+- `fielderId`
+- `commentaryText`
+- `createdBy`
+- `createdAt`
+- `editedFlag`
+- `revisionNo`
+
+Delivery types:
+- `NORMAL`
+- `WIDE`
+- `NO_BALL`
+- `BYE`
+- `LEG_BYE`
+- `DEAD_BALL`
+- `PENALTY`
+
+### 9.2 Legal Ball Rules
+
+Counts as legal ball:
+- Normal delivery
+- Wicket on legal delivery
+- Byes and leg byes on legal delivery
+
+Does not count as legal ball:
+- Wide
+- No ball
+- Dead ball
+
+Implementation rule:
+- An over progresses only when `isLegalDelivery = true`.
+- An over closes after 6 legal balls unless a tournament rule overrides it.
+
+### 9.3 Run Calculation Rules
+
+Formula:
+- `totalAdded = runsOffBat + extrasRuns`
+
+Cases:
+- Dot ball: no score change
+- Single to six: bat runs only
+- Bye and leg bye: extras only
+- Wide: extras, not legal
+- No ball: at least 1 extra, may also include bat runs
+- Penalty runs: separate administrative event
+
+### 9.4 Wicket Rules
+
+Flow:
+1. Capture wicket type
+2. Determine legal-ball impact
+3. Determine batter ball-faced impact
+4. Determine bowler wicket credit
+5. Determine fielder credit
+6. Require new batter if innings continues
+
+Bowler credited:
+- Bowled
+- Caught
+- LBW
+- Stumped
+- Hit wicket
+
+Bowler not credited:
+- Run out
+- Retired out
+- Timed out
+- Obstructing the field
+
+### 9.5 Strike Rotation
+
+Rules:
+- Odd run movement swaps strike
+- End of over swaps strike
+- Wicket edge cases may need scorer override
+
+### 9.6 Over Completion
+
+On over completion:
+- Freeze over summary
+- Update bowler figures
+- Swap strike
+- Prompt for next bowler
+- Increment over number
+
+### 9.7 Innings Completion
+
+An innings ends when:
+- Team all out
+- Overs completed
+- Chasing side reaches target
+- Match stopped or abandoned
+
+On innings end:
+- Lock innings snapshot
+- Generate target if first innings
+- Generate result if second innings is complete
+
+### 9.8 Result Logic
+
+Supported results:
+- Won by runs
+- Won by wickets
+- Tie
+- No result
+- Abandoned
+
+### 9.9 Recalculation Strategy
+
+Recommended approach:
+- Use incremental updates in live mode
+- Use selective replay from the edited ball forward after edits
+- Keep full recompute tooling for verification and admin repair
+
+### 9.10 Undo and Edit
+
+Mandatory features:
+- Undo last ball
+- Edit earlier ball
+- Recompute all affected downstream state
+- Persist audit log
+
+Audit fields:
+- `eventId`
+- `previousData`
+- `newData`
+- `changedBy`
+- `changedAt`
+- `reason`
+
+### 9.11 Validation Rules
+
+Prevent:
+- More than 11 players batting
+- Duplicate striker and non-striker
+- Wicket without player-out reference
+- Innings continuing after all out
+- Chase continuing after target reached
+- Negative scores
+- Duplicate ball sequence IDs
+
+Warn but allow override for:
+- Unusual run-out crossing cases
+- Local-rule edge cases
+- Striker swap ambiguity
+
+## 10. Derived Statistics Contracts
+
+After every committed ball event, update:
+
+### 10.1 Match Scoreboard
+- Total runs
+- Wickets
+- Overs
+- Current run rate
+- Target and required rate
+
+### 10.2 Batter Stats
+- Runs
+- Balls faced
+- Fours
+- Sixes
+- Strike rate
+- Dismissal state
+
+### 10.3 Bowler Stats
+- Overs
+- Maidens
+- Runs conceded
+- Wickets
+- Economy
+
+### 10.4 Team Innings Stats
+- Extras
+- Boundaries
+- Partnerships
+- Fall of wickets
+
+### 10.5 Tournament Stats
+- Player aggregate stats
+- Team aggregate stats
+- Points table after match completion
+
+## 11. MVP Definition
+
+Phase 1 MVP includes:
+- Login and signup
+- Role management
+- League and tournament creation
+- Team creation
+- Player creation and assignment
+- Fixture creation
+- Match creation
+- Toss handling
+- Playing XI selection
+- Live ball-by-ball scoring
+- Scorecard generation
+- Points table
+- Basic stats dashboard
+- Admin panel
+- Public live score view
+
+This is the release baseline for a first production version.
+
+## 12. Delivery Priority
+
+### Phase 1
+- Authentication and roles
+- Team and player management
+- League and tournament setup
+- Match scheduling
+- Live scoring engine
+- Scorecard
+- Points table
+- Basic stats
 
 ### Phase 2
-- Notifications, reports, payments, sponsor placements, media enhancements
+- Venue module
+- Umpire and scorer module
+- Notifications
+- Advanced reports
+- Public fan-facing pages
 
 ### Phase 3
-- Streaming hooks, fantasy module, richer analytics
+- Advanced analytics
+- Offline scoring
+- Media uploads
+- AI insights
+- Monetization modules if reintroduced later
 
-## 8. Current Codebase Fit
-Already present:
-- Core models for league/team/player/match/scoring/points/stats
-- Live scoring APIs and scorer UI
-- Basic standings and leaderboards
+## 13. Implementation Notes for This Repo
 
-Gaps to implement next:
-- Full registration workflow states and fee tracking
-- Formal fixture generator + overlap validator
-- DLS interruption + revision entities
-- Head-to-head tie-break resolution
-- Stronger ball-based cumulative bowling math in season/career aggregates
+Current development should align to these priorities:
+- Preserve existing scoring-first architecture
+- Remove fee, billing, and subscription assumptions from roadmap docs and planning
+- Prefer event-driven scoring state with explicit auditability
+- Keep public viewer pages read-only
+- Model tournament operations before optional commercial workflows
+
+## 14. QA Priorities
+
+Must-test scoring scenarios:
+- Standard over with only legal deliveries
+- Wides and no-balls in one over
+- Wicket plus runs combinations
+- Run out with crossed batters
+- Undo last ball
+- Edit earlier ball and replay state
+- Innings ending by all out
+- Innings ending by chase completion
+- Points table update after match completion
+- Reconnect and resync under poor network conditions

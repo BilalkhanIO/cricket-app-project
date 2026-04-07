@@ -11,6 +11,8 @@ interface Match {
   status: string;
   matchFormat: string;
   overs: number;
+  stage?: string | null;
+  groupName?: string | null;
   result?: string | null;
   matchDate: Date | string;
   homeTeamId: string;
@@ -351,7 +353,14 @@ export default function MatchesClient({ allMatches }: { allMatches: Match[] }) {
                               match.status === "COMPLETED" ? "bg-[color:var(--card-muted)] border-[color:var(--border-color)]" :
                               "bg-gray-50 border-gray-100"
                             }`}>
-                              <span className="text-xs text-gray-500">{match.league.name}</span>
+                              <div className="flex flex-col">
+                                <span className="text-xs text-gray-500">{match.league.name}</span>
+                                {(match.groupName || match.stage) ? (
+                                  <span className="text-[10px] uppercase tracking-[0.12em] text-[color:var(--primary)]">
+                                    {[match.groupName, match.stage].filter(Boolean).join(" · ").replace(/_/g, " ")}
+                                  </span>
+                                ) : null}
+                              </div>
                               <StatusBadge status={match.status} />
                             </div>
                             <CardBody className="py-4">

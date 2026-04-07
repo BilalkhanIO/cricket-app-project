@@ -18,7 +18,7 @@ async function getLeagues() {
 export default async function LeaguesPage() {
   const leagues = await getLeagues();
   const activeLeagues = leagues.filter((league) => league.status === "ACTIVE");
-  const registrationLeagues = leagues.filter((league) => league.status === "REGISTRATION");
+  const setupLeagues = leagues.filter((league) => league.status === "REGISTRATION" || league.status === "DRAFT");
   const completedLeagues = leagues.filter((league) => league.status === "COMPLETED");
 
   return (
@@ -44,10 +44,10 @@ export default async function LeaguesPage() {
               <div className="space-y-5">
                 <h1 className="font-[var(--font-display)] text-5xl font-black uppercase tracking-tight text-white sm:text-6xl">
                   Leagues,
-                  <span className="block text-[#4ae183]">seasons, and entry windows</span>
+                  <span className="block text-[#4ae183]">seasons, and match operations</span>
                 </h1>
                 <p className="max-w-2xl text-sm leading-7 text-[#9bb2d1] sm:text-base">
-                  Browse active competitions, registration campaigns, completed seasons, and multi-season league families from one public board.
+                  Browse active competitions, setup phases, completed seasons, and multi-season league families from one public board.
                 </p>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <a
@@ -57,10 +57,10 @@ export default async function LeaguesPage() {
                     Open directory
                   </a>
                   <a
-                    href="#registration-window"
+                    href="#setup-pipeline"
                     className="bg-[#1b3656] px-6 py-4 text-center text-sm font-black uppercase tracking-[0.22em] text-white transition hover:bg-[#234669]"
                   >
-                    Registration windows
+                    Setup pipeline
                   </a>
                 </div>
               </div>
@@ -69,7 +69,7 @@ export default async function LeaguesPage() {
                 {[
                   { value: leagues.length, label: "All leagues" },
                   { value: activeLeagues.length, label: "Active now" },
-                  { value: registrationLeagues.length, label: "Open entry" },
+                  { value: setupLeagues.length, label: "In setup" },
                   { value: completedLeagues.length, label: "Archived" },
                 ].map((stat) => (
                   <div key={stat.label} className="border border-white/10 bg-[#001c3a] px-4 py-4">

@@ -1,313 +1,387 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useEffect, useMemo, useState, use } from "react";
 import Link from "next/link";
 
-type Status = "PENDING" | "APPROVED" | "REJECTED" | "WAITLISTED";
+type LeagueTeamStatus = "ACTIVE" | "APPROVED" | "PENDING" | "WAITLISTED" | "REJECTED";
 
-interface TeamReg {
+interface TeamRecord {
   id: string;
-  status: Status;
-  registrationFeeStatus: string;
+  name: string;
+  shortName: string;
+  jerseyColor: string | null;
+  city?: string | null;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  sponsorName?: string | null;
+  manager: { name: string; email: string };
+  _count: { players: number };
+  leagues?: Array<{ status: LeagueTeamStatus; group: string | null }>;
+}
+
+interface TeamLeagueRecord {
+  id: string;
+  status: LeagueTeamStatus;
+  group?: string | null;
   approvalNotes: string | null;
   registeredAt: string;
   approvedAt: string | null;
-  rejectedAt: string | null;
-  team: {
-    id: string;
-    name: string;
-    shortName: string;
-    jerseyColor: string | null;
-    city: string | null;
-    contactEmail: string | null;
-    contactPhone: string | null;
-    sponsorName: string | null;
-    manager: { name: string; email: string };
-    _count: { players: number };
-  };
+  team: TeamRecord;
 }
 
-const STATUS_COLORS: Record<Status, string> = {
-  PENDING: "bg-yellow-100 text-yellow-800",
+const STATUS_STYLES: Record<LeagueTeamStatus, string> = {
+  ACTIVE: "bg-[color:var(--card-muted)] text-[color:var(--color-ink)]",
   APPROVED: "bg-[color:var(--card-muted)] text-[color:var(--color-ink)]",
-  REJECTED: "bg-red-100 text-red-700",
+  PENDING: "bg-yellow-100 text-yellow-800",
   WAITLISTED: "bg-gray-100 text-gray-700",
+  REJECTED: "bg-red-100 text-red-700",
 };
 
-const FEE_COLORS: Record<string, string> = {
-  PENDING: "bg-yellow-50 text-yellow-700",
-  PAID: "bg-[color:var(--card-muted)] text-[color:var(--primary)]",
-  WAIVED: "bg-gray-100 text-gray-600",
-};
-
-export default function TeamRegistrationsPage({ params }: { params: Promise<{ id: string }> }) {
+export default function LeagueTeamsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const [registrations, setRegistrations] = useState<TeamReg[]>([]);
-  const [loading, setLoading] = useState(true);
   const [leagueName, setLeagueName] = useState("");
-  const [filter, setFilter] = useState<"ALL" | Status>("ALL");
-  const [processing, setProcessing] = useState<string | null>(null);
-  const [notes, setNotes] = useState<Record<string, string>>({});
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [assignedTeams, setAssignedTeams] = useState<TeamLeagueRecord[]>([]);
+  const [allTeams, setAllTeams] = useState<TeamRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [error, setError] = useState("");
+  const [groupDrafts, setGroupDrafts] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    fetch(`/api/leagues/${id}`)
-      .then(r => r.json())
-      .then(data => {
-        setLeagueName(data.league?.name || "");
-        setRegistrations(data.league?.teams || []);
+    Promise.all([
+      fetch(`/api/leagues/${id}`).then((res) => res.json()),
+      fetch("/api/teams").then((res) => res.json()),
+    ])
+      .then(([leagueData, teamsData]) => {
+        setLeagueName(leagueData.league?.name || "");
+        setAssignedTeams(leagueData.league?.teams || []);
+        setAllTeams(teamsData.teams || []);
+        setGroupDrafts(
+          Object.fromEntries(
+            (leagueData.league?.teams || []).map((item: TeamLeagueRecord) => [item.team.id, item.group || ""])
+          )
+        );
+        setLoading(false);
+      })
+      .catch(() => {
+        setError("Failed to load league teams");
         setLoading(false);
       });
   }, [id]);
 
-  const updateStatus = async (teamLeagueId: string, teamId: string, action: string) => {
-    setProcessing(teamLeagueId);
+  const assignedTeamIds = useMemo(
+    () => new Set(assignedTeams.map((item) => item.team.id)),
+    [assignedTeams],
+  );
+
+  const normalizedSearch = search.trim().toLowerCase();
+
+  const filteredAssigned = useMemo(() => {
+    return assignedTeams.filter((item) => {
+      if (!normalizedSearch) return true;
+      return (
+        item.team.name.toLowerCase().includes(normalizedSearch) ||
+        item.team.shortName.toLowerCase().includes(normalizedSearch) ||
+        item.team.manager.name.toLowerCase().includes(normalizedSearch)
+      );
+    });
+  }, [assignedTeams, normalizedSearch]);
+
+  const availableTeams = useMemo(() => {
+    return allTeams.filter((team) => {
+      if (assignedTeamIds.has(team.id)) return false;
+      if (!normalizedSearch) return true;
+      return (
+        team.name.toLowerCase().includes(normalizedSearch) ||
+        team.shortName.toLowerCase().includes(normalizedSearch) ||
+        team.manager.name.toLowerCase().includes(normalizedSearch)
+      );
+    });
+  }, [allTeams, assignedTeamIds, normalizedSearch]);
+
+  const activeAssignments = assignedTeams.filter((item) =>
+    ["ACTIVE", "APPROVED"].includes(item.status),
+  ).length;
+  const pendingAssignments = assignedTeams.filter((item) => item.status === "PENDING").length;
+
+  const assignTeam = async (teamId: string) => {
+    setProcessingId(teamId);
+    setError("");
     try {
       const res = await fetch(`/api/leagues/${id}/teams`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          teamId,
-          action,
-          approvalNotes: notes[teamLeagueId] || "",
-        }),
+        body: JSON.stringify({ teamId, action: "add", group: groupDrafts[teamId] || null }),
       });
-      if (res.ok) {
-        const newStatus: Status =
-          action === "approve" ? "APPROVED" : action === "reject" ? "REJECTED" : "WAITLISTED";
-        setRegistrations(prev =>
-          prev.map(r =>
-            r.id === teamLeagueId
-              ? { ...r, status: newStatus, approvalNotes: notes[teamLeagueId] || r.approvalNotes }
-              : r
-          )
-        );
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Failed to assign team");
+        return;
       }
+
+      const team = allTeams.find((item) => item.id === teamId);
+      if (!team) return;
+
+      setAssignedTeams((current) => [
+        ...current.filter((item) => item.team.id !== teamId),
+        {
+          id: data.registration?.id || `${id}-${teamId}`,
+          status: data.registration?.status || "ACTIVE",
+          group: data.registration?.group || groupDrafts[teamId] || null,
+          approvalNotes: data.registration?.approvalNotes || null,
+          registeredAt: data.registration?.registeredAt || new Date().toISOString(),
+          approvedAt: data.registration?.approvedAt || new Date().toISOString(),
+          team,
+        },
+      ]);
     } finally {
-      setProcessing(null);
+      setProcessingId(null);
     }
   };
 
-  const bulkApprove = async () => {
-    const pending = registrations.filter(r => r.status === "PENDING");
-    for (const reg of pending) {
-      await updateStatus(reg.id, reg.team.id, "approve");
+  const updateGroup = async (teamId: string) => {
+    setProcessingId(teamId);
+    setError("");
+    try {
+      const res = await fetch(`/api/leagues/${id}/teams`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamId, action: "update-group", group: groupDrafts[teamId] || null }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Failed to update pool");
+        return;
+      }
+      setAssignedTeams((current) =>
+        current.map((item) =>
+          item.team.id === teamId ? { ...item, group: data.registration?.group || groupDrafts[teamId] || null } : item
+        )
+      );
+    } finally {
+      setProcessingId(null);
     }
   };
 
-  const filtered = filter === "ALL" ? registrations : registrations.filter(r => r.status === filter);
-
-  const counts = {
-    ALL: registrations.length,
-    PENDING: registrations.filter(r => r.status === "PENDING").length,
-    APPROVED: registrations.filter(r => r.status === "APPROVED").length,
-    REJECTED: registrations.filter(r => r.status === "REJECTED").length,
-    WAITLISTED: registrations.filter(r => r.status === "WAITLISTED").length,
+  const removeTeam = async (teamId: string) => {
+    setProcessingId(teamId);
+    setError("");
+    try {
+      const res = await fetch(`/api/leagues/${id}/teams`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamId, action: "remove" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Failed to remove team");
+        return;
+      }
+      setAssignedTeams((current) => current.filter((item) => item.team.id !== teamId));
+    } finally {
+      setProcessingId(null);
+    }
   };
 
   if (loading) {
     return (
       <div className="space-y-4 animate-pulse">
-        <div className="h-8 bg-gray-200 rounded w-64" />
-        {[1,2,3].map(i => <div key={i} className="h-24 bg-gray-100 rounded-xl" />)}
+        <div className="h-8 w-64 rounded bg-gray-200" />
+        <div className="h-32 rounded-xl bg-gray-100" />
+        <div className="h-64 rounded-xl bg-gray-100" />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Link href={`/admin/leagues/${id}`} className="text-sm text-gray-500 hover:text-gray-700">
             ← {leagueName}
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Team Registrations</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Team Assignment</h1>
         </div>
         <div className="flex gap-2">
-          {counts.PENDING > 0 && (
-            <button
-              onClick={bulkApprove}
-              disabled={!!processing}
-              className="px-4 py-2 bg-[color:var(--primary)] text-white rounded-lg text-sm font-medium hover:bg-[color:var(--primary-dark)] disabled:opacity-50 transition-colors"
-            >
-              Approve All Pending ({counts.PENDING})
-            </button>
-          )}
+          <Link
+            href={`/admin/teams/new`}
+            className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            + Create Team
+          </Link>
           <Link
             href={`/admin/leagues/${id}/fixtures`}
-            className="px-4 py-2 bg-[color:var(--primary-dark)] text-white rounded-lg text-sm font-medium hover:bg-[#17364e] transition-colors"
+            className="rounded-lg bg-[color:var(--primary-dark)] px-4 py-2 text-sm font-medium text-white hover:bg-[#17364e]"
           >
             Generate Fixtures →
           </Link>
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {(["PENDING", "APPROVED", "WAITLISTED", "REJECTED"] as Status[]).map((s) => (
-          <button
-            key={s}
-            onClick={() => setFilter(filter === s ? "ALL" : s)}
-            className={`rounded-xl border-2 p-4 text-left transition-colors ${
-              filter === s ? "border-[color:var(--primary)] bg-[color:var(--card-muted)]" : "border-transparent bg-white hover:border-gray-200"
-            }`}
-          >
-            <div className="text-2xl font-bold text-gray-900">{counts[s]}</div>
-            <div className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium mt-1 ${STATUS_COLORS[s]}`}>
-              {s}
-            </div>
-          </button>
-        ))}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="rounded-xl border bg-white p-4">
+          <div className="text-2xl font-bold text-gray-900">{assignedTeams.length}</div>
+          <div className="text-sm text-gray-500">League teams</div>
+        </div>
+        <div className="rounded-xl border bg-white p-4">
+          <div className="text-2xl font-bold text-gray-900">{activeAssignments}</div>
+          <div className="text-sm text-gray-500">Active assignments</div>
+        </div>
+        <div className="rounded-xl border bg-white p-4">
+          <div className="text-2xl font-bold text-gray-900">{pendingAssignments}</div>
+          <div className="text-sm text-gray-500">Pending legacy rows</div>
+        </div>
+        <div className="rounded-xl border bg-white p-4">
+          <div className="text-2xl font-bold text-gray-900">{new Set(assignedTeams.map((item) => item.group || "Ungrouped")).size}</div>
+          <div className="text-sm text-gray-500">Pools configured</div>
+        </div>
       </div>
 
-      {/* Registration List */}
-      <div className="space-y-3">
-        {filtered.length === 0 && (
-          <div className="text-center py-12 text-gray-400">No registrations in this category.</div>
-        )}
-        {filtered.map((reg) => (
-          <div
-            key={reg.id}
-            className={`bg-white rounded-xl border-2 overflow-hidden transition-colors ${
-              reg.status === "PENDING" ? "border-yellow-200" :
-              reg.status === "APPROVED" ? "border-[color:var(--border-color)]" :
-              reg.status === "REJECTED" ? "border-red-100" :
-              "border-gray-200"
-            }`}
-          >
-            {/* Main Row */}
-            <div className="px-5 py-4 flex flex-wrap items-center gap-4">
-              {/* Team color dot + name */}
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <div
-                  className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-white font-bold text-sm"
-                  style={{ backgroundColor: reg.team.jerseyColor || "var(--primary)" }}
-                >
-                  {reg.team.shortName.charAt(0)}
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-gray-900">{reg.team.name}</span>
-                    <span className="text-xs text-gray-500">({reg.team.shortName})</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[reg.status]}`}>
-                      {reg.status}
-                    </span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${FEE_COLORS[reg.team.contactEmail ? "PAID" : "PENDING"]}`}>
-                      Fee: {reg.registrationFeeStatus}
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Manager: {reg.team.manager.name} · {reg.team.manager.email}
-                  </p>
-                </div>
-              </div>
+      <div className="rounded-2xl border border-[color:var(--border-color)] bg-[color:var(--card-muted)] px-4 py-4 text-sm text-[color:var(--color-ink)]">
+        Assign teams directly to this league. Add pool labels like `Pool A` or `Group 1` here, and group-stage fixtures and standings will use them automatically.
+      </div>
 
-              {/* Stats */}
-              <div className="flex items-center gap-4 text-center text-sm flex-shrink-0">
-                <div>
-                  <div className="font-bold text-gray-900">{reg.team._count.players}</div>
-                  <div className="text-xs text-gray-500">Players</div>
-                </div>
-                {reg.team.city && (
-                  <div>
-                    <div className="font-medium text-gray-700 text-xs">{reg.team.city}</div>
-                    <div className="text-xs text-gray-400">City</div>
-                  </div>
-                )}
-                <div className="text-xs text-gray-400">
-                  Registered {new Date(reg.registeredAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}
-                </div>
-              </div>
+      <div className="rounded-xl border bg-white p-4">
+        <label className="block text-sm font-medium text-gray-700">Search teams or managers</label>
+        <input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search by team name, short name, or manager"
+          className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none ring-0 placeholder:text-gray-400 focus:border-[color:var(--primary)]"
+        />
+      </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <button
-                  onClick={() => setExpandedId(expandedId === reg.id ? null : reg.id)}
-                  className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs hover:bg-gray-200 transition-colors"
-                >
-                  {expandedId === reg.id ? "▲ Less" : "▼ Details"}
-                </button>
-                {reg.status !== "APPROVED" && (
-                  <button
-                    onClick={() => updateStatus(reg.id, reg.team.id, "approve")}
-                    disabled={processing === reg.id}
-                    className="px-3 py-1.5 bg-[color:var(--primary)] text-white rounded-lg text-xs font-medium hover:bg-[color:var(--primary-dark)] disabled:opacity-50 transition-colors"
-                  >
-                    {processing === reg.id ? "..." : "Approve"}
-                  </button>
-                )}
-                {reg.status === "PENDING" && (
-                  <button
-                    onClick={() => updateStatus(reg.id, reg.team.id, "waitlist")}
-                    disabled={processing === reg.id}
-                    className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-200 disabled:opacity-50 transition-colors"
-                  >
-                    Waitlist
-                  </button>
-                )}
-                {reg.status !== "REJECTED" && reg.status !== "APPROVED" && (
-                  <button
-                    onClick={() => updateStatus(reg.id, reg.team.id, "reject")}
-                    disabled={processing === reg.id}
-                    className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-medium hover:bg-red-100 disabled:opacity-50 transition-colors"
-                  >
-                    Reject
-                  </button>
-                )}
-              </div>
-            </div>
+      {error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      ) : null}
 
-            {/* Expanded Details */}
-            {expandedId === reg.id && (
-              <div className="border-t border-gray-100 bg-gray-50 px-5 py-4 space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Contact</p>
-                    <p>{reg.team.contactEmail || "—"}</p>
-                    <p>{reg.team.contactPhone || "—"}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Sponsor</p>
-                    <p>{reg.team.sponsorName || "—"}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Timeline</p>
-                    <p className="text-xs text-gray-600">Registered: {new Date(reg.registeredAt).toLocaleString("en-GB")}</p>
-                    {reg.approvedAt && <p className="text-xs text-[color:var(--primary)]">Approved: {new Date(reg.approvedAt).toLocaleString("en-GB")}</p>}
-                    {reg.rejectedAt && <p className="text-xs text-red-600">Rejected: {new Date(reg.rejectedAt).toLocaleString("en-GB")}</p>}
-                  </div>
-                </div>
-
-                {/* Notes */}
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Admin Notes</p>
-                  {reg.approvalNotes && (
-                    <p className="text-xs text-gray-600 mb-2 italic">"{reg.approvalNotes}"</p>
-                  )}
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Add a note (optional)..."
-                      value={notes[reg.id] || ""}
-                      onChange={(e) => setNotes(prev => ({ ...prev, [reg.id]: e.target.value }))}
-                      className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[color:var(--primary)]"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <Link
-                    href={`/admin/teams/${reg.team.id}`}
-                    className="text-xs text-[color:var(--primary)] hover:underline"
-                  >
-                    View Team Profile →
-                  </Link>
-                </div>
-              </div>
-            )}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Assigned Teams</h2>
+            <p className="text-sm text-gray-500">Teams already attached to this league and ready for setup.</p>
           </div>
-        ))}
+
+          {filteredAssigned.length === 0 ? (
+            <div className="rounded-xl border bg-white px-5 py-10 text-center text-sm text-gray-500">
+              No teams assigned yet.
+            </div>
+          ) : (
+            filteredAssigned.map((entry) => (
+              <div key={entry.id} className="rounded-xl border bg-white p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex min-w-0 flex-1 items-start gap-3">
+                    <div
+                      className="flex h-11 w-11 items-center justify-center rounded-full text-sm font-bold text-white"
+                      style={{ backgroundColor: entry.team.jerseyColor || "var(--primary)" }}
+                    >
+                      {entry.team.shortName}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold text-gray-900">{entry.team.name}</span>
+                        <span className="text-xs text-gray-500">({entry.team.shortName})</span>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[entry.status]}`}>
+                          {entry.status}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Manager: {entry.team.manager.name} · {entry.team.manager.email}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-400">
+                        {entry.team._count.players} players
+                        {entry.team.city ? ` · ${entry.team.city}` : ""}
+                        {entry.approvedAt
+                          ? ` · active ${new Date(entry.approvedAt).toLocaleDateString("en-GB")}`
+                          : ` · added ${new Date(entry.registeredAt).toLocaleDateString("en-GB")}`}
+                      </p>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <input
+                          value={groupDrafts[entry.team.id] || ""}
+                          onChange={(event) =>
+                            setGroupDrafts((current) => ({ ...current, [entry.team.id]: event.target.value }))
+                          }
+                          placeholder="Pool A / Group 1"
+                          className="rounded-lg border border-gray-200 px-3 py-2 text-xs"
+                        />
+                        <button
+                          onClick={() => updateGroup(entry.team.id)}
+                          disabled={processingId === entry.team.id}
+                          className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          Save pool
+                        </button>
+                        <span className="text-xs text-gray-500">
+                          {entry.group || "Ungrouped"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => removeTeam(entry.team.id)}
+                    disabled={processingId === entry.team.id}
+                    className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+                  >
+                    {processingId === entry.team.id ? "Removing..." : "Remove"}
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </section>
+
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Available Teams</h2>
+            <p className="text-sm text-gray-500">Existing teams that can be added to this league.</p>
+          </div>
+
+          {availableTeams.length === 0 ? (
+            <div className="rounded-xl border bg-white px-5 py-10 text-center text-sm text-gray-500">
+              No unassigned teams match the current search.
+            </div>
+          ) : (
+            availableTeams.map((team) => (
+              <div key={team.id} className="rounded-xl border bg-white p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex min-w-0 flex-1 items-start gap-3">
+                    <div
+                      className="flex h-11 w-11 items-center justify-center rounded-full text-sm font-bold text-white"
+                      style={{ backgroundColor: team.jerseyColor || "var(--primary)" }}
+                    >
+                      {team.shortName}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold text-gray-900">{team.name}</span>
+                        <span className="text-xs text-gray-500">({team.shortName})</span>
+                      </div>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Manager: {team.manager.name} · {team.manager.email}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-400">
+                        {team._count.players} players
+                        {team.city ? ` · ${team.city}` : ""}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => assignTeam(team.id)}
+                    disabled={processingId === team.id}
+                    className="rounded-lg bg-[color:var(--primary)] px-3 py-2 text-xs font-medium text-white hover:bg-[color:var(--primary-dark)] disabled:opacity-50"
+                  >
+                    {processingId === team.id ? "Adding..." : "Add to League"}
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </section>
       </div>
     </div>
   );

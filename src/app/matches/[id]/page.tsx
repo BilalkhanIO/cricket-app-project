@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -10,8 +11,45 @@ import prisma from "@/lib/prisma";
 import { formatDateTime } from "@/lib/utils";
 import PublicShell from "@/components/layout/PublicShell";
 import PublicMatchTabs from "./PublicMatchTabs";
+import ShareButton from "@/components/ui/ShareButton";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const match = await prisma.match.findUnique({
+    where: { id },
+    select: {
+      matchFormat: true,
+      status: true,
+      result: true,
+      matchDate: true,
+      homeTeam: { select: { shortName: true, name: true } },
+      awayTeam: { select: { shortName: true, name: true } },
+      league: { select: { name: true, season: true } },
+    },
+  });
+  if (!match) return { title: "Match Not Found — CricketLeague" };
+
+  const vs = `${match.homeTeam.shortName} vs ${match.awayTeam.shortName}`;
+  const title = `${vs} — ${match.league.name} ${match.league.season}`;
+  const description = match.result
+    ? `${match.result} | ${match.matchFormat} | ${match.league.name} ${match.league.season}`
+    : `${match.status === "LIVE" ? "LIVE NOW" : match.matchFormat} | ${match.homeTeam.name} v ${match.awayTeam.name} | ${match.league.name}`;
+
+  const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+  // Use MOM card for completed matches (richer social image), fallback to match card
+  const ogImage = match.status === "COMPLETED"
+    ? `${baseUrl}/api/og/mom/${id}`
+    : `${baseUrl}/api/og/match/${id}`;
+
+  return {
+    title,
+    description,
+    openGraph: { title, description, type: "website", images: [{ url: ogImage, width: 1200, height: 630 }] },
+    twitter: { card: "summary_large_image", title, description, images: [ogImage] },
+  };
+}
 
 async function getMatch(id: string) {
   return prisma.match.findUnique({
@@ -22,7 +60,11 @@ async function getMatch(id: string) {
       awayTeam: { select: { id: true, name: true, shortName: true, jerseyColor: true } },
       venue: true,
       scorer: { select: { name: true } },
-      officials: true,
+      officials: {
+        include: {
+          user: { select: { id: true, name: true } },
+        },
+      },
       awards: {
         where: { awardType: "MAN_OF_MATCH" },
         include: {
@@ -49,6 +91,8 @@ async function getMatch(id: string) {
           battingScores: {
             include: {
               player: { include: { user: { select: { name: true } } } },
+              bowler: { include: { user: { select: { name: true } } } },
+              fielder: { include: { user: { select: { name: true } } } },
             },
             orderBy: { battingOrder: "asc" },
           },
@@ -169,13 +213,26 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(27,54,86,0.95),transparent_52%),linear-gradient(180deg,rgba(0,20,43,0.22),#00142b_76%)]" />
 
           <div className="relative mx-auto max-w-screen-xl">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className={`px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${getStatusTone(match.status)}`}>
-                {formatLabel(match.status)}
-              </span>
-              <Link href={`/leagues/${match.league.id}`} className="bg-[#12324d] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#d4e3ff]">
-                {match.league.name}
-              </Link>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className={`px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${getStatusTone(match.status)}`}>
+                  {formatLabel(match.status)}
+                </span>
+                <Link href={`/leagues/${match.league.id}`} className="bg-[#12324d] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#d4e3ff]">
+                  {match.league.name}
+                </Link>
+              {match.groupName ? (
+                <span className="bg-[#08203d] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#4ae183]">
+                  {match.groupName}
+                </span>
+              ) : null}
+                {match.stage ? (
+                  <span className="bg-[#12324d] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#c8c8b0]">
+                    {formatLabel(match.stage)}
+                  </span>
+                ) : null}
+              </div>
+              <ShareButton label="Share match" />
             </div>
 
             <div className="mt-6 space-y-5">
@@ -342,27 +399,6 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
                 ))}
               </div>
 
-              <div className="mt-6 grid gap-4 border-t border-white/10 pt-5 lg:grid-cols-[1.2fr_0.8fr]">
-                <div className="border border-white/10 bg-[#001c3a] p-5">
-                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#c8c8b0]">Public match center</p>
-                  <p className="mt-3 text-sm leading-7 text-[#d4e3ff]">
-                    Fans see scorecards, commentary, officials, and the assigned scorer here. The scoring console itself remains private to the assigned scorer and authorized match admins.
-                  </p>
-                </div>
-                <div className="border border-white/10 bg-[#001c3a] p-5">
-                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#c8c8b0]">Scoring desk</p>
-                  <div className="mt-3 space-y-2">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#7f9abd]">Assigned scorer</span>
-                      <span className="text-sm font-bold uppercase tracking-[0.08em] text-white">{match.scorer?.name || "Not assigned"}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#7f9abd]">Access model</span>
-                      <span className="text-sm font-bold uppercase tracking-[0.08em] text-[#4ae183]">Private console</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
           </section>
 

@@ -3,7 +3,7 @@
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import PublicShell from "@/components/layout/PublicShell";
-import { getDashboardLinkForRole, getRoleLabel } from "@/lib/roles";
+import { getDashboardLinkForRole, getRoleLabel, normalizeRole, ROLE } from "@/lib/roles";
 
 export const dynamic = 'force-dynamic';
 
@@ -33,42 +33,33 @@ export default function ProfilePage() {
     );
   }
 
+  const effectiveRole = normalizeRole(session.user.role) || ROLE.VIEWER;
   const workspaceLink = getDashboardLinkForRole(session.user.role);
-  const workspaceLabel = session.user.role === "FAN" ? "My Profile" : `${getRoleLabel(session.user.role)} Workspace`;
+  const workspaceLabel = effectiveRole === ROLE.VIEWER ? "My Profile" : `${getRoleLabel(session.user.role)} Workspace`;
   const roleActions: { href: string; label: string; accent?: boolean }[] = (() => {
-    switch (session.user.role) {
-      case "SUPER_ADMIN":
-      case "LEAGUE_ADMIN":
+    switch (effectiveRole) {
+      case ROLE.SUPER_ADMIN:
+      case ROLE.LEAGUE_ADMIN:
         return [
           { href: workspaceLink, label: "Open Admin Workspace", accent: true },
-          { href: "/admin/leagues/new", label: "Create League" },
+          { href: "/admin/leagues/new", label: "Create Tournament" },
         ];
-      case "LEAGUE_STAFF":
-        return [
-          { href: workspaceLink, label: "Open Operations Workspace", accent: true },
-          { href: "/admin/matches", label: "Match Operations" },
-        ];
-      case "SCORER":
+      case ROLE.SCORER:
         return [
           { href: workspaceLink, label: "Assigned Matches", accent: true },
           { href: "/matches", label: "Public Match Center" },
         ];
-      case "TEAM_MANAGER":
+      case ROLE.TEAM_MANAGER:
         return [
           { href: workspaceLink, label: "Team Workspace", accent: true },
           { href: "/teams", label: "Browse Teams" },
         ];
-      case "PLAYER":
+      case ROLE.PLAYER:
         return [
           { href: workspaceLink, label: "Player Dashboard", accent: true },
           { href: "/stats", label: "Statistics" },
         ];
-      case "TEAM_OWNER":
-      case "COACH":
-      case "SELECTOR":
-      case "ANALYST":
-      case "UMPIRE":
-      case "MATCH_REFEREE":
+      case ROLE.UMPIRE:
         return [
           { href: workspaceLink, label: workspaceLabel, accent: true },
           { href: "/matches", label: "View Matches" },
@@ -123,7 +114,7 @@ export default function ProfilePage() {
                 <p className="mt-1 text-sm text-[#9bb2d1]">{session.user.email}</p>
                 <div className="mt-3">
                   <span className="inline-block bg-[#1b3656] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#4ae183]">
-                    {session.user.role.replace(/_/g, " ")}
+                          {session.user.role.replace(/_/g, " ")}
                   </span>
                 </div>
               </div>
@@ -146,7 +137,7 @@ export default function ProfilePage() {
                   {[
                     { label: "Full Name", value: session.user.name },
                     { label: "Email", value: session.user.email },
-                    { label: "Role", value: session.user.role.replace(/_/g, " ") },
+                    { label: "Role", value: getRoleLabel(session.user.role) },
                   ].map((item) => (
                     <div key={item.label} className="flex items-center justify-between px-5 py-4">
                       <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">

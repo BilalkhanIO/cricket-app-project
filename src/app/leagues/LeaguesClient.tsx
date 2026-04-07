@@ -14,11 +14,8 @@ interface League {
   season: string;
   year: number;
   tournamentType: string;
-  playerRegistrationStatus: string;
   startDate: Date | string;
   endDate: Date | string;
-  registrationOpenDate?: Date | string | null;
-  registrationCloseDate?: Date | string | null;
   maxTeams: number;
   admin: { name: string };
   parentLeague?: { id: string; name: string } | null;
@@ -26,7 +23,6 @@ interface League {
     teams: number;
     matches: number;
     seasons: number;
-    playerRegistrations: number;
   };
 }
 
@@ -44,20 +40,14 @@ function getStatusTone(status: string) {
   return "bg-[#12324d] text-[#9bb2d1]";
 }
 
-function getRegistrationCopy(league: League) {
+function getSetupCopy(league: League) {
   if (league.status === "REGISTRATION") {
-    return league.registrationCloseDate
-      ? `Closes ${formatDate(league.registrationCloseDate)}`
-      : "Registration open";
+    return "Fixture setup and team assignment in progress";
   }
-
-  if (league.playerRegistrationStatus === "OPEN") {
-    return league.registrationCloseDate
-      ? `Players open until ${formatDate(league.registrationCloseDate)}`
-      : "Players can register";
+  if (league.status === "DRAFT") {
+    return "Competition shell created and awaiting activation";
   }
-
-  return "Registration closed";
+  return `Runs ${formatDate(league.startDate)} to ${formatDate(league.endDate)}`;
 }
 
 export default function LeaguesClient({ leagues }: { leagues: League[] }) {
@@ -84,9 +74,7 @@ export default function LeaguesClient({ leagues }: { leagues: League[] }) {
   }, [formatFilter, leagues, search, statusFilter]);
 
   const featuredActive = filtered.filter((league) => league.status === "ACTIVE").slice(0, 3);
-  const openRegistration = filtered.filter(
-    (league) => league.status === "REGISTRATION" || league.playerRegistrationStatus === "OPEN"
-  );
+  const setupLeagues = filtered.filter((league) => league.status === "REGISTRATION" || league.status === "DRAFT");
 
   return (
     <div id="league-directory" className="mx-auto max-w-screen-xl px-4 pb-16 pt-10 sm:px-6 lg:pb-20 lg:pt-12">
@@ -97,7 +85,7 @@ export default function LeaguesClient({ leagues }: { leagues: League[] }) {
             <span className="block text-[#c8c8b0]">league boards</span>
           </h2>
           <p className="max-w-xl text-sm leading-7 text-[#9bb2d1]">
-            Current competitions, season branches, and open entry campaigns arranged like a public control room instead of a plain list.
+            Current competitions, season branches, and upcoming tournament setups arranged like a public control room instead of a plain list.
           </p>
         </div>
 
@@ -115,8 +103,8 @@ export default function LeaguesClient({ leagues }: { leagues: League[] }) {
             },
             {
               icon: ShieldCheck,
-              value: openRegistration.length,
-              label: "Entry windows",
+              value: setupLeagues.length,
+              label: "Setup boards",
             },
           ].map((item) => (
             <div key={item.label} className="border border-white/10 bg-[#001c3a] p-5">
@@ -173,7 +161,7 @@ export default function LeaguesClient({ leagues }: { leagues: League[] }) {
           <span className="h-1 w-1 rounded-full bg-[#4ae183]" />
           <span>{featuredActive.length} featured active</span>
           <span className="h-1 w-1 rounded-full bg-[#4ae183]" />
-          <span>{openRegistration.length} with open entry</span>
+          <span>{setupLeagues.length} in setup</span>
         </div>
       </section>
 
@@ -231,24 +219,24 @@ export default function LeaguesClient({ leagues }: { leagues: League[] }) {
         </section>
       )}
 
-      <section id="registration-window" className="mt-12 grid gap-6 lg:grid-cols-[0.92fr_1.08fr]">
+      <section id="setup-pipeline" className="mt-12 grid gap-6 lg:grid-cols-[0.92fr_1.08fr]">
         <div className="space-y-4">
           <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
-            Registration
-            <span className="block text-[#c8c8b0]">windows</span>
+            Tournament
+            <span className="block text-[#c8c8b0]">setup boards</span>
           </h2>
           <p className="text-sm leading-7 text-[#9bb2d1]">
-            These seasons are currently accepting entries or have player registration enabled. League admins can run multiple seasons under one league family.
+            These seasons are being prepared for play. League admins can structure multi-season competitions before moving them into active match operations.
           </p>
         </div>
 
         <div className="space-y-3">
-          {openRegistration.length === 0 ? (
+          {setupLeagues.length === 0 ? (
             <div className="border border-white/10 bg-[#001c3a] p-6 text-sm text-[#9bb2d1]">
-              No registration windows are open right now.
+              No leagues are currently in setup.
             </div>
           ) : (
-            openRegistration.slice(0, 4).map((league) => (
+            setupLeagues.slice(0, 4).map((league) => (
               <Link
                 key={league.id}
                 href={`/leagues/${league.id}`}
@@ -262,14 +250,14 @@ export default function LeaguesClient({ leagues }: { leagues: League[] }) {
                     {league.name}
                   </h3>
                   <p className="mt-2 text-xs font-bold uppercase tracking-[0.18em] text-[#9bb2d1]">
-                    {getRegistrationCopy(league)}
+                    {getSetupCopy(league)}
                   </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 text-center sm:min-w-[12rem]">
                   <div className="border border-white/10 bg-[#00142b] px-3 py-3">
-                    <p className="font-[var(--font-display)] text-2xl font-black text-white">{league._count.playerRegistrations}</p>
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">Players</p>
+                    <p className="font-[var(--font-display)] text-2xl font-black text-white">{league._count.seasons}</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">Seasons</p>
                   </div>
                   <div className="border border-white/10 bg-[#00142b] px-3 py-3">
                     <p className="font-[var(--font-display)] text-2xl font-black text-white">{league._count.teams}</p>
@@ -312,7 +300,7 @@ export default function LeaguesClient({ leagues }: { leagues: League[] }) {
 
                 <p className="mt-4 line-clamp-3 text-sm leading-7 text-[#9bb2d1]">
                   {league.description ||
-                    `${league.season} season managed by ${league.admin.name}. Entry, fixtures, standings, and records are available from the league board.`}
+                    `${league.season} season managed by ${league.admin.name}. Fixtures, standings, match updates, and records are available from the league board.`}
                 </p>
 
                 <div className="mt-5 flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#c8c8b0]">
@@ -349,7 +337,7 @@ export default function LeaguesClient({ leagues }: { leagues: League[] }) {
                   </div>
                   <div className="flex items-center gap-2">
                     <LayoutGrid className="h-4 w-4 text-[#4ae183]" />
-                    <span>{getRegistrationCopy(league)}</span>
+                    <span>{getSetupCopy(league)}</span>
                   </div>
                 </div>
               </Link>

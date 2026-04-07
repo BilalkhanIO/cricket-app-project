@@ -13,92 +13,99 @@ export function OPTIONS(req: NextRequest) {
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const match = await prisma.match.findUnique({
-      where: { id: id },
-      include: {
-        league: { select: { id: true, name: true, oversPerInnings: true } },
-        homeTeam: {
-          select: {
-            id: true,
-            name: true,
-            shortName: true,
-            logo: true,
-            jerseyColor: true,
-            players: {
-              where: { isActive: true },
-              select: {
-                id: true,
-                isCaptain: true,
-                isWicketkeeper: true,
-                user: { select: { name: true, profileImage: true } },
+    const [match, ballEventAudits] = await Promise.all([
+      prisma.match.findUnique({
+        where: { id: id },
+        include: {
+          league: { select: { id: true, name: true, oversPerInnings: true } },
+          homeTeam: {
+            select: {
+              id: true,
+              name: true,
+              shortName: true,
+              logo: true,
+              jerseyColor: true,
+              players: {
+                where: { isActive: true },
+                select: {
+                  id: true,
+                  isCaptain: true,
+                  isWicketkeeper: true,
+                  user: { select: { name: true, profileImage: true } },
+                },
               },
             },
           },
-        },
-        awayTeam: {
-          select: {
-            id: true,
-            name: true,
-            shortName: true,
-            logo: true,
-            jerseyColor: true,
-            players: {
-              where: { isActive: true },
-              select: {
-                id: true,
-                isCaptain: true,
-                isWicketkeeper: true,
-                user: { select: { name: true, profileImage: true } },
+          awayTeam: {
+            select: {
+              id: true,
+              name: true,
+              shortName: true,
+              logo: true,
+              jerseyColor: true,
+              players: {
+                where: { isActive: true },
+                select: {
+                  id: true,
+                  isCaptain: true,
+                  isWicketkeeper: true,
+                  user: { select: { name: true, profileImage: true } },
+                },
               },
             },
           },
-        },
-        venue: true,
-        scorer: { select: { name: true } },
-        officials: true,
-        interruptions: {
-          orderBy: { createdAt: "desc" },
-        },
-        dlsRevisions: {
-          orderBy: { createdAt: "desc" },
-        },
-        playingXIs: {
-          include: {
-            player: {
-              include: {
-                user: { select: { name: true, profileImage: true } },
+          venue: true,
+          scorer: { select: { name: true } },
+          officials: true,
+          interruptions: {
+            orderBy: { createdAt: "desc" },
+          },
+          dlsRevisions: {
+            orderBy: { createdAt: "desc" },
+          },
+          playingXIs: {
+            include: {
+              player: {
+                include: {
+                  user: { select: { name: true, profileImage: true } },
+                },
               },
             },
           },
-        },
-        innings: {
-          include: {
-            team: { select: { id: true, name: true, shortName: true } },
-            battingScores: {
-              include: {
-                player: { include: { user: { select: { name: true } } } },
+          innings: {
+            include: {
+              team: { select: { id: true, name: true, shortName: true } },
+              battingScores: {
+                include: {
+                  player: { include: { user: { select: { name: true } } } },
+                },
+                orderBy: { battingOrder: "asc" },
               },
-              orderBy: { battingOrder: "asc" },
-            },
-            bowlingScores: {
-              include: {
-                player: { include: { user: { select: { name: true } } } },
+              bowlingScores: {
+                include: {
+                  player: { include: { user: { select: { name: true } } } },
+                },
+              },
+              overs: {
+                orderBy: { overNumber: "asc" },
+                include: {
+                  balls: { orderBy: { ballNumber: "asc" } },
+                },
               },
             },
-            overs: {
-              orderBy: { overNumber: "asc" },
-              include: {
-                balls: { orderBy: { ballNumber: "asc" } },
-              },
-            },
+            orderBy: { inningsNumber: "asc" },
           },
-          orderBy: { inningsNumber: "asc" },
         },
-      },
-    });
+      }),
+      prisma.ballEventAudit.findMany({
+        where: { matchId: id },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      }),
+    ]);
 
     if (!match) return jsonWithCors(req, { error: "Match not found" }, { status: 404 });
-    return jsonWithCors(req, { match });
+    return jsonWithCors(req, { match, ballEventAudits });
   } catch (error) {
     return jsonWithCors(req, { error: "Failed to fetch match" }, { status: 500 });
   }
@@ -192,6 +199,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           message: `You are the scorer for ${(updated as any).homeTeam.shortName} vs ${(updated as any).awayTeam.shortName} on ${updated.matchDate.toLocaleDateString("en-GB")}.`,
         },
       }).catch(() => {}); // non-fatal
+    }
+
+    // Notify team managers if match date changed
+    if (data.matchDate && nextMatchDate.getTime() !== currentMatch.matchDate.getTime()) {
+      const teamsWithManagers = await prisma.team.findMany({
+        where: { id: { in: [updated.homeTeamId, updated.awayTeamId] } },
+        select: { managerId: true },
+      });
+      const managerIds = teamsWithManagers.map((t) => t.managerId).filter(Boolean) as string[];
+      if (managerIds.length > 0) {
+        await prisma.notification.createMany({
+          data: managerIds.map((uid) => ({
+            userId: uid,
+            matchId: id,
+            type: "SCHEDULE_UPDATED",
+            title: "Match rescheduled",
+            message: `${(updated as any).homeTeam.shortName} vs ${(updated as any).awayTeam.shortName} has been rescheduled to ${updated.matchDate.toLocaleDateString("en-GB")}.`,
+          })),
+          skipDuplicates: true,
+        }).catch(() => {});
+      }
     }
 
     // Log audit

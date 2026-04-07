@@ -37,9 +37,9 @@ export async function PATCH(
       const teamLeague = await prisma.teamLeague.findUnique({
         where: { teamId_leagueId: { teamId, leagueId: id } },
       });
-      if (!teamLeague || teamLeague.status !== "APPROVED") {
+      if (!teamLeague || !["ACTIVE", "APPROVED"].includes(teamLeague.status)) {
         return NextResponse.json(
-          { error: "Target team is not approved in this league" },
+          { error: "Target team is not assigned to this league" },
           { status: 400 }
         );
       }

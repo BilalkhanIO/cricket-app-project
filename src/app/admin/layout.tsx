@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Building2, CalendarDays, LayoutDashboard, MapPinned, Megaphone, Menu, Shield, Trophy, Users } from "lucide-react";
+import { BarChart2, Building2, CalendarDays, LayoutDashboard, MapPinned, Megaphone, Menu, Shield, Trophy, UserCheck, Users } from "lucide-react";
 import { getRoleLabel } from "@/lib/roles";
 import { canAccessAdminArea } from "@/lib/permissions";
 
@@ -15,8 +15,10 @@ const navItems = [
   { href: "/admin/players", label: "Players", icon: Users },
   { href: "/admin/matches", label: "Matches", icon: CalendarDays },
   { href: "/admin/venues", label: "Venues", icon: MapPinned },
+  { href: "/admin/officials", label: "Officials", icon: UserCheck },
   { href: "/admin/announcements", label: "Announcements", icon: Megaphone },
   { href: "/admin/users", label: "Users", icon: Building2 },
+  { href: "/admin/reports", label: "Reports", icon: BarChart2 },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

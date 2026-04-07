@@ -4,6 +4,7 @@ import { jsonWithCors, optionsWithCors } from "@/lib/api-cors";
 import { OVERALL_LEAGUE_KEY } from "@/lib/constants";
 import { getMobileUserFromRequest } from "@/lib/mobile-auth";
 import prisma from "@/lib/prisma";
+import { normalizeRole, ROLE } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -342,33 +343,24 @@ export async function GET(req: NextRequest) {
       return jsonWithCors(req, { error: "User not found" }, { status: 404 });
     }
 
+    const normalizedRole = normalizeRole(baseUser.role);
     let dashboard;
-    switch (baseUser.role) {
-      case "SUPER_ADMIN":
-      case "LEAGUE_ADMIN":
+    switch (normalizedRole) {
+      case ROLE.SUPER_ADMIN:
+      case ROLE.LEAGUE_ADMIN:
         dashboard = await getAdminDashboard();
         break;
-      case "PLAYER":
+      case ROLE.PLAYER:
         dashboard = await getPlayerDashboard(baseUser.id);
         break;
-      case "TEAM_MANAGER":
+      case ROLE.TEAM_MANAGER:
         dashboard = await getTeamManagerDashboard(baseUser.id);
         break;
-      case "SCORER":
+      case ROLE.SCORER:
         dashboard = await getScorerDashboard(baseUser.id);
         break;
-      case "TEAM_OWNER":
-      case "COACH":
-      case "SELECTOR":
-      case "ANALYST":
-        dashboard = await getTeamStaffDashboard();
-        break;
-      case "UMPIRE":
-      case "MATCH_REFEREE":
+      case ROLE.UMPIRE:
         dashboard = await getOfficialsDashboard();
-        break;
-      case "LEAGUE_STAFF":
-        dashboard = await getLeagueStaffDashboard();
         break;
       default:
         dashboard = { kind: "generic", overview: {} };

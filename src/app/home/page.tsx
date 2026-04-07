@@ -14,7 +14,7 @@ async function getHomeData() {
       upcomingMatches,
       recentResults,
       activeLeagues,
-      registrationLeagues,
+      setupLeagues,
       announcements,
       topBatters,
       topBowlers,
@@ -24,7 +24,7 @@ async function getHomeData() {
       totalMatches,
     ] = await Promise.all([
       prisma.match.findMany({
-        where: { status: "LIVE" },
+        where: { status: { in: ["LIVE", "INNINGS_BREAK", "TOSS"] } },
         include: {
           homeTeam: { select: { id: true, name: true, shortName: true, jerseyColor: true } },
           awayTeam: { select: { id: true, name: true, shortName: true, jerseyColor: true } },
@@ -41,7 +41,7 @@ async function getHomeData() {
           },
         },
         orderBy: { updatedAt: "desc" },
-        take: 1,
+        take: 6,
       }),
       prisma.match.findMany({
         where: { status: { in: ["UPCOMING", "TOSS"] } },
@@ -79,7 +79,7 @@ async function getHomeData() {
         take: 6,
       }),
       prisma.league.findMany({
-        where: { status: "REGISTRATION" },
+        where: { status: { in: ["REGISTRATION", "DRAFT"] } },
         select: {
           id: true,
           name: true,
@@ -146,10 +146,11 @@ async function getHomeData() {
 
     return {
       liveMatch: liveMatches[0] ?? null,
+      moreLiveMatches: liveMatches.slice(1),
       upcomingMatches,
       recentResults,
       activeLeagues,
-      registrationLeagues,
+      setupLeagues,
       announcements,
       topBatter: topBatters[0] ?? null,
       topBowler: topBowlers[0] ?? null,
@@ -162,10 +163,11 @@ async function getHomeData() {
     console.error("Home data load failed:", error);
     return {
       liveMatch: null,
+      moreLiveMatches: [],
       upcomingMatches: [],
       recentResults: [],
       activeLeagues: [],
-      registrationLeagues: [],
+      setupLeagues: [],
       announcements: [],
       topBatter: null,
       topBowler: null,
@@ -245,10 +247,11 @@ function ResultStrip({ match }: { match: any }) {
 export default async function HomePage() {
   const {
     liveMatch,
+    moreLiveMatches,
     upcomingMatches,
     recentResults,
     activeLeagues,
-    registrationLeagues,
+    setupLeagues,
     announcements,
     topBatter,
     topBowler,
@@ -349,7 +352,7 @@ export default async function HomePage() {
                   <span className="block text-[#4ae183]">broadcast like a league brand</span>
                 </h1>
                 <p className="max-w-xl text-base leading-7 text-[#9bb2d1]">
-                  Fixtures, standings, results, registration windows, player leaders, and public league notices arranged in one complete matchday home.
+                  Fixtures, standings, results, player leaders, and public league notices arranged in one complete matchday home.
                 </p>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Link
@@ -387,6 +390,48 @@ export default async function HomePage() {
             ))}
           </div>
         </section>
+
+        {moreLiveMatches.length > 0 && (
+          <section className="mt-8 px-4 sm:px-6">
+            <div className="mx-auto max-w-screen-xl">
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 animate-pulse bg-[#93000a]" />
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#ffdad6]">
+                    Also live now
+                  </p>
+                </div>
+                <Link href="/matches" className="text-[10px] font-black uppercase tracking-[0.18em] text-[#4ae183] hover:underline">
+                  All matches
+                </Link>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {moreLiveMatches.map((match) => {
+                  const hInn = getInning(match, match.homeTeamId);
+                  const aInn = getInning(match, match.awayTeamId);
+                  return (
+                    <Link
+                      key={match.id}
+                      href={`/matches/${match.id}`}
+                      className="flex items-center justify-between gap-4 border border-[#93000a]/50 bg-[#001c3a] p-4 transition hover:bg-[#0b2747]"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">{match.league.name}</p>
+                        <p className="mt-1 font-[var(--font-display)] text-xl font-black uppercase tracking-tight text-white">
+                          {match.homeTeam.shortName} vs {match.awayTeam.shortName}
+                        </p>
+                      </div>
+                      <div className="flex-none text-right">
+                        <p className="font-[var(--font-display)] text-lg font-black text-white">{formatScore(hInn)}</p>
+                        <p className="font-[var(--font-display)] text-base font-black text-[#9bb2d1]">{formatScore(aInn)}</p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+        )}
 
         <section className="mt-16 px-4 sm:px-6 lg:mt-20">
           <div className="mx-auto grid max-w-screen-xl gap-6 lg:grid-cols-[1.05fr_0.95fr]">
@@ -630,28 +675,28 @@ export default async function HomePage() {
           <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
             <div className="space-y-4">
               <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
-                Open
-                <span className="block text-[#c8c8b0]">Registration</span>
+                Competition
+                <span className="block text-[#c8c8b0]">Setup</span>
               </h2>
-              {registrationLeagues.length === 0 ? (
+              {setupLeagues.length === 0 ? (
                 <div className="bg-[#001c3a] p-6 text-sm text-[#9bb2d1]">
-                  No registration windows are open right now.
+                  No leagues are currently in setup.
                 </div>
               ) : (
-                registrationLeagues.map((league) => (
+                setupLeagues.map((league) => (
                   <Link
                     key={league.id}
                     href={`/leagues/${league.id}`}
                     className="block bg-[#001c3a] p-5 transition hover:bg-[#0b2747]"
                   >
                     <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#4ae183]">
-                      Registration season
+                      Setup board
                     </p>
                     <h3 className="mt-2 font-[var(--font-display)] text-2xl font-black uppercase tracking-tight text-white">
                       {league.name}
                     </h3>
                     <p className="mt-2 text-xs font-bold uppercase tracking-[0.18em] text-[#9bb2d1]">
-                      {league.season} · closes {league.registrationCloseDate ? formatDate(league.registrationCloseDate) : "TBA"}
+                      {league.season}
                     </p>
                   </Link>
                 ))

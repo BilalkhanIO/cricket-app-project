@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
       where: {
         ...(managerId && { managerId }),
         ...(leagueId && {
-          leagues: { some: { leagueId, status: "APPROVED" } },
+          leagues: { some: { leagueId, status: { in: ["ACTIVE", "APPROVED"] } } },
         }),
       },
       include: {

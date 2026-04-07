@@ -2,18 +2,14 @@
 
 import { useState } from "react";
 
-import { ROLE_LABELS, ROLE } from "@/lib/roles";
+import { ROLE_LABELS, ROLE, type UserRole } from "@/lib/roles";
 
 const ROLE_OPTIONS = [
-  ROLE.FAN,
+  ROLE.VIEWER,
   ROLE.PLAYER,
   ROLE.TEAM_MANAGER,
-  ROLE.COACH,
-  ROLE.ANALYST,
   ROLE.SCORER,
   ROLE.UMPIRE,
-  ROLE.MATCH_REFEREE,
-  ROLE.LEAGUE_STAFF,
   ROLE.LEAGUE_ADMIN,
   ROLE.SUPER_ADMIN,
 ];
@@ -61,7 +57,7 @@ export default function UserAccessManager({
     currentUserRole === ROLE.SUPER_ADMIN
       ? ROLE_OPTIONS
       : ROLE_OPTIONS.filter((item) => item !== ROLE.SUPER_ADMIN && item !== ROLE.LEAGUE_ADMIN);
-  const canEditAdminAccount = currentUserRole === ROLE.SUPER_ADMIN || ![ROLE.SUPER_ADMIN, ROLE.LEAGUE_ADMIN].includes(user.role as typeof ROLE[keyof typeof ROLE]);
+  const canEditAdminAccount = currentUserRole === ROLE.SUPER_ADMIN || !([ROLE.SUPER_ADMIN, ROLE.LEAGUE_ADMIN] as string[]).includes(user.role);
 
   return (
     <div className="space-y-2">

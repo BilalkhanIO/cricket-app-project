@@ -13,14 +13,17 @@ A full-stack cricket league management platform built with **Next.js 15**, **Tai
 - 👕 Team profiles & squads
 - 📢 Announcements and news
 - 🏏 Player leaderboards (runs, wickets, sixes)
+- 🟢 Public live match and scorecard viewing
 
 ### Admin Panel (`/admin`)
 - 📋 Dashboard with real-time stats
-- 🏆 Create & manage leagues (Round Robin, Knockout, etc.)
-- 👕 Team registration & approval workflow
+- 🏆 Create & manage leagues and tournaments
+- 👕 Team management
 - 🏏 Player management
 - 📅 Match scheduling with venue assignment
 - 🏟️ Venue management
+- 👨‍⚖️ Officials assignment
+- 🔔 Notifications and announcements
 - 📢 Post announcements
 
 ### Scorer Panel (`/scorer/[matchId]`)
@@ -38,7 +41,7 @@ A full-stack cricket league management platform built with **Next.js 15**, **Tai
 |-------|-----------|
 | Framework | Next.js 15 App Router |
 | Styling | Tailwind CSS |
-| Database | SQLite via Prisma ORM v5 |
+| Database | Prisma ORM v5 with a relational database |
 | Authentication | NextAuth.js v4 |
 | Language | TypeScript |
 | Server | API Routes (Next.js) |
@@ -89,7 +92,7 @@ curl -X POST http://localhost:3000/api/seed
 ```
 src/
 ├── app/
-│   ├── admin/           # Admin dashboard & management
+│   ├── admin/           # Admin dashboard & operations
 │   ├── api/             # REST API routes
 │   │   ├── auth/        # NextAuth + register
 │   │   ├── leagues/     # League CRUD
@@ -120,7 +123,7 @@ src/
 
 ## Database Schema
 
-Key entities: User, League, Team, TeamLeague, Player, Venue, Match, Innings, Over, BallEvent, BattingScorecard, BowlingScorecard, PointsTable, PlayerStats, Notification, Announcement, Award, AuditLog
+Key entities: User, Role, League, Season, Team, Player, TeamPlayer, Venue, Match, MatchOfficial, Toss, Innings, Over, BallEvent, BattingScorecard, BowlingScorecard, FieldingStats, PointsTable, Notification, Announcement, AuditLog
 
 ## User Roles & Permissions
 

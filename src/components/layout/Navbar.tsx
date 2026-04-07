@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
-import { useEffect, useRef, useState } from "react";
-import { Bell, ChevronDown, LayoutGrid, Menu, Shield, User, X } from "lucide-react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { Bell, ChevronDown, LayoutGrid, Menu, Search, Shield, User, X } from "lucide-react";
 import { getDashboardLinkForRole, getRoleLabel } from "@/lib/roles";
 
 interface Notification {
@@ -16,6 +16,13 @@ interface Notification {
   createdAt: string;
 }
 
+interface SearchResults {
+  leagues: { id: string; name: string; season: string; status: string }[];
+  teams: { id: string; name: string; shortName: string; homeCity: string | null }[];
+  players: { id: string; playerRole: string | null; user: { name: string }; team: { shortName: string } | null }[];
+  matches: { id: string; status: string; homeTeam: { shortName: string }; awayTeam: { shortName: string }; league: { name: string } }[];
+}
+
 const navLinks = [
   { href: "/home", label: "Home" },
   { href: "/leagues", label: "Leagues" },
@@ -23,18 +30,26 @@ const navLinks = [
   { href: "/teams", label: "Teams" },
   { href: "/players", label: "Players" },
   { href: "/stats", label: "Statistics" },
+  { href: "/venues", label: "Venues" },
 ];
 
 export default function Navbar() {
   const { data: session } = useSession();
   const pathname = usePathname();
+  const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [scrolled, setScrolled] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const dashboardLink = session ? getDashboardLinkForRole(session.user.role) : null;
   const unreadCount = notifications.filter((item) => !item.isRead).length;
@@ -52,10 +67,42 @@ export default function Navbar() {
     function handleClickOutside(event: MouseEvent) {
       if (notifRef.current && !notifRef.current.contains(event.target as Node)) setNotifOpen(false);
       if (userRef.current && !userRef.current.contains(event.target as Node)) setUserMenuOpen(false);
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) setSearchOpen(false);
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  const doSearch = useCallback(async (q: string) => {
+    if (q.length < 2) { setSearchResults(null); return; }
+    setSearchLoading(true);
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+      if (res.ok) setSearchResults(await res.json());
+    } finally {
+      setSearchLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => doSearch(searchQuery), 280);
+    return () => clearTimeout(timer);
+  }, [searchQuery, doSearch]);
+
+  const openSearch = () => {
+    setSearchOpen(true);
+    setTimeout(() => searchInputRef.current?.focus(), 50);
+  };
+
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setSearchQuery("");
+    setSearchResults(null);
+  };
+
+  const totalResults = searchResults
+    ? searchResults.leagues.length + searchResults.teams.length + searchResults.players.length + searchResults.matches.length
+    : 0;
 
   useEffect(() => {
     if (!session) return;
@@ -289,6 +336,94 @@ export default function Navbar() {
                 </Link>
               </div>
             )}
+
+            {/* Search button */}
+            <div className="relative" ref={searchRef}>
+              <button
+                onClick={searchOpen ? closeSearch : openSearch}
+                aria-label="Search"
+                className="border border-white/10 bg-[#001c3a] p-3 text-[#d4e3ff] transition hover:bg-[#0b2747]"
+              >
+                {searchOpen ? <X className="h-4 w-4" /> : <Search className="h-4 w-4" />}
+              </button>
+
+              {searchOpen && (
+                <div className="absolute right-0 mt-3 w-[min(26rem,calc(100vw-2rem))] overflow-hidden border border-white/10 bg-[#071a31] shadow-[0_24px_50px_rgba(0,8,20,0.44)]">
+                  <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
+                    <Search className="h-4 w-4 shrink-0 text-[#9bb2d1]" />
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search leagues, teams, players…"
+                      className="w-full bg-transparent text-sm text-white placeholder:text-[#9bb2d1]/60 focus:outline-none"
+                    />
+                    {searchLoading && <span className="h-3 w-3 shrink-0 animate-spin rounded-full border border-[#4ae183] border-t-transparent" />}
+                  </div>
+
+                  {searchResults && totalResults === 0 && searchQuery.length >= 2 && (
+                    <div className="px-4 py-6 text-center text-sm text-[#9bb2d1]">No results for &ldquo;{searchQuery}&rdquo;</div>
+                  )}
+
+                  {searchResults && totalResults > 0 && (
+                    <div className="max-h-96 overflow-y-auto">
+                      {searchResults.leagues.length > 0 && (
+                        <div>
+                          <p className="border-b border-white/5 bg-[#001c3a] px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-[#9bb2d1]">Leagues</p>
+                          {searchResults.leagues.map((l) => (
+                            <Link key={l.id} href={`/leagues/${l.id}`} onClick={closeSearch}
+                              className="flex items-center justify-between gap-3 border-b border-white/5 px-4 py-3 hover:bg-[#0b2747]">
+                              <span className="text-sm font-bold text-white">{l.name} <span className="text-[#9bb2d1]">{l.season}</span></span>
+                              <span className={`shrink-0 px-2 py-0.5 text-[10px] font-black uppercase ${l.status === "ACTIVE" ? "bg-[#4ae183]/20 text-[#4ae183]" : "bg-[#12324d] text-[#9bb2d1]"}`}>{l.status}</span>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                      {searchResults.teams.length > 0 && (
+                        <div>
+                          <p className="border-b border-white/5 bg-[#001c3a] px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-[#9bb2d1]">Teams</p>
+                          {searchResults.teams.map((t) => (
+                            <Link key={t.id} href={`/teams/${t.id}`} onClick={closeSearch}
+                              className="flex items-center gap-3 border-b border-white/5 px-4 py-3 hover:bg-[#0b2747]">
+                              <span className="text-sm font-bold text-white">{t.name}</span>
+                              {t.homeCity && <span className="text-xs text-[#9bb2d1]">{t.homeCity}</span>}
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                      {searchResults.players.length > 0 && (
+                        <div>
+                          <p className="border-b border-white/5 bg-[#001c3a] px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-[#9bb2d1]">Players</p>
+                          {searchResults.players.map((p) => (
+                            <Link key={p.id} href={`/players/${p.id}`} onClick={closeSearch}
+                              className="flex items-center gap-3 border-b border-white/5 px-4 py-3 hover:bg-[#0b2747]">
+                              <span className="text-sm font-bold text-white">{p.user.name}</span>
+                              <span className="text-xs text-[#9bb2d1]">{p.team?.shortName ?? "—"} · {p.playerRole ?? "Player"}</span>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                      {searchResults.matches.length > 0 && (
+                        <div>
+                          <p className="border-b border-white/5 bg-[#001c3a] px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-[#9bb2d1]">Matches</p>
+                          {searchResults.matches.map((m) => (
+                            <Link key={m.id} href={`/matches/${m.id}`} onClick={closeSearch}
+                              className="flex items-center justify-between gap-3 border-b border-white/5 px-4 py-3 hover:bg-[#0b2747] last:border-b-0">
+                              <span className="text-sm font-bold text-white">{m.homeTeam.shortName} vs {m.awayTeam.shortName}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-[#9bb2d1]">{m.league.name}</span>
+                                {m.status === "LIVE" && <span className="h-1.5 w-1.5 animate-pulse bg-[#93000a]" />}
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             <button
               onClick={() => setMenuOpen((open) => !open)}

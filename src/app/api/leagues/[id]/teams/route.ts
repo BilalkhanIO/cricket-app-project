@@ -12,7 +12,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { teamId, action, approvalNotes, registrationFeeStatus } = await req.json();
+    const { teamId, action, approvalNotes, group } = await req.json();
     const league = await prisma.league.findUnique({
       where: { id },
       include: {
@@ -21,14 +21,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     });
     if (!league) return NextResponse.json({ error: "League not found" }, { status: 404 });
 
-    if (action === "register") {
-      const now = new Date();
-      if (league.registrationOpenDate && now < league.registrationOpenDate) {
-        return NextResponse.json({ error: "Registration has not opened yet" }, { status: 400 });
-      }
-      if (league.registrationCloseDate && now > league.registrationCloseDate) {
-        return NextResponse.json({ error: "Registration is closed" }, { status: 400 });
-      }
+    if (!canManageTeamRegistrations(session.user.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    if (action === "register" || action === "add" || !action) {
       if (league._count.teams >= league.maxTeams) {
         return NextResponse.json({ error: "League team limit reached" }, { status: 400 });
       }
@@ -72,46 +69,51 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       const registration = await prisma.teamLeague.upsert({
         where: { teamId_leagueId: { teamId, leagueId: id } },
         update: {
-          status: "PENDING",
-          registrationFeeStatus: registrationFeeStatus || "PENDING",
+          status: "ACTIVE",
+          group: group || null,
+          approvalNotes: approvalNotes || null,
+          approvedAt: new Date(),
         },
         create: {
           teamId,
           leagueId: id,
-          status: "PENDING",
-          registrationFeeStatus: registrationFeeStatus || "PENDING",
+          status: "ACTIVE",
+          group: group || null,
+          approvalNotes: approvalNotes || null,
+          approvedAt: new Date(),
         },
       });
+
+      await prisma.pointsTable.upsert({
+        where: { leagueId_teamId: { leagueId: id, teamId } },
+        update: { group: group || null },
+        create: { leagueId: id, teamId, group: group || null },
+      });
+
       return NextResponse.json({ registration });
     }
 
-    if (action === "approve" || action === "reject" || action === "waitlist") {
-      if (!canManageTeamRegistrations(session.user.role)) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
-
-      const updated = await prisma.teamLeague.update({
+    if (action === "update-group") {
+      const registration = await prisma.teamLeague.update({
         where: { teamId_leagueId: { teamId, leagueId: id } },
-        data: {
-          status:
-            action === "approve" ? "APPROVED" : action === "reject" ? "REJECTED" : "WAITLISTED",
-          approvalNotes: approvalNotes || null,
-          ...(action === "approve" && { approvedAt: new Date() }),
-          ...(action === "reject" && { rejectedAt: new Date() }),
-          ...(action === "waitlist" && { waitlistedAt: new Date() }),
-          ...(registrationFeeStatus && { registrationFeeStatus }),
-        },
+        data: { group: group || null },
       });
 
-      if (action === "approve") {
-        await prisma.pointsTable.upsert({
-          where: { leagueId_teamId: { leagueId: id, teamId } },
-          update: {},
-          create: { leagueId: id, teamId },
-        });
-      }
+      await prisma.pointsTable.upsert({
+        where: { leagueId_teamId: { leagueId: id, teamId } },
+        update: { group: group || null },
+        create: { leagueId: id, teamId, group: group || null },
+      });
 
-      return NextResponse.json({ updated });
+      return NextResponse.json({ registration });
+    }
+
+    if (action === "remove") {
+      await prisma.teamLeague.delete({
+        where: { teamId_leagueId: { teamId, leagueId: id } },
+      });
+
+      return NextResponse.json({ removed: true });
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });

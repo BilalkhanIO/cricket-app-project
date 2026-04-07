@@ -17,6 +17,8 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const role = searchParams.get("role");
     const roles = searchParams.get("roles");
+    const search = searchParams.get("search");
+    const take = parseInt(searchParams.get("take") || "50", 10);
     const parsedRoles = roles ? roles.split(",").map((value) => value.trim()).filter(Boolean) : [];
 
     const users = await prisma.user.findMany({
@@ -24,7 +26,14 @@ export async function GET(req: NextRequest) {
         isActive: true,
         ...(role && { role }),
         ...(parsedRoles.length > 0 && { role: { in: parsedRoles } }),
+        ...(search && {
+          OR: [
+            { name: { contains: search, mode: "insensitive" } },
+            { email: { contains: search, mode: "insensitive" } },
+          ],
+        }),
       },
+      take,
       select: {
         id: true,
         name: true,

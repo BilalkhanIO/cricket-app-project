@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { jsonWithCors, optionsWithCors } from "@/lib/api-cors";
+import { isValidPoolConfigJson, serializePoolConfig } from "@/lib/pools";
 import prisma from "@/lib/prisma";
 import { canEditLeague } from "@/lib/permissions";
-import { ROLE } from "@/lib/roles";
+import { ROLE, normalizeRole } from "@/lib/roles";
 
 export const dynamic = 'force-dynamic';
 
@@ -83,20 +84,26 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const league = await prisma.league.findUnique({ where: { id } });
     if (!league) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+    const normalizedRole = normalizeRole(session.user.role);
     const canEdit =
       canEditLeague(session.user.role) &&
-      (session.user.role === ROLE.SUPER_ADMIN ||
-        session.user.role === ROLE.LEAGUE_STAFF ||
-        (session.user.role === ROLE.LEAGUE_ADMIN && league.adminId === session.user.id));
+      (normalizedRole === ROLE.SUPER_ADMIN ||
+        (normalizedRole === ROLE.LEAGUE_ADMIN && league.adminId === session.user.id));
     if (!canEdit) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const data = await req.json();
+    if ("poolConfigJson" in data && !isValidPoolConfigJson(data.poolConfigJson)) {
+      return NextResponse.json({ error: "Invalid pool configuration JSON" }, { status: 400 });
+    }
+
     const nextStartDate = data.startDate ? new Date(data.startDate) : league.startDate;
     const nextEndDate = data.endDate ? new Date(data.endDate) : league.endDate;
     const nextOvers = Number(data.oversPerInnings ?? league.oversPerInnings);
     const nextPowerplay = Number(data.powerplayOvers ?? league.powerplayOvers);
     const nextPlayerRegistrationStatus =
       data.playerRegistrationStatus ?? league.playerRegistrationStatus;
+    const nextPoolConfigJson =
+      "poolConfigJson" in data ? serializePoolConfig(data.poolConfigJson) : league.poolConfigJson;
 
     if (Number.isNaN(nextStartDate.getTime()) || Number.isNaN(nextEndDate.getTime())) {
       return NextResponse.json({ error: "Invalid start/end date" }, { status: 400 });
@@ -170,6 +177,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         ...data,
         parentLeagueId: nextParentLeagueId,
         playerRegistrationStatus: nextPlayerRegistrationStatus,
+        poolConfigJson: nextPoolConfigJson,
         ...(data.startDate && { startDate: new Date(data.startDate) }),
         ...(data.endDate && { endDate: new Date(data.endDate) }),
         ...("registrationOpenDate" in data && { registrationOpenDate: nextRegistrationOpen }),

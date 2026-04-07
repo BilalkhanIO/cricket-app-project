@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -12,6 +13,25 @@ import { formatDateTime } from "@/lib/utils";
 import PublicShell from "@/components/layout/PublicShell";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const team = await prisma.team.findUnique({
+    where: { id },
+    select: { name: true, shortName: true, city: true },
+  });
+  if (!team) return { title: "Team Not Found — CricketLeague" };
+
+  const title = `${team.name} (${team.shortName}) — CricketLeague`;
+  const description = `${team.name} cricket team${team.city ? ` from ${team.city}` : ""}. Fixtures, results, squad, and stats.`;
+
+  return {
+    title,
+    description,
+    openGraph: { title, description, type: "website" },
+    twitter: { card: "summary", title, description },
+  };
+}
 
 async function getTeam(id: string) {
   return prisma.team.findUnique({
@@ -55,7 +75,14 @@ async function getTeam(id: string) {
         orderBy: { updatedAt: "desc" },
       },
       homeMatches: {
-        include: {
+        select: {
+          id: true,
+          matchDate: true,
+          status: true,
+          winnerTeamId: true,
+          homeTeamId: true,
+          awayTeamId: true,
+          result: true,
           league: { select: { id: true, name: true, season: true } },
           homeTeam: { select: { id: true, name: true, shortName: true } },
           awayTeam: { select: { id: true, name: true, shortName: true } },
@@ -63,10 +90,17 @@ async function getTeam(id: string) {
           innings: { select: { teamId: true, totalRuns: true, totalWickets: true } },
         },
         orderBy: { matchDate: "desc" },
-        take: 8,
+        take: 20,
       },
       awayMatches: {
-        include: {
+        select: {
+          id: true,
+          matchDate: true,
+          status: true,
+          winnerTeamId: true,
+          homeTeamId: true,
+          awayTeamId: true,
+          result: true,
           league: { select: { id: true, name: true, season: true } },
           homeTeam: { select: { id: true, name: true, shortName: true } },
           awayTeam: { select: { id: true, name: true, shortName: true } },
@@ -74,7 +108,7 @@ async function getTeam(id: string) {
           innings: { select: { teamId: true, totalRuns: true, totalWickets: true } },
         },
         orderBy: { matchDate: "desc" },
-        take: 8,
+        take: 20,
       },
     },
   });
@@ -111,9 +145,29 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
   const team = await getTeam(id);
   if (!team) notFound();
 
-  const matches = [...team.homeMatches, ...team.awayMatches]
-    .sort((a, b) => new Date(b.matchDate).getTime() - new Date(a.matchDate).getTime())
-    .slice(0, 8);
+  const allMatches = [...team.homeMatches, ...team.awayMatches]
+    .sort((a, b) => new Date(b.matchDate).getTime() - new Date(a.matchDate).getTime());
+  const matches = allMatches.slice(0, 8);
+
+  // Head-to-head: aggregate W/L/T vs each opponent from completed matches
+  const h2hMap = new Map<string, { opponentId: string; opponentName: string; opponentShort: string; wins: number; losses: number; ties: number }>();
+  for (const match of allMatches) {
+    if (match.status !== "COMPLETED") continue;
+    const isHome = match.homeTeamId === id;
+    const opponent = isHome ? match.awayTeam : match.homeTeam;
+    if (!h2hMap.has(opponent.id)) {
+      h2hMap.set(opponent.id, { opponentId: opponent.id, opponentName: opponent.name, opponentShort: opponent.shortName, wins: 0, losses: 0, ties: 0 });
+    }
+    const entry = h2hMap.get(opponent.id)!;
+    if (!match.winnerTeamId) {
+      entry.ties++;
+    } else if (match.winnerTeamId === id) {
+      entry.wins++;
+    } else {
+      entry.losses++;
+    }
+  }
+  const h2hRecords = [...h2hMap.values()].sort((a, b) => (b.wins + b.losses + b.ties) - (a.wins + a.losses + a.ties));
 
   const captain = team.players.find((player) => player.isCaptain);
   const wicketkeeper = team.players.find((player) => player.isWicketkeeper);
@@ -126,6 +180,7 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
     { id: "overview", label: "Overview" },
     { id: "squad", label: "Squad" },
     { id: "competitions", label: "Leagues" },
+    { id: "h2h", label: "Head-to-Head" },
     { id: "fixtures", label: "Matches" },
   ];
 
@@ -441,6 +496,55 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
                 </div>
               </div>
             </div>
+          </section>
+
+          <section id="h2h" className="mt-14">
+            <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
+              Head-to-
+              <span className="block text-[#4ae183]">head</span>
+            </h2>
+
+            {h2hRecords.length === 0 ? (
+              <div className="mt-6 border border-white/10 bg-[#001c3a] p-6 text-sm text-[#9bb2d1]">
+                Head-to-head records will appear after completed matches.
+              </div>
+            ) : (
+              <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {h2hRecords.map((rec) => {
+                  const total = rec.wins + rec.losses + rec.ties;
+                  const winPct = total > 0 ? Math.round((rec.wins / total) * 100) : 0;
+                  return (
+                    <Link
+                      key={rec.opponentId}
+                      href={`/teams/${rec.opponentId}`}
+                      className="block border border-white/10 bg-[#001c3a] p-5 transition hover:bg-[#0b2747]"
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        <p className="font-[var(--font-display)] text-2xl font-black uppercase tracking-tight text-white">
+                          {rec.opponentShort}
+                        </p>
+                        <span className={`px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${rec.wins > rec.losses ? "bg-[#4ae183] text-[#003919]" : rec.losses > rec.wins ? "bg-[#93000a] text-[#ffdad6]" : "bg-[#1b3656] text-[#d4e3ff]"}`}>
+                          {winPct}% win
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#9bb2d1]">{rec.opponentName}</p>
+                      <div className="mt-4 grid grid-cols-3 gap-3">
+                        {[
+                          { label: "Won", value: rec.wins, accent: "#4ae183" },
+                          { label: "Lost", value: rec.losses, accent: "#ffdad6" },
+                          { label: "Tied", value: rec.ties, accent: "#c8c8b0" },
+                        ].map((item) => (
+                          <div key={item.label} className="border border-white/10 bg-[#00142b] px-3 py-3 text-center">
+                            <p className="font-[var(--font-display)] text-2xl font-black" style={{ color: item.accent }}>{item.value}</p>
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">{item.label}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </section>
 
           <section id="fixtures" className="mt-14">

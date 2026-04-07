@@ -4,13 +4,14 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { canEditLeague } from "@/lib/permissions";
 import prisma from "@/lib/prisma";
-import { ROLE } from "@/lib/roles";
+import { ROLE, normalizeRole } from "@/lib/roles";
 
 export const dynamic = 'force-dynamic';
 
 async function canManageLeague(userId: string, role: string, leagueId: string) {
-  if (!canEditLeague(role)) return false;
-  if (role === ROLE.SUPER_ADMIN || role === ROLE.LEAGUE_STAFF) return true;
+  const normalizedRole = normalizeRole(role);
+  if (!canEditLeague(normalizedRole)) return false;
+  if (normalizedRole === ROLE.SUPER_ADMIN) return true;
   const league = await prisma.league.findUnique({ where: { id: leagueId }, select: { adminId: true } });
   return !!league && league.adminId === userId;
 }

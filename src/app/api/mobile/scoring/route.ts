@@ -2,7 +2,6 @@ import { NextRequest } from "next/server";
 import { jsonWithCors, optionsWithCors } from "@/lib/api-cors";
 import { getMobileUserFromRequest } from "@/lib/mobile-auth";
 import prisma from "@/lib/prisma";
-import { calcNRR } from "@/lib/utils";
 import { updatePlayerStatsForMatchScopes } from "@/lib/player-stats";
 import { canScoreMatch } from "@/lib/permissions";
 import { ROLE } from "@/lib/roles";
@@ -120,19 +119,27 @@ export async function POST(req: NextRequest) {
       data: {
         inningsId,
         overId,
+        matchId: inningsMeta.match.id,
         ballNumber,
         overNumber,
         batsmanId: batsmanId || null,
+        strikerId: batsmanId || null,
+        playerOutId: isWicket ? wicketPlayerId || null : null,
         bowlerId: bowlerId || null,
+        deliveryType: extraType || "NORMAL",
         runs: runs || 0,
+        runsOffBat: runs || 0,
         isWicket: isWicket || false,
         wicketType: wicketType || null,
         fielderIds: fielderIds || null,
+        fielderId: fielderIds || null,
         isExtra: isExtra || false,
         extraType: extraType || null,
         extraRuns: extraRuns || 0,
+        isLegalDelivery: !isExtra || extraType === "BYE" || extraType === "LEG_BYE",
         isBoundary: isBoundary || false,
         isSix: isSix || false,
+        createdBy: user.id,
         commentary: buildBallCommentary(
           commentary,
           isWicket ? wicketPlayerId || null : null,
@@ -239,6 +246,7 @@ export async function POST(req: NextRequest) {
               wicketType: wicketType || null,
               bowlerId: bowlerId || null,
               fielderId: fielderIds || null,
+              runsAtDismissal: updatedInnings.totalRuns,
             }),
           },
         });
@@ -257,6 +265,7 @@ export async function POST(req: NextRequest) {
             wicketType: isWicket && wicketPlayerId === batsmanId ? wicketType || null : null,
             bowlerId: isWicket && wicketPlayerId === batsmanId ? bowlerId || null : null,
             fielderId: isWicket && wicketPlayerId === batsmanId ? fielderIds || null : null,
+            runsAtDismissal: isWicket && wicketPlayerId === batsmanId ? updatedInnings.totalRuns : undefined,
           },
         });
       }
@@ -310,6 +319,29 @@ export async function POST(req: NextRequest) {
 
     // (Omit match completion logic here for brevity, assume Scorer manually triggers /complete when needed, 
     // or we can copy-paste the logic from main route if auto-detect is preferred)
+
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        matchId: updatedInnings.matchId,
+        action: "BALL_EVENT",
+        entity: "BallEvent",
+        entityId: ball.id,
+        newValue: JSON.stringify({ runs, isWicket, extraType }),
+      },
+    });
+
+    await prisma.ballEventAudit.create({
+      data: {
+        eventId: ball.id,
+        inningsId,
+        matchId: updatedInnings.matchId,
+        changedBy: user.id,
+        action: "CREATE",
+        newValue: JSON.stringify(ball),
+        revisionNo: 1,
+      },
+    });
 
     return jsonWithCors(req, {
       success: true,

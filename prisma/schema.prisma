@@ -14,7 +14,7 @@ model User {
   phone          String?
   name           String
   password       String
-  role           String         @default("FAN")
+  role           String         @default("VIEWER")
   profileImage   String?
   dateOfBirth    DateTime?
   city           String?
@@ -25,14 +25,28 @@ model User {
   isVerified     Boolean        @default(false)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
-  announcements  Announcement[]
-  auditLogs      AuditLog[]
-  awards         Award[]        @relation("AwardedTo")
-  managedLeagues League[]       @relation("LeagueAdmin")
-  scorerMatches  Match[]        @relation("MatchScorer")
-  notifications  Notification[]
-  playerProfile  Player?
-  managedTeams   Team[]         @relation("TeamManager")
+  announcements       Announcement[]
+  auditLogs           AuditLog[]
+  awards              Award[]              @relation("AwardedTo")
+  managedLeagues      League[]             @relation("LeagueAdmin")
+  scorerMatches       Match[]              @relation("MatchScorer")
+  notifications       Notification[]
+  playerProfile       Player?
+  managedTeams        Team[]               @relation("TeamManager")
+  officialAssignments MatchOfficial[]      @relation("OfficialUser")
+  passwordResetTokens PasswordResetToken[]
+  polls               Poll[]               @relation("PollAuthor")
+  votes               PollVote[]
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model League {
@@ -67,6 +81,7 @@ model League {
   matchRulesJson        String?
   minimumOversForResult Int            @default(5)
   noResultRule          String?
+  poolConfigJson        String?
   registrationCloseDate DateTime?
   registrationOpenDate  DateTime?
   playerRegistrationStatus String      @default("CLOSED")
@@ -82,6 +97,7 @@ model League {
   seasons               League[]       @relation("LeagueSeasons")
   sponsors              Sponsor[]
   teams                 TeamLeague[]
+  polls                 Poll[]
 
   @@index([parentLeagueId])
 }
@@ -150,7 +166,9 @@ model Player {
   medicalStatus      String?
   photoUrl           String?
   awards             Award[]            @relation("PlayerAward")
-  battingScores      BattingScorecard[]
+  battingScores      BattingScorecard[] @relation("BattingPlayer")
+  wicketsTaken       BattingScorecard[] @relation("BattingBowler")
+  fieldingDismissals BattingScorecard[] @relation("BattingFielder")
   bowlingScores      BowlingScorecard[]
   team               Team?              @relation(fields: [teamId], references: [id])
   user               User               @relation(fields: [userId], references: [id])
@@ -265,11 +283,13 @@ model DlsRevision {
 }
 
 model MatchOfficial {
-  id      String @id @default(cuid())
+  id      String  @id @default(cuid())
   matchId String
   name    String
   role    String
-  match   Match  @relation(fields: [matchId], references: [id])
+  userId  String?
+  match   Match   @relation(fields: [matchId], references: [id])
+  user    User?   @relation("OfficialUser", fields: [userId], references: [id])
 }
 
 model PlayingXI {
@@ -303,6 +323,7 @@ model Innings {
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
   ballEvents    BallEvent[]
+  ballEventAudits BallEventAudit[]
   battingScores BattingScorecard[]
   bowlingScores BowlingScorecard[]
   match         Match              @relation(fields: [matchId], references: [id])
@@ -324,44 +345,80 @@ model Over {
 }
 
 model BallEvent {
-  id         String   @id @default(cuid())
-  inningsId  String
-  overId     String
-  ballNumber Int
-  overNumber Int
-  batsmanId  String?
-  bowlerId   String?
-  runs       Int      @default(0)
-  isWicket   Boolean  @default(false)
-  wicketType String?
-  fielderIds String?
-  isExtra    Boolean  @default(false)
-  extraType  String?
-  extraRuns  Int      @default(0)
-  isBoundary Boolean  @default(false)
-  isSix      Boolean  @default(false)
-  commentary String?
-  createdAt  DateTime @default(now())
-  innings    Innings  @relation(fields: [inningsId], references: [id])
-  over       Over     @relation(fields: [overId], references: [id])
+  id              String           @id @default(cuid())
+  inningsId       String
+  overId          String
+  ballNumber      Int
+  overNumber      Int
+  batsmanId       String?
+  strikerId       String?
+  nonStrikerId    String?
+  playerOutId     String?
+  bowlerId        String?
+  matchId         String?
+  eventSequence   Int?
+  deliveryType    String           @default("NORMAL")
+  runs            Int              @default(0)
+  runsOffBat      Int              @default(0)
+  isWicket        Boolean          @default(false)
+  wicketType      String?
+  fielderIds      String?
+  fielderId       String?
+  isExtra         Boolean          @default(false)
+  extraType       String?
+  extraRuns       Int              @default(0)
+  isLegalDelivery Boolean          @default(true)
+  isBoundary      Boolean          @default(false)
+  isSix           Boolean          @default(false)
+  commentary      String?
+  createdBy       String?
+  editedBy        String?
+  editedAt        DateTime?
+  editedFlag      Boolean          @default(false)
+  revisionNo      Int              @default(1)
+  originalEventId String?
+  hitRegion       String?
+  createdAt       DateTime         @default(now())
+  innings         Innings          @relation(fields: [inningsId], references: [id])
+  over            Over             @relation(fields: [overId], references: [id])
+  audits          BallEventAudit[] @relation("BallEventAuditEntries")
+}
+
+model BallEventAudit {
+  id           String   @id @default(cuid())
+  eventId       String
+  inningsId     String
+  matchId       String?
+  changedBy     String?
+  action        String
+  reason        String?
+  oldValue      String?
+  newValue      String?
+  revisionNo    Int      @default(1)
+  createdAt     DateTime @default(now())
+  event         BallEvent @relation("BallEventAuditEntries", fields: [eventId], references: [id])
+  innings       Innings   @relation(fields: [inningsId], references: [id])
 }
 
 model BattingScorecard {
-  id           String  @id @default(cuid())
-  inningsId    String
-  playerId     String
-  runs         Int     @default(0)
-  balls        Int     @default(0)
-  fours        Int     @default(0)
-  sixes        Int     @default(0)
-  strikeRate   Float   @default(0)
-  isOut        Boolean @default(false)
-  wicketType   String?
-  bowlerId     String?
-  fielderId    String?
-  battingOrder Int
-  innings      Innings @relation(fields: [inningsId], references: [id])
-  player       Player  @relation(fields: [playerId], references: [id])
+  id                String  @id @default(cuid())
+  inningsId         String
+  playerId          String
+  runs              Int     @default(0)
+  balls             Int     @default(0)
+  fours             Int     @default(0)
+  sixes             Int     @default(0)
+  strikeRate        Float   @default(0)
+  isOut             Boolean @default(false)
+  wicketType        String?
+  bowlerId          String?
+  fielderId         String?
+  runsAtDismissal   Int?
+  battingOrder      Int
+  innings           Innings @relation(fields: [inningsId], references: [id])
+  player            Player  @relation("BattingPlayer", fields: [playerId], references: [id])
+  bowler            Player? @relation("BattingBowler", fields: [bowlerId], references: [id])
+  fielder           Player? @relation("BattingFielder", fields: [fielderId], references: [id])
 }
 
 model BowlingScorecard {
@@ -516,4 +573,41 @@ model AuditLog {
   createdAt DateTime @default(now())
   match     Match?   @relation(fields: [matchId], references: [id])
   user      User?    @relation(fields: [userId], references: [id])
+}
+
+model Poll {
+  id          String       @id @default(cuid())
+  leagueId    String?
+  matchId     String?
+  authorId    String
+  title       String
+  description String?
+  type        String       @default("SINGLE_CHOICE")
+  expiresAt   DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  author      User         @relation("PollAuthor", fields: [authorId], references: [id])
+  league      League?      @relation(fields: [leagueId], references: [id])
+  options     PollOption[]
+  votes       PollVote[]
+}
+
+model PollOption {
+  id     String     @id @default(cuid())
+  pollId String
+  text   String
+  votes  PollVote[]
+  poll   Poll       @relation(fields: [pollId], references: [id])
+}
+
+model PollVote {
+  id       String     @id @default(cuid())
+  pollId   String
+  userId   String
+  optionId String
+  poll     Poll       @relation(fields: [pollId], references: [id])
+  user     User       @relation(fields: [userId], references: [id])
+  option   PollOption @relation(fields: [optionId], references: [id])
+
+  @@unique([pollId, userId])
 }

@@ -1,20 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  return {
+    "Access-Control-Allow-Origin": origin || "*",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Max-Age": "86400",
+    "Vary": "Origin",
+  };
+}
 
 export function withCors(request: NextRequest, response: NextResponse) {
   const origin = request.headers.get("origin");
-
-  response.headers.set("Access-Control-Allow-Origin", origin || "*");
-  response.headers.set("Vary", "Origin");
-
-  for (const [key, value] of Object.entries(CORS_HEADERS)) {
+  const headers = getCorsHeaders(origin);
+  for (const [key, value] of Object.entries(headers)) {
     response.headers.set(key, value);
   }
-
   return response;
 }
 
@@ -23,9 +24,19 @@ export function jsonWithCors(
   body: unknown,
   init?: ResponseInit,
 ) {
-  return withCors(request, NextResponse.json(body, init));
+  const origin = request.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+  const existingHeaders = (init?.headers as Record<string, string>) || {};
+  return NextResponse.json(body, {
+    ...init,
+    headers: { ...existingHeaders, ...corsHeaders },
+  });
 }
 
 export function optionsWithCors(request: NextRequest) {
-  return withCors(request, new NextResponse(null, { status: 204 }));
+  const origin = request.headers.get("origin");
+  return new NextResponse(null, {
+    status: 204,
+    headers: getCorsHeaders(origin),
+  });
 }

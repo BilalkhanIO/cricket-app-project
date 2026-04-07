@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
       upcomingMatches,
       recentResults,
       announcements,
-      registrationLeagues,
+      setupLeagues,
       topBatters,
       topBowlers,
       totalTeams,
@@ -88,12 +88,13 @@ export async function GET(req: NextRequest) {
         take: 5,
       }),
       prisma.league.findMany({
-        where: { status: "REGISTRATION" },
+        where: { status: { in: ["DRAFT", "REGISTRATION"] } },
         select: {
           id: true,
           name: true,
           season: true,
           registrationCloseDate: true,
+          poolConfigJson: true,
         },
         orderBy: { createdAt: "desc" },
         take: 3,
@@ -133,14 +134,16 @@ export async function GET(req: NextRequest) {
       (accumulator, item) => {
         accumulator.total += item._count._all;
         if (item.status === "ACTIVE") accumulator.active += item._count._all;
-        if (item.status === "REGISTRATION") accumulator.registration += item._count._all;
+        if (item.status === "REGISTRATION" || item.status === "DRAFT") {
+          accumulator.setup += item._count._all;
+        }
         if (item.status === "COMPLETED") accumulator.completed += item._count._all;
         return accumulator;
       },
       {
         total: 0,
         active: 0,
-        registration: 0,
+        setup: 0,
         completed: 0,
       },
     );
@@ -157,7 +160,7 @@ export async function GET(req: NextRequest) {
       upcomingMatches,
       recentResults,
       announcements,
-      registrationLeagues,
+      setupLeagues,
       topBatters,
       topBowlers,
     });

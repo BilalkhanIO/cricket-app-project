@@ -3,14 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Input } from "@/components/ui/Input";
-import { Button } from "@/components/ui/Button";
+import { Shield } from "lucide-react";
 import { ROLE, SELF_REGISTRATION_ROLES, getRoleLabel } from "@/lib/roles";
 
 export default function RegisterPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    name: "", email: "", password: "", phone: "", role: ROLE.FAN,
+    name: "", email: "", password: "", phone: "", role: ROLE.VIEWER,
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -40,13 +39,11 @@ export default function RegisterPage() {
   };
 
   const roleCards: Record<string, { icon: string; desc: string }> = {
-    [ROLE.FAN]: { icon: "👀", desc: "Follow leagues and matches" },
-    [ROLE.PLAYER]: { icon: "🏏", desc: "View your stats and season records" },
+    [ROLE.VIEWER]:       { icon: "👀", desc: "Follow leagues, matches, and public scorecards" },
+    [ROLE.PLAYER]:       { icon: "🏏", desc: "View your stats and season records" },
     [ROLE.TEAM_MANAGER]: { icon: "👥", desc: "Manage team operations and squads" },
-    [ROLE.COACH]: { icon: "🎯", desc: "Support squad planning and match prep" },
-    [ROLE.ANALYST]: { icon: "📈", desc: "Track performance and cricket insights" },
-    [ROLE.SCORER]: { icon: "📊", desc: "Record live match scoring" },
-    [ROLE.UMPIRE]: { icon: "🧢", desc: "Join match-official workflows" },
+    [ROLE.SCORER]:       { icon: "📊", desc: "Record live match scoring" },
+    [ROLE.UMPIRE]:       { icon: "🧢", desc: "Join match-official workflows" },
   };
   const roles = SELF_REGISTRATION_ROLES.map((role) => ({
     value: role,
@@ -55,77 +52,139 @@ export default function RegisterPage() {
     desc: roleCards[role]?.desc || "Create an account",
   }));
 
+  const inputClass =
+    "w-full border border-white/10 bg-[#001c3a] px-4 py-3 text-sm text-white placeholder:text-[#9bb2d1]/50 focus:border-[#4ae183] focus:outline-none";
+
   return (
-    <div className="min-h-screen flex bg-[linear-gradient(135deg,#102433_0%,#17364e_55%,#1f6f50_100%)]">
-      {/* Left panel */}
-      <div className="hidden lg:flex lg:w-5/12 flex-col justify-between p-12 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-5 text-[200px] flex items-center justify-center select-none pointer-events-none">🏏</div>
-        <Link href="/home" className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-[color:var(--primary)] rounded-xl flex items-center justify-center text-2xl">🏏</div>
+    <div className="flex min-h-screen bg-[#00142b]">
+      {/* Left panel — branding */}
+      <div className="relative hidden flex-col justify-between overflow-hidden bg-[#001c3a] p-12 lg:flex lg:w-5/12">
+        <div
+          className="absolute inset-0 opacity-20"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(74,225,131,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(74,225,131,0.06) 1px, transparent 1px)",
+            backgroundSize: "40px 40px",
+          }}
+        />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(27,54,86,0.9),transparent_60%)]" />
+
+        <div className="relative">
+          <Link href="/home" className="inline-flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center border border-white/10 bg-[#1b3656] text-[#f4d58a]">
+              <Shield className="h-5 w-5" />
+            </div>
+            <div>
+              <span className="block font-[var(--font-display)] text-xl font-black uppercase tracking-tight text-white">
+                CricketLeague
+              </span>
+              <span className="block text-[10px] font-bold uppercase tracking-[0.24em] text-[#9bb2d1]">
+                Pro platform
+              </span>
+            </div>
+          </Link>
+        </div>
+
+        <div className="relative space-y-8">
           <div>
-            <span className="font-bold text-xl text-white block">CricketLeague</span>
-            <span className="text-[10px] text-[#9a8569] tracking-widest uppercase">Pro Platform</span>
+            <h1 className="font-[var(--font-display)] text-5xl font-black uppercase leading-tight tracking-tight text-white">
+              Join the
+              <span className="block text-[#4ae183]">community</span>
+            </h1>
+            <p className="mt-4 max-w-sm text-sm leading-7 text-[#9bb2d1]">
+              Register as a viewer, player, team manager, scorer, or umpire and take part in the tournament workflow.
+            </p>
           </div>
-        </Link>
 
-        <div>
-          <h1 className="text-4xl font-bold text-white leading-tight mb-4">
-            Join the<br />
-            <span className="text-[#9a8569]">Cricket Community</span>
-          </h1>
-          <p className="text-[#d6cab7] leading-relaxed max-w-sm">
-            Whether you&apos;re a fan, player, team staff member, or match official, there&apos;s a place for you here.
-          </p>
-
-          <div className="mt-8 space-y-2">
+          <div className="space-y-3">
             {roles.map((r) => (
-              <div key={r.value} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${formData.role === r.value ? "bg-white/15 border border-white/20" : "opacity-60"}`}>
+              <div
+                key={r.value}
+                className={`flex items-center gap-3 border px-4 py-3 transition-all ${
+                  formData.role === r.value
+                    ? "border-[#4ae183] bg-[#4ae183]/10"
+                    : "border-white/5 opacity-50"
+                }`}
+              >
                 <span className="text-xl">{r.icon}</span>
                 <div>
-                  <p className="text-sm font-semibold text-white">{r.label}</p>
-                  <p className="text-xs text-[#9a8569]">{r.desc}</p>
+                  <p className="text-sm font-black uppercase tracking-[0.12em] text-white">{r.label}</p>
+                  <p className="text-[10px] text-[#9bb2d1]">{r.desc}</p>
                 </div>
-                {formData.role === r.value && <span className="ml-auto text-[color:var(--primary)]">✓</span>}
+                {formData.role === r.value && (
+                  <span className="ml-auto text-[10px] font-black text-[#4ae183]">Selected</span>
+                )}
               </div>
             ))}
           </div>
         </div>
 
-        <p className="text-[color:var(--primary)] text-xs">© {new Date().getFullYear()} CricketLeague App</p>
+        <p className="relative text-[10px] font-bold uppercase tracking-[0.18em] text-[#9bb2d1]">
+          © {new Date().getFullYear()} CricketLeague App
+        </p>
       </div>
 
-      {/* Right panel - form */}
-      <div className="w-full lg:w-7/12 flex items-center justify-center p-6 lg:p-12 bg-[color:var(--card-muted)] overflow-y-auto">
-        <div className="w-full max-w-md py-4">
-          {/* Mobile logo */}
-          <div className="lg:hidden text-center mb-8">
-            <div className="w-14 h-14 bg-[color:var(--primary)] rounded-2xl flex items-center justify-center text-3xl mx-auto mb-3">🏏</div>
-            <h1 className="text-2xl font-bold text-[color:var(--color-ink)]">Join CricketLeague</h1>
+      {/* Right panel — form */}
+      <div className="flex w-full flex-1 flex-col justify-center overflow-y-auto px-6 py-12 lg:px-16">
+        {/* Mobile logo */}
+        <div className="mb-8 lg:hidden">
+          <Link href="/home" className="inline-flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center bg-[#1b3656] text-[#f4d58a]">
+              <Shield className="h-5 w-5" />
+            </div>
+            <span className="font-[var(--font-display)] text-xl font-black uppercase tracking-tight text-white">
+              CricketLeague
+            </span>
+          </Link>
+        </div>
+
+        <div className="mx-auto w-full max-w-md">
+          <div className="mb-8">
+            <div className="inline-flex bg-[#1b3656] px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-[#d4e3ff]">
+              Create account
+            </div>
+            <h2 className="mt-4 font-[var(--font-display)] text-4xl font-black uppercase tracking-tight text-white">
+              Get started
+            </h2>
+            <p className="mt-2 text-sm text-[#9bb2d1]">Fill in your details to join the platform</p>
           </div>
 
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-[color:var(--color-ink)]">Create account</h2>
-            <p className="text-[color:var(--color-ink-soft)] mt-1 text-sm">Fill in your details to get started</p>
-          </div>
-
-          <div className="page-shell rounded-[2rem] p-6 sm:p-8">
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Input label="Full Name" name="name" value={formData.name} onChange={handleChange} placeholder="Your full name" required />
-            <Input label="Email Address" type="email" name="email" value={formData.email} onChange={handleChange} placeholder="you@example.com" required />
-            <Input label="Phone Number (optional)" type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder="+92 300 1234567" />
-            <Input label="Password" type="password" name="password" value={formData.password} onChange={handleChange} placeholder="Minimum 6 characters" required minLength={6} />
+            {/* Name */}
+            <div>
+              <label className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">Full Name</label>
+              <input name="name" value={formData.name} onChange={handleChange} placeholder="Your full name" required className={inputClass} />
+            </div>
+
+            {/* Email */}
+            <div>
+              <label className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">Email Address</label>
+              <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="you@example.com" required className={inputClass} />
+            </div>
+
+            {/* Phone */}
+            <div>
+              <label className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">Phone (optional)</label>
+              <input type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder="+92 300 1234567" className={inputClass} />
+            </div>
+
+            {/* Password */}
+            <div>
+              <label className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">Password</label>
+              <input type="password" name="password" value={formData.password} onChange={handleChange} placeholder="Minimum 6 characters" required minLength={6} className={inputClass} />
+            </div>
 
             {/* Role selector */}
             <div>
-              <label className="text-sm font-semibold text-[color:var(--color-ink)] block mb-2">Account Role</label>
-              <div className="grid grid-cols-1 gap-2">
+              <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">Account Role</label>
+              <div className="space-y-2">
                 {roles.map((r) => (
                   <label
                     key={r.value}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 cursor-pointer transition-all ${
+                    className={`flex cursor-pointer items-center gap-3 border px-4 py-3 transition-all ${
                       formData.role === r.value
-                        ? "border-[color:var(--primary)] bg-[color:var(--card-muted)]"
-                        : "border-[color:var(--border-color)] bg-white hover:border-[color:var(--primary)] hover:bg-[color:var(--card-muted)]"
+                        ? "border-[#4ae183] bg-[#4ae183]/10"
+                        : "border-white/10 bg-[#001c3a] hover:border-white/20"
                     }`}
                   >
                     <input
@@ -136,38 +195,42 @@ export default function RegisterPage() {
                       onChange={handleChange}
                       className="sr-only"
                     />
-                    <span className="text-xl">{r.icon}</span>
+                    <span className="text-lg">{r.icon}</span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-[color:var(--color-ink)]">{r.label}</p>
-                      <p className="text-xs text-[color:var(--color-ink-soft)]">{r.desc}</p>
+                      <p className="text-sm font-black uppercase tracking-[0.1em] text-white">{r.label}</p>
+                      <p className="text-[10px] text-[#9bb2d1]">{r.desc}</p>
                     </div>
-                    <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${formData.role === r.value ? "border-[color:var(--primary)] bg-[color:var(--primary)]" : "border-[color:var(--border-color)]"}`}>
-                      {formData.role === r.value && <div className="w-full h-full rounded-full bg-white scale-50" />}
-                    </div>
+                    <div
+                      className={`h-4 w-4 flex-shrink-0 border-2 ${
+                        formData.role === r.value ? "border-[#4ae183] bg-[#4ae183]" : "border-white/20"
+                      }`}
+                    />
                   </label>
                 ))}
               </div>
             </div>
 
             {error && (
-              <div className="flex items-center gap-2.5 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-                <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
+              <div className="border border-[#93000a] bg-[#93000a]/20 px-4 py-3 text-sm font-bold text-[#ffdad6]">
                 {error}
               </div>
             )}
 
-            <Button type="submit" fullWidth size="lg" loading={loading} variant="navy">
-              Create Account
-            </Button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-[#4ae183] py-3 text-sm font-black uppercase tracking-[0.18em] text-[#002613] transition hover:bg-white disabled:opacity-60"
+            >
+              {loading ? "Creating account…" : "Create Account"}
+            </button>
           </form>
 
-          <p className="text-center text-sm text-[color:var(--color-ink-soft)] mt-5">
+          <p className="mt-5 text-center text-sm text-[#9bb2d1]">
             Already have an account?{" "}
-            <Link href="/login" className="text-[color:var(--primary)] font-semibold hover:underline">Sign in</Link>
+            <Link href="/login" className="font-black text-[#4ae183] hover:underline">
+              Sign in
+            </Link>
           </p>
-          </div>
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
-import { ROLE, canSelfRegister } from "@/lib/roles";
+import { ROLE, canSelfRegister, normalizeRole } from "@/lib/roles";
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const requestedRole = role || ROLE.FAN;
+    const requestedRole = normalizeRole(role || ROLE.VIEWER) || ROLE.VIEWER;
     if (!canSelfRegister(requestedRole)) {
       return NextResponse.json(
         { error: "This role cannot be created through public registration" },

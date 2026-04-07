@@ -3,23 +3,17 @@ import { getServerSession } from "next-auth";
 
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { ROLE } from "@/lib/roles";
+import { ROLE, normalizeRole, type UserRole } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
 const SUPER_ADMIN_ASSIGNABLE_ROLES = new Set(Object.values(ROLE));
 const LEAGUE_ADMIN_ASSIGNABLE_ROLES = new Set([
-  ROLE.FAN,
+  ROLE.VIEWER,
   ROLE.PLAYER,
-  ROLE.TEAM_OWNER,
   ROLE.TEAM_MANAGER,
-  ROLE.COACH,
-  ROLE.SELECTOR,
-  ROLE.ANALYST,
   ROLE.SCORER,
   ROLE.UMPIRE,
-  ROLE.MATCH_REFEREE,
-  ROLE.LEAGUE_STAFF,
 ]);
 
 export async function PATCH(
@@ -52,25 +46,26 @@ export async function PATCH(
     }
 
     if (role !== undefined) {
+      const normalizedRole = normalizeRole(role);
       const allowedRoles = isSuperAdmin ? SUPER_ADMIN_ASSIGNABLE_ROLES : LEAGUE_ADMIN_ASSIGNABLE_ROLES;
-      if (!allowedRoles.has(role)) {
+      if (!normalizedRole || !allowedRoles.has(normalizedRole as UserRole)) {
         return NextResponse.json({ error: "Invalid role" }, { status: 400 });
       }
-      if (isLeagueAdmin && targetUser.role === ROLE.LEAGUE_ADMIN && role !== ROLE.LEAGUE_ADMIN) {
+      if (isLeagueAdmin && normalizeRole(targetUser.role) === ROLE.LEAGUE_ADMIN && normalizedRole !== ROLE.LEAGUE_ADMIN) {
         return NextResponse.json({ error: "League admins cannot demote other league admins" }, { status: 403 });
       }
-      data.role = role;
+      data.role = normalizedRole;
     }
 
     if (isActive !== undefined) {
-      if (isLeagueAdmin && [ROLE.LEAGUE_ADMIN, ROLE.SUPER_ADMIN].includes(targetUser.role)) {
+      if (isLeagueAdmin && ([ROLE.LEAGUE_ADMIN, ROLE.SUPER_ADMIN] as string[]).includes(targetUser.role)) {
         return NextResponse.json({ error: "League admins cannot change admin account status" }, { status: 403 });
       }
       data.isActive = Boolean(isActive);
     }
 
     if (isVerified !== undefined) {
-      if (isLeagueAdmin && [ROLE.LEAGUE_ADMIN, ROLE.SUPER_ADMIN].includes(targetUser.role)) {
+      if (isLeagueAdmin && ([ROLE.LEAGUE_ADMIN, ROLE.SUPER_ADMIN] as string[]).includes(targetUser.role)) {
         return NextResponse.json({ error: "League admins cannot change admin verification" }, { status: 403 });
       }
       data.isVerified = Boolean(isVerified);

@@ -23,6 +23,8 @@ interface GeneratedMatch {
   homeTeam: { name: string; shortName: string };
   awayTeam: { name: string; shortName: string };
   status: string;
+  groupName?: string | null;
+  stage?: string | null;
 }
 
 const FIXTURE_TYPES = [
@@ -58,11 +60,11 @@ export default function FixtureGeneratorPage({ params }: { params: Promise<{ id:
       fetch("/api/venues").then((r) => r.json()),
       fetch(`/api/matches?leagueId=${id}`).then((r) => r.json()),
     ]).then(([leagueData, venueData, matchData]) => {
-      const approvedTeams = (leagueData.league?.teams || [])
-        .filter((tl: any) => tl.status === "APPROVED")
+      const assignedTeams = (leagueData.league?.teams || [])
+        .filter((tl: any) => ["ACTIVE", "APPROVED"].includes(tl.status))
         .map((tl: any) => tl.team);
-      setTeams(approvedTeams);
-      setSelectedTeams(approvedTeams.map((t: Team) => t.id));
+      setTeams(assignedTeams);
+      setSelectedTeams(assignedTeams.map((t: Team) => t.id));
       setVenues(venueData.venues || []);
       setExistingMatches(matchData.matches || []);
       setLoading(false);
@@ -165,6 +167,7 @@ export default function FixtureGeneratorPage({ params }: { params: Promise<{ id:
                 <thead>
                   <tr className="border-b border-[color:var(--border-color)]">
                     <th className="text-left py-2 px-3 text-xs font-medium text-gray-500">#</th>
+                    <th className="text-left py-2 px-3 text-xs font-medium text-gray-500">Pool</th>
                     <th className="text-left py-2 px-3 text-xs font-medium text-gray-500">Match</th>
                     <th className="text-left py-2 px-3 text-xs font-medium text-gray-500">Date & Time</th>
                   </tr>
@@ -173,6 +176,7 @@ export default function FixtureGeneratorPage({ params }: { params: Promise<{ id:
                   {result.matches.map((m, i) => (
                     <tr key={m.id} className="border-b border-gray-50">
                       <td className="py-2 px-3 text-gray-400 text-xs">{m.matchNumber || i + 1}</td>
+                      <td className="py-2 px-3 text-gray-500 text-xs">{m.groupName || m.stage || "Overall"}</td>
                       <td className="py-2 px-3 font-medium text-gray-900">
                         {m.homeTeam.shortName} vs {m.awayTeam.shortName}
                       </td>
@@ -242,9 +246,9 @@ export default function FixtureGeneratorPage({ params }: { params: Promise<{ id:
               </div>
               {teams.length === 0 ? (
                 <p className="text-sm text-gray-400">
-                  No approved teams. Approve teams first from the{" "}
+                  No assigned teams. Add teams first from the{" "}
                   <Link href={`/admin/leagues/${id}/teams`} className="text-[color:var(--primary)] hover:underline">
-                    teams registration page
+                    team assignment page
                   </Link>.
                 </p>
               ) : (
@@ -376,6 +380,10 @@ export default function FixtureGeneratorPage({ params }: { params: Promise<{ id:
                   <span className="font-medium">{fixtureType.replace(/_/g, " ")}</span>
                 </div>
                 <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Stage</span>
+                  <span className="font-medium">{stage.replace(/_/g, " ")}</span>
+                </div>
+                <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Teams</span>
                   <span className="font-medium">{selectedTeams.length}</span>
                 </div>
@@ -406,6 +414,11 @@ export default function FixtureGeneratorPage({ params }: { params: Promise<{ id:
                   </div>
                 )}
               </div>
+              {stage === "GROUP" ? (
+                <p className="mt-4 text-xs text-gray-500">
+                  Group-stage fixtures are split by each team&apos;s saved pool label when available.
+                </p>
+              ) : null}
             </div>
 
             {existingMatches.length > 0 && (

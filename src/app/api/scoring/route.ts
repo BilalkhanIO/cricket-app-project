@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { calcNRR } from "@/lib/utils";
 import { updatePlayerStatsForMatchScopes } from "@/lib/player-stats";
 import { canScoreMatch } from "@/lib/permissions";
 import { ROLE } from "@/lib/roles";
+import { applyCompletedMatchStandings } from "@/lib/standings";
 
 export const dynamic = 'force-dynamic';
 
@@ -52,8 +52,9 @@ export async function POST(req: NextRequest) {
       isBoundary,
       isSix,
       commentary,
+      hitRegion,
     } = await req.json();
-    const validExtras = new Set(["WIDE", "NO_BALL", "BYE", "LEG_BYE"]);
+    const validExtras = new Set(["WIDE", "NO_BALL", "BYE", "LEG_BYE", "PENALTY"]);
     const validWicketTypes = new Set([
       "BOWLED",
       "CAUGHT",
@@ -149,10 +150,21 @@ export async function POST(req: NextRequest) {
 
     const over = await prisma.over.findUnique({
       where: { id: overId },
-      select: { id: true, bowlerId: true, inningsId: true },
+      select: { id: true, bowlerId: true, inningsId: true, overNumber: true },
     });
     if (!over || over.inningsId !== inningsId) {
       return NextResponse.json({ error: "Invalid over for innings" }, { status: 400 });
+    }
+
+    // 2026 UX: Server-side validation for consecutive overs
+    if (over.overNumber > 1) {
+      const prevOver = await prisma.over.findFirst({
+        where: { inningsId, overNumber: over.overNumber - 1 },
+        select: { bowlerId: true },
+      });
+      if (prevOver && prevOver.bowlerId === bowlerId) {
+        return NextResponse.json({ error: "A bowler cannot bowl two overs in a row" }, { status: 400 });
+      }
     }
     if (over.bowlerId && bowlerId && over.bowlerId !== bowlerId) {
       return NextResponse.json(
@@ -176,19 +188,28 @@ export async function POST(req: NextRequest) {
       data: {
         inningsId,
         overId,
+        matchId: inningsMeta.match.id,
         ballNumber,
         overNumber,
         batsmanId: batsmanId || null,
+        strikerId: batsmanId || null,
+        playerOutId: isWicket ? wicketPlayerId || null : null,
         bowlerId: bowlerId || null,
+        deliveryType: extraType || "NORMAL",
         runs: runs || 0,
+        runsOffBat: runs || 0,
         isWicket: isWicket || false,
         wicketType: wicketType || null,
         fielderIds: fielderIds || null,
+        fielderId: fielderIds || null,
         isExtra: isExtra || false,
         extraType: extraType || null,
         extraRuns: extraRuns || 0,
+        isLegalDelivery: !isExtra || extraType === "BYE" || extraType === "LEG_BYE",
         isBoundary: isBoundary || false,
         isSix: isSix || false,
+        hitRegion: hitRegion || null,
+        createdBy: session.user.id,
         commentary: buildBallCommentary(
           commentary,
           isWicket ? wicketPlayerId || null : null,
@@ -300,6 +321,7 @@ export async function POST(req: NextRequest) {
               wicketType: wicketType || null,
               bowlerId: bowlerId || null,
               fielderId: fielderIds || null,
+              runsAtDismissal: innings.totalRuns,
             }),
           },
         });
@@ -318,6 +340,7 @@ export async function POST(req: NextRequest) {
             wicketType: isWicket && wicketPlayerId === batsmanId ? wicketType || null : null,
             bowlerId: isWicket && wicketPlayerId === batsmanId ? bowlerId || null : null,
             fielderId: isWicket && wicketPlayerId === batsmanId ? fielderIds || null : null,
+            runsAtDismissal: isWicket && wicketPlayerId === batsmanId ? innings.totalRuns : undefined,
           },
         });
       }
@@ -336,6 +359,7 @@ export async function POST(req: NextRequest) {
             wicketType: wicketType || null,
             bowlerId: bowlerId || null,
             fielderId: fielderIds || null,
+            runsAtDismissal: innings.totalRuns,
           },
         });
       } else {
@@ -348,6 +372,7 @@ export async function POST(req: NextRequest) {
             wicketType: wicketType || null,
             bowlerId: bowlerId || null,
             fielderId: fielderIds || null,
+            runsAtDismissal: innings.totalRuns,
           },
         });
       }
@@ -430,16 +455,21 @@ export async function POST(req: NextRequest) {
           matchCompleted = true;
         } else if (allOut || oversComplete) {
           const runsShort = target - currentInnings.totalRuns - 1;
-          const bowlingTeamId =
-            currentInnings.teamId === match.homeTeamId ? match.awayTeamId : match.homeTeamId;
-          winnerTeamId = bowlingTeamId;
-          winMargin = runsShort;
-          winType = "runs";
-          const winnerName =
-            bowlingTeamId === match.homeTeamId
-              ? match.homeTeam?.name || "Home"
-              : match.awayTeam?.name || "Away";
-          result = `${winnerName} won by ${runsShort} run${runsShort !== 1 ? "s" : ""}`;
+          if (runsShort === 0) {
+            winType = "tie";
+            result = "Match Tied";
+          } else {
+            const bowlingTeamId =
+              currentInnings.teamId === match.homeTeamId ? match.awayTeamId : match.homeTeamId;
+            winnerTeamId = bowlingTeamId;
+            winMargin = runsShort;
+            winType = "runs";
+            const winnerName =
+              bowlingTeamId === match.homeTeamId
+                ? match.homeTeam?.name || "Home"
+                : match.awayTeam?.name || "Away";
+            result = `${winnerName} won by ${runsShort} run${runsShort !== 1 ? "s" : ""}`;
+          }
           matchCompleted = true;
         }
       }
@@ -485,75 +515,26 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: "Match not found after completion" }, { status: 404 });
         }
 
-        // Update points table
-        if (winnerTeamId && match.leagueId) {
-          const loserTeamId =
-            match.homeTeamId === winnerTeamId ? match.awayTeamId : match.homeTeamId;
-
-          await prisma.pointsTable.upsert({
-            where: { leagueId_teamId: { leagueId: match.leagueId, teamId: winnerTeamId } },
-            update: {
-              matchesPlayed: { increment: 1 },
-              wins: { increment: 1 },
-              points: { increment: completedMatch.league.pointsPerWin },
+        if (match.leagueId) {
+          await applyCompletedMatchStandings({
+            leagueId: match.leagueId,
+            homeTeamId: match.homeTeamId,
+            awayTeamId: match.awayTeamId,
+            winnerTeamId: completedMatch.winnerTeamId,
+            winType: completedMatch.winType,
+            result: completedMatch.result,
+            league: {
+              id: completedMatch.league.id,
+              pointsPerWin: completedMatch.league.pointsPerWin,
+              pointsPerTie: completedMatch.league.pointsPerTie,
+              pointsPerNoResult: completedMatch.league.pointsPerNoResult,
             },
-            create: {
-              leagueId: match.leagueId,
-              teamId: winnerTeamId,
-              matchesPlayed: 1,
-              wins: 1,
-              points: completedMatch.league.pointsPerWin,
-            },
+            innings: completedMatch.innings.map((innings) => ({
+              teamId: innings.teamId,
+              totalRuns: innings.totalRuns,
+              totalBalls: innings.totalBalls,
+            })),
           });
-
-          await prisma.pointsTable.upsert({
-            where: { leagueId_teamId: { leagueId: match.leagueId, teamId: loserTeamId } },
-            update: { matchesPlayed: { increment: 1 }, losses: { increment: 1 } },
-            create: {
-              leagueId: match.leagueId,
-              teamId: loserTeamId,
-              matchesPlayed: 1,
-              losses: 1,
-              points: 0,
-            },
-          });
-
-          // Recalculate NRR
-          for (const teamId of [match.homeTeamId, match.awayTeamId]) {
-            const battingInnings = completedMatch.innings.find((i) => i.teamId === teamId);
-            const bowlingInnings = completedMatch.innings.find((i) => i.teamId !== teamId);
-
-            if (battingInnings && bowlingInnings) {
-              const runsScored = battingInnings.totalRuns;
-              const oversFaced = battingInnings.totalBalls / 6;
-              const runsConceded = bowlingInnings.totalRuns;
-              const oversBowled = bowlingInnings.totalBalls / 6;
-
-              const updatedPointsEntry = await prisma.pointsTable.update({
-                where: { leagueId_teamId: { leagueId: match.leagueId, teamId } },
-                data: {
-                  runsScored: { increment: runsScored },
-                  oversFaced: { increment: oversFaced },
-                  runsConceded: { increment: runsConceded },
-                  oversBowled: { increment: oversBowled },
-                },
-              });
-
-              if (updatedPointsEntry.oversFaced > 0 && updatedPointsEntry.oversBowled > 0) {
-                await prisma.pointsTable.update({
-                  where: { id: updatedPointsEntry.id },
-                  data: {
-                    netRunRate: calcNRR(
-                      updatedPointsEntry.runsScored,
-                      updatedPointsEntry.oversFaced,
-                      updatedPointsEntry.runsConceded,
-                      updatedPointsEntry.oversBowled,
-                    ),
-                  },
-                });
-              }
-            }
-          }
         }
 
         // Auto-update PlayerStats for all players in this match
@@ -598,6 +579,18 @@ export async function POST(req: NextRequest) {
         entity: "BallEvent",
         entityId: ball.id,
         newValue: JSON.stringify({ runs, isWicket, extraType }),
+      },
+    });
+
+    await prisma.ballEventAudit.create({
+      data: {
+        eventId: ball.id,
+        inningsId,
+        matchId: innings.matchId,
+        changedBy: session.user.id,
+        action: "CREATE",
+        newValue: JSON.stringify(ball),
+        revisionNo: 1,
       },
     });
 

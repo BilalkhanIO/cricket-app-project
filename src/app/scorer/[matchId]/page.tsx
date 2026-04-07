@@ -44,6 +44,8 @@ interface BallEvent {
   id: string;
   ballNumber: number;
   overNumber: number;
+  batsmanId?: string | null;
+  bowlerId?: string | null;
   runs: number;
   isWicket: boolean;
   wicketType: string | null;
@@ -52,6 +54,9 @@ interface BallEvent {
   extraRuns: number;
   isBoundary: boolean;
   isSix: boolean;
+  fielderIds?: string | null;
+  commentary?: string | null;
+  revisionNo?: number;
 }
 
 interface Over {
@@ -104,6 +109,16 @@ interface Match {
   league: { oversPerInnings: number };
   innings: Innings[];
   playingXIs: { playerId: string; teamId: string; battingOrder: number; player: Player }[];
+}
+
+interface BallEventAudit {
+  id: string;
+  eventId: string;
+  action: string;
+  createdAt: string;
+  revisionNo: number;
+  oldValue?: string | null;
+  newValue?: string | null;
 }
 
 interface ScoringPlayerOption {
@@ -174,6 +189,15 @@ function BallDot({ ball }: { ball: BallEvent }) {
   );
 }
 
+function formatBallLabel(ball: BallEvent) {
+  if (ball.isWicket) return "W";
+  if (ball.isExtra) {
+    const prefix = ball.extraType === "NO_BALL" ? "nb" : ball.extraType === "WIDE" ? "wd" : ball.extraType === "LEG_BYE" ? "lb" : "b";
+    return `${prefix}${ball.extraRuns > 1 ? `+${ball.extraRuns - (ball.extraType === "NO_BALL" || ball.extraType === "WIDE" ? 1 : 0)}` : ""}`;
+  }
+  return `${ball.runs}`;
+}
+
 export default function ScorerPage({ params }: { params: Promise<{ matchId: string }> }) {
   const { matchId } = use(params);
   const { data: session } = useSession();
@@ -192,6 +216,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
   const [fielder, setFielder] = useState("");
   const [dismissedBatter, setDismissedBatter] = useState<"STRIKER" | "NON_STRIKER">("STRIKER");
   const [recentBalls, setRecentBalls] = useState<BallEvent[]>([]);
+  const [editingBall, setEditingBall] = useState<BallEvent | null>(null);
   const [phase, setPhase] = useState<"toss" | "playing_xi" | "start_innings" | "scoring">("toss");
   const [matchResult, setMatchResult] = useState<string | null>(null);
   const [partnershipRuns, setPartnershipRuns] = useState(0);
@@ -201,6 +226,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
   const [error, setError] = useState<string | null>(null);
   const [showMomModal, setShowMomModal] = useState(false);
   const [momPlayerId, setMomPlayerId] = useState("");
+  const [ballEventAudits, setBallEventAudits] = useState<BallEventAudit[]>([]);
 
   const getTeamPlayerPool = useCallback(
     (teamId: string | null): ScoringPlayerOption[] => {
@@ -240,12 +266,35 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
     () => getTeamPlayerPool(bowlingTeamId),
     [getTeamPlayerPool, bowlingTeamId]
   );
+  const inningsRecentBalls = useMemo(
+    () =>
+      currentInnings
+        ? [...currentInnings.overs]
+            .flatMap((over) => over.balls || [])
+            .sort((a, b) => {
+              if (a.overNumber !== b.overNumber) return b.overNumber - a.overNumber;
+              return b.ballNumber - a.ballNumber;
+            })
+            .slice(0, 12)
+        : [],
+    [currentInnings]
+  );
+  const selectedBallAudits = useMemo(
+    () =>
+      editingBall
+        ? ballEventAudits
+            .filter((audit) => audit.eventId === editingBall.id)
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        : [],
+    [ballEventAudits, editingBall]
+  );
 
   const fetchMatch = useCallback(async () => {
     const res = await fetch(`/api/matches/${matchId}`);
     const data = await res.json();
     if (data.match) {
       setMatch(data.match);
+      setBallEventAudits(data.ballEventAudits || []);
       determinePhase(data.match);
     }
     setLoading(false);
@@ -271,6 +320,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
         setCurrentBowler("");
         setRecentBalls([]);
       }
+      setEditingBall(null);
       setPhase("scoring");
     } else if (m.innings.length === 0 || m.innings.every((i) => i.isCompleted)) {
       setPhase("start_innings");
@@ -470,28 +520,31 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
     fielderParam?: string,
     dismissedBatterParam?: "STRIKER" | "NON_STRIKER",
   ) => {
-    if (!currentInnings || !currentOverId) return;
-    if (!striker) { const message = "Select striker before recording a ball"; setError(message); showToast(message, "error"); return; }
-    if (!nonStriker) { const message = "Select non-striker before recording a ball"; setError(message); showToast(message, "error"); return; }
-    if (striker === nonStriker) { const message = "Striker and non-striker must be different players"; setError(message); showToast(message, "error"); return; }
-    if (!currentBowler) { const message = "Select bowler before recording a ball"; setError(message); showToast(message, "error"); return; }
+    if (!currentInnings) return;
+    if (!editingBall && !currentOverId) return;
+    if (!editingBall && !striker) { const message = "Select striker before recording a ball"; setError(message); showToast(message, "error"); return; }
+    if (!editingBall && !nonStriker) { const message = "Select non-striker before recording a ball"; setError(message); showToast(message, "error"); return; }
+    if (!editingBall && striker === nonStriker) { const message = "Striker and non-striker must be different players"; setError(message); showToast(message, "error"); return; }
+    if (!editingBall && !currentBowler) { const message = "Select bowler before recording a ball"; setError(message); showToast(message, "error"); return; }
     setError(null);
     setSubmitting(true);
     setExtraMode(null);
 
+    const activeStriker = editingBall?.batsmanId || striker;
+    const activeBowler = editingBall?.bowlerId || currentBowler;
     const dismissedPlayerId =
       isWicket && dismissedBatterParam === "NON_STRIKER"
         ? nonStriker
-        : striker;
+        : activeStriker;
 
     const body = {
       inningsId: currentInnings.id,
-      overId: currentOverId,
-      ballNumber: ballInOver + 1,
-      overNumber: Math.floor(currentInnings.totalBalls / 6) + 1,
-      batsmanId: striker,
-      batsmanOrder: getBattingOrder(striker),
-      bowlerId: currentBowler,
+      overId: editingBall ? currentInnings.overs.find((over) => over.balls.some((ball) => ball.id === editingBall.id))?.id : currentOverId,
+      ballNumber: editingBall ? editingBall.ballNumber : ballInOver + 1,
+      overNumber: editingBall ? editingBall.overNumber : Math.floor(currentInnings.totalBalls / 6) + 1,
+      batsmanId: activeStriker,
+      batsmanOrder: getBattingOrder(activeStriker),
+      bowlerId: activeBowler,
       runs,
       isWicket: isWicket || false,
       wicketType: isWicket ? (wtParam || "") : null,
@@ -505,10 +558,10 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
       fielderIds: fielderParam || null,
     };
 
-    const res = await fetch("/api/scoring", {
-      method: "POST",
+    const res = await fetch(editingBall ? "/api/scoring/edit" : "/api/scoring", {
+      method: editingBall ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify(editingBall ? { eventId: editingBall.id, ...body } : body),
     });
 
     const data = await res.json();
@@ -520,7 +573,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
       return;
     }
 
-    if (data.ball) {
+    if (data.ball && !editingBall) {
       const newBall: BallEvent = {
         id: data.ball.id,
         ballNumber: body.ballNumber,
@@ -594,6 +647,16 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
       }
 
       await fetchMatch();
+    }
+
+    if (data.ball && editingBall) {
+      setEditingBall(null);
+      setShowWicketModal(false);
+      setSelectedWicketType("");
+      setFielder("");
+      setDismissedBatter("STRIKER");
+      await fetchMatch();
+      showToast("Ball corrected", "success");
     }
 
     setSubmitting(false);
@@ -1254,7 +1317,7 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
                 <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Score Ball</p>
                 <button
                   onClick={undoLastBall}
-                  disabled={submitting || (currentInnings.overs.reduce((s, o) => s + o.balls.length, 0) === 0)}
+                  disabled={submitting || !!editingBall || (currentInnings.overs.reduce((s, o) => s + o.balls.length, 0) === 0)}
                   className="flex items-center gap-1.5 text-xs text-orange-400 hover:text-orange-300 disabled:opacity-30 bg-orange-900/20 px-3 py-1.5 border border-orange-700/50 transition-colors"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1264,9 +1327,82 @@ export default function ScorerPage({ params }: { params: Promise<{ matchId: stri
                 </button>
               </div>
 
+              <div className="border border-white/10 bg-[#00142b] p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#9bb2d1]">Recent balls</p>
+                    <p className="mt-1 text-xs text-gray-400">Tap any recent ball to correct it using the scoring controls below.</p>
+                  </div>
+                  {editingBall && (
+                    <button
+                      onClick={() => setEditingBall(null)}
+                      className="border border-white/10 bg-[#12324d] px-3 py-2 text-xs font-semibold text-white hover:bg-[#1b3656]"
+                    >
+                      Cancel edit
+                    </button>
+                  )}
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {inningsRecentBalls.length === 0 ? (
+                    <span className="text-xs text-gray-500">No ball history yet.</span>
+                  ) : (
+                    inningsRecentBalls.map((ball) => (
+                      <button
+                        key={ball.id}
+                        onClick={() => {
+                          setEditingBall(ball);
+                          setShowWicketModal(false);
+                          setSelectedWicketType(ball.wicketType || "");
+                          setFielder(ball.fielderIds || "");
+                          setDismissedBatter("STRIKER");
+                          setError(null);
+                        }}
+                        disabled={submitting}
+                        className={`flex items-center gap-2 border px-3 py-2 text-xs transition-colors ${
+                          editingBall?.id === ball.id
+                            ? "border-[#4ae183] bg-[#0f3f31] text-white"
+                            : "border-white/10 bg-[#08203d] text-[#d6d9df] hover:bg-[#12324d]"
+                        }`}
+                      >
+                        <span className="font-bold">{ball.overNumber}.{ball.ballNumber}</span>
+                        <span>{formatBallLabel(ball)}</span>
+                        {ball.revisionNo && ball.revisionNo > 1 ? <span className="text-[#4ae183]">r{ball.revisionNo}</span> : null}
+                      </button>
+                    ))
+                  )}
+                </div>
+                {editingBall && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-xs text-[#4ae183]">
+                      Editing ball {editingBall.overNumber}.{editingBall.ballNumber}. The selected event will be replayed through the innings when you save.
+                    </p>
+                    <div className="border border-white/10 bg-[#04162a] p-3">
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#9bb2d1]">Revision history</p>
+                      {selectedBallAudits.length === 0 ? (
+                        <p className="mt-2 text-xs text-gray-500">No audit entries for this ball yet.</p>
+                      ) : (
+                        <div className="mt-2 space-y-2">
+                          {selectedBallAudits.map((audit) => (
+                            <div key={audit.id} className="border border-white/10 bg-[#08203d] px-3 py-2 text-xs text-[#d6d9df]">
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="font-semibold text-white">{audit.action}</span>
+                                <span className="text-[#9bb2d1]">r{audit.revisionNo}</span>
+                              </div>
+                              <p className="mt-1 text-[#9bb2d1]">
+                                {new Date(audit.createdAt).toLocaleString("en-GB")}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Runs */}
               <div>
-                <p className="text-xs text-gray-400 mb-2 font-medium">RUNS</p>
+                <p className="text-xs text-gray-400 mb-2 font-medium">{editingBall ? "CORRECT RUNS" : "RUNS"}</p>
                 <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
                   {[0, 1, 2, 3, 4, 5, 6].map((r) => (
                     <button

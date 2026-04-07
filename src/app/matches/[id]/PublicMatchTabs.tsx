@@ -22,8 +22,26 @@ function formatLabel(value: string) {
   return value.replace(/_/g, " ");
 }
 
+function formatDismissal(bat: any): string {
+  if (!bat.isOut) return "not out";
+  const type = (bat.wicketType || "OUT").toUpperCase();
+  const bowlerName = bat.bowler?.user?.name;
+  const fielderName = bat.fielder?.user?.name;
+  if (type === "CAUGHT" || type === "CAUGHT_OUT") {
+    if (fielderName && bowlerName) return `c ${fielderName} b ${bowlerName}`;
+    if (bowlerName) return `c & b ${bowlerName}`;
+    return "caught";
+  }
+  if (type === "BOWLED") return bowlerName ? `b ${bowlerName}` : "bowled";
+  if (type === "LBW") return bowlerName ? `lbw b ${bowlerName}` : "lbw";
+  if (type === "RUN_OUT" || type === "RUN OUT") return fielderName ? `run out (${fielderName})` : "run out";
+  if (type === "STUMPED") return fielderName && bowlerName ? `st ${fielderName} b ${bowlerName}` : "stumped";
+  if (type === "HIT_WICKET" || type === "HIT WICKET") return bowlerName ? `hit wicket b ${bowlerName}` : "hit wicket";
+  return formatLabel(type).toLowerCase();
+}
+
 export default function PublicMatchTabs({ match }: { match: MatchData }) {
-  const [activeTab, setActiveTab] = useState<"scorecards" | "commentary" | "overs" | "others">("scorecards");
+  const [activeTab, setActiveTab] = useState<"scorecards" | "commentary" | "overs" | "info">("scorecards");
   const [selectedInningsId, setSelectedInningsId] = useState(match.innings[0]?.id || "");
 
   const selectedInnings = useMemo(
@@ -48,8 +66,8 @@ export default function PublicMatchTabs({ match }: { match: MatchData }) {
         <button type="button" onClick={() => setActiveTab("overs")} className={tabButtonClass("overs")}>
           Overs
         </button>
-        <button type="button" onClick={() => setActiveTab("others")} className={tabButtonClass("others")}>
-          Others
+        <button type="button" onClick={() => setActiveTab("info")} className={tabButtonClass("info")}>
+          Playing XI & Officials
         </button>
       </div>
 
@@ -100,6 +118,7 @@ export default function PublicMatchTabs({ match }: { match: MatchData }) {
                       <th className="px-3 py-3 text-center">B</th>
                       <th className="px-3 py-3 text-center">4s</th>
                       <th className="px-3 py-3 text-center">6s</th>
+                      <th className="px-3 py-3 text-center">SR</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -108,18 +127,33 @@ export default function PublicMatchTabs({ match }: { match: MatchData }) {
                         <td className="px-4 py-3">
                           <p className="font-bold uppercase tracking-[0.06em] text-white">{bat.player.user.name}</p>
                           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
-                            {bat.isOut ? formatLabel(bat.wicketType || "OUT") : "Not out"}
+                            {formatDismissal(bat)}
                           </p>
                         </td>
                         <td className="px-3 py-3 text-center font-black text-white">{bat.runs}</td>
                         <td className="px-3 py-3 text-center text-[#d4e3ff]">{bat.balls}</td>
                         <td className="px-3 py-3 text-center text-[#d4e3ff]">{bat.fours}</td>
                         <td className="px-3 py-3 text-center text-[#d4e3ff]">{bat.sixes}</td>
+                        <td className="px-3 py-3 text-center text-[#d4e3ff]">
+                          {bat.balls > 0 ? ((bat.runs / bat.balls) * 100).toFixed(1) : "—"}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+              {(selectedInnings.extras > 0 || selectedInnings.wides > 0 || selectedInnings.noBalls > 0 || selectedInnings.byes > 0 || selectedInnings.legByes > 0) && (
+                <div className="border-t border-white/10 px-5 py-3">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                    <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">Extras</span>
+                    <span className="text-sm font-black text-white">{selectedInnings.extras}</span>
+                    {selectedInnings.wides > 0 && <span className="text-xs text-[#9bb2d1]">Wd {selectedInnings.wides}</span>}
+                    {selectedInnings.noBalls > 0 && <span className="text-xs text-[#9bb2d1]">Nb {selectedInnings.noBalls}</span>}
+                    {selectedInnings.byes > 0 && <span className="text-xs text-[#9bb2d1]">B {selectedInnings.byes}</span>}
+                    {selectedInnings.legByes > 0 && <span className="text-xs text-[#9bb2d1]">Lb {selectedInnings.legByes}</span>}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="border border-white/10 bg-[#001c3a]">
@@ -132,6 +166,7 @@ export default function PublicMatchTabs({ match }: { match: MatchData }) {
                     <tr>
                       <th className="px-4 py-3 text-left">Bowler</th>
                       <th className="px-3 py-3 text-center">O</th>
+                      <th className="px-3 py-3 text-center">M</th>
                       <th className="px-3 py-3 text-center">R</th>
                       <th className="px-3 py-3 text-center">W</th>
                       <th className="px-3 py-3 text-center">Eco</th>
@@ -142,9 +177,10 @@ export default function PublicMatchTabs({ match }: { match: MatchData }) {
                       <tr key={bowl.id} className="border-b border-white/10 last:border-b-0">
                         <td className="px-4 py-3 font-bold uppercase tracking-[0.06em] text-white">{bowl.player.user.name}</td>
                         <td className="px-3 py-3 text-center text-[#d4e3ff]">{bowl.overs.toFixed(1)}</td>
+                        <td className="px-3 py-3 text-center text-[#d4e3ff]">{bowl.maidens ?? 0}</td>
                         <td className="px-3 py-3 text-center text-[#d4e3ff]">{bowl.runs}</td>
                         <td className="px-3 py-3 text-center font-black text-white">{bowl.wickets}</td>
-                        <td className="px-3 py-3 text-center text-[#d4e3ff]">{bowl.economy.toFixed(2)}</td>
+                        <td className="px-3 py-3 text-center text-[#d4e3ff]">{bowl.economy != null ? bowl.economy.toFixed(2) : "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -152,6 +188,31 @@ export default function PublicMatchTabs({ match }: { match: MatchData }) {
               </div>
             </div>
           </div>
+
+          {/* Fall of Wickets */}
+          {selectedInnings.battingScores.filter((b: any) => b.isOut).length > 0 && (
+            <div className="border border-white/10 bg-[#001c3a] p-5">
+              <h3 className="mb-4 font-[var(--font-display)] text-xl font-black uppercase tracking-tight text-white">
+                Fall of wickets
+              </h3>
+              <div className="flex flex-wrap gap-3">
+                {selectedInnings.battingScores
+                  .filter((b: any) => b.isOut)
+                  .map((bat: any, i: number) => (
+                    <div key={bat.id} className="border border-white/10 bg-[#00142b] px-3 py-2">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
+                        {i + 1}{i === 0 ? "st" : i === 1 ? "nd" : i === 2 ? "rd" : "th"} wicket
+                      </p>
+                      <p className="mt-1 text-sm font-bold text-white">{bat.player.user.name}</p>
+                      <p className="text-[10px] font-black text-[#4ae183]">
+                        {bat.runs} ({bat.balls})
+                        {bat.runsAtDismissal != null ? ` @ ${bat.runsAtDismissal}` : ""}
+                      </p>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -192,7 +253,7 @@ export default function PublicMatchTabs({ match }: { match: MatchData }) {
         </div>
       )}
 
-      {activeTab === "others" && (
+      {activeTab === "info" && (
         <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
           <div className="space-y-4">
             <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
@@ -210,7 +271,14 @@ export default function PublicMatchTabs({ match }: { match: MatchData }) {
                 {match.officials.map((official) => (
                   <div key={official.id} className="flex items-center justify-between gap-4 border-b border-white/10 pb-3 last:border-b-0 last:pb-0">
                     <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">{official.role}</span>
-                    <span className="text-sm font-bold uppercase tracking-[0.08em] text-white">{official.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold uppercase tracking-[0.08em] text-white">
+                        {official.user?.name ?? official.name}
+                      </span>
+                      {official.user && (
+                        <span className="text-[10px] font-black uppercase tracking-[0.12em] text-[#4ae183]">✓</span>
+                      )}
+                    </div>
                   </div>
                 ))}
                 {match.scorer && (
@@ -226,13 +294,30 @@ export default function PublicMatchTabs({ match }: { match: MatchData }) {
           <div className="space-y-4">
             <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
               Match
-              <span className="block text-[#c8c8b0]">notes</span>
+              <span className="block text-[#c8c8b0]">details</span>
             </h2>
-            <div className="border border-white/10 bg-[#4ae183] p-6 text-[#003919]">
-              <p className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight">Public match hub</p>
-              <p className="mt-3 text-sm font-medium leading-6">
-                {match.matchFormat} fixture in {match.league.name} {match.league.season}. Result: {match.result || "In progress"}.
-              </p>
+
+            <div className="border border-white/10 bg-[#001c3a] p-5">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">Format</span>
+                  <span className="text-sm font-bold uppercase tracking-[0.08em] text-white">{match.matchFormat}</span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">League</span>
+                  <span className="text-sm font-bold uppercase tracking-[0.08em] text-white">{match.league.name} {match.league.season}</span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">Result</span>
+                  <span className="text-sm font-bold uppercase tracking-[0.08em] text-[#4ae183]">{match.result || "In progress"}</span>
+                </div>
+                {match.scorer && (
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">Scorer</span>
+                    <span className="text-sm font-bold uppercase tracking-[0.08em] text-white">{match.scorer.name}</span>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="border border-white/10 bg-[#001c3a] p-5">

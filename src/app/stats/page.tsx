@@ -9,7 +9,7 @@ async function getStats(filters: { leagueId?: string; teamId?: string }) {
   const scopeLeagueId = filters.leagueId || OVERALL_LEAGUE_KEY;
   const playerFilter = filters.teamId ? { player: { teamId: filters.teamId } } : {};
 
-  const [topBatters, topBowlers, topSixers, leagues] = await Promise.all([
+  const [topBatters, topBowlers, topSixers, bestAverages, bestStrikeRates, bestEconomies, leagues] = await Promise.all([
     prisma.playerStats.findMany({
       where: { leagueId: scopeLeagueId, runs: { gt: 0 }, ...playerFilter },
       include: {
@@ -49,13 +49,53 @@ async function getStats(filters: { leagueId?: string; teamId?: string }) {
       orderBy: { sixes: "desc" },
       take: 10,
     }),
+    prisma.playerStats.findMany({
+      where: { leagueId: scopeLeagueId, dismissals: { gt: 0 }, runs: { gte: 50 }, ...playerFilter },
+      include: {
+        player: {
+          include: {
+            user: { select: { name: true } },
+            team: { select: { id: true, shortName: true, jerseyColor: true } },
+          },
+        },
+      },
+      orderBy: { average: "desc" },
+      take: 10,
+    }),
+    prisma.playerStats.findMany({
+      where: { leagueId: scopeLeagueId, ballsFaced: { gte: 25 }, runs: { gt: 0 }, ...playerFilter },
+      include: {
+        player: {
+          include: {
+            user: { select: { name: true } },
+            team: { select: { id: true, shortName: true, jerseyColor: true } },
+          },
+        },
+      },
+      orderBy: { strikeRate: "desc" },
+      take: 10,
+    }),
+    prisma.playerStats.findMany({
+      where: { leagueId: scopeLeagueId, ballsBowled: { gte: 12 }, wickets: { gt: 0 }, ...playerFilter },
+      include: {
+        player: {
+          include: {
+            user: { select: { name: true } },
+            team: { select: { id: true, shortName: true, jerseyColor: true } },
+          },
+        },
+      },
+      orderBy: { economy: "asc" },
+      take: 10,
+    }),
     prisma.league.findMany({
-      where: { status: "ACTIVE" },
-      select: { id: true, name: true },
+      where: { status: { in: ["ACTIVE", "COMPLETED"] } },
+      select: { id: true, name: true, status: true },
+      orderBy: [{ status: "asc" }, { name: "asc" }],
     }),
   ]);
 
-  return { topBatters, topBowlers, topSixers, leagues };
+  return { topBatters, topBowlers, topSixers, bestAverages, bestStrikeRates, bestEconomies, leagues };
 }
 
 export default async function StatsPage({
@@ -64,7 +104,7 @@ export default async function StatsPage({
   searchParams: Promise<{ leagueId?: string; teamId?: string }>;
 }) {
   const { leagueId, teamId } = await searchParams;
-  const [{ topBatters, topBowlers, topSixers, leagues }, league, team] = await Promise.all([
+  const [{ topBatters, topBowlers, topSixers, bestAverages, bestStrikeRates, bestEconomies, leagues }, league, team] = await Promise.all([
     getStats({ leagueId, teamId }),
     leagueId ? prisma.league.findUnique({ where: { id: leagueId }, select: { id: true, name: true } }) : null,
     teamId ? prisma.team.findUnique({ where: { id: teamId }, select: { id: true, name: true } }) : null,
@@ -101,17 +141,43 @@ export default async function StatsPage({
                 <p className="max-w-2xl text-sm leading-7 text-[#9bb2d1] sm:text-base">{description}</p>
               </div>
 
-              <div className="grid grid-cols-3 gap-3 text-center">
-                {[
-                  { value: topBatters.length, label: "Batters" },
-                  { value: topBowlers.length, label: "Bowlers" },
-                  { value: topSixers.length, label: "Hitters" },
-                ].map((stat) => (
-                  <div key={stat.label} className="border border-white/10 bg-[#001c3a] px-4 py-4">
-                    <p className="font-[var(--font-display)] text-3xl font-black text-white">{stat.value}</p>
-                    <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">{stat.label}</p>
-                  </div>
-                ))}
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  {[
+                    { value: topBatters.length, label: "Batters" },
+                    { value: topBowlers.length, label: "Bowlers" },
+                    { value: bestEconomies.length, label: "Economy" },
+                  ].map((stat) => (
+                    <div key={stat.label} className="border border-white/10 bg-[#001c3a] px-4 py-4">
+                      <p className="font-[var(--font-display)] text-3xl font-black text-white">{stat.value}</p>
+                      <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">{stat.label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {leagues.length > 0 && (
+                  <form method="GET" className="flex items-center gap-3">
+                    <label className="text-[10px] font-black uppercase tracking-[0.22em] text-[#9bb2d1] whitespace-nowrap">
+                      Filter by league
+                    </label>
+                    <select
+                      name="leagueId"
+                      defaultValue={leagueId || ""}
+                      className="flex-1 border border-white/10 bg-[#001c3a] px-3 py-2 text-sm font-bold text-white focus:border-[#4ae183] focus:outline-none"
+                    >
+                      <option value="">All leagues (career)</option>
+                      {leagues.map((l) => (
+                        <option key={l.id} value={l.id}>{l.name}{l.status === "COMPLETED" ? " (completed)" : ""}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="submit"
+                      className="bg-[#4ae183] px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-[#003919] hover:bg-[#6bfe9c]"
+                    >
+                      Apply
+                    </button>
+                  </form>
+                )}
               </div>
             </div>
           </div>
@@ -123,6 +189,9 @@ export default async function StatsPage({
               { title: "Most Runs", stats: topBatters, valueKey: "runs", subKey: "average" },
               { title: "Most Wickets", stats: topBowlers, valueKey: "wickets", subKey: "economy" },
               { title: "Most Sixes", stats: topSixers, valueKey: "sixes", subKey: null },
+              { title: "Best Average", stats: bestAverages, valueKey: "average", subKey: "runs" },
+              { title: "Best Strike Rate", stats: bestStrikeRates, valueKey: "strikeRate", subKey: "runs" },
+              { title: "Best Economy", stats: bestEconomies, valueKey: "economy", subKey: "wickets" },
             ].map((board) => (
               <div key={board.title} className="border border-white/10 bg-[#001c3a]">
                 <div className="border-b border-white/10 px-5 py-4">
@@ -166,13 +235,18 @@ export default async function StatsPage({
           {!teamId && leagues.length > 0 && (
             <div className="mt-10 space-y-4">
               <h2 className="font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
-                Active
-                <span className="block text-[#4ae183]">league boards</span>
+                League
+                <span className="block text-[#4ae183]">boards</span>
               </h2>
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {leagues.map((league) => (
                   <Link key={league.id} href={`/stats?leagueId=${league.id}`} className="border border-white/10 bg-[#001c3a] px-5 py-5 transition hover:bg-[#0b2747]">
-                    <p className="font-[var(--font-display)] text-2xl font-black uppercase tracking-tight text-white">{league.name}</p>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-[var(--font-display)] text-2xl font-black uppercase tracking-tight text-white">{league.name}</p>
+                      <span className={`px-2 py-1 text-[9px] font-black uppercase tracking-[0.18em] ${league.status === "ACTIVE" ? "bg-[#4ae183] text-[#003919]" : "bg-[#1b3656] text-[#d4e3ff]"}`}>
+                        {league.status}
+                      </span>
+                    </div>
                     <p className="mt-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">Open league-specific stats</p>
                   </Link>
                 ))}

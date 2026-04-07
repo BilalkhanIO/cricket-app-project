@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { canManageLeaguePlayers } from "@/lib/permissions";
-import { isAdminRole, ROLE } from "@/lib/roles";
+import { isAdminRole, normalizeRole, ROLE } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -41,10 +41,11 @@ export async function POST(
     const { id } = await params;
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const normalizedRole = normalizeRole(session.user.role);
     const canManage =
-      canManageLeaguePlayers(session.user.role) || session.user.role === ROLE.PLAYER;
+      canManageLeaguePlayers(session.user.role) || normalizedRole === ROLE.PLAYER;
     if (!canManage) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    const canBypassRegistrationWindow = isAdminRole(session.user.role) || session.user.role === ROLE.LEAGUE_STAFF;
+    const canBypassRegistrationWindow = isAdminRole(session.user.role);
 
     const body = await req.json();
     const playerId = body.playerId;
@@ -84,13 +85,13 @@ export async function POST(
     });
     if (!player) return NextResponse.json({ error: "Player not found" }, { status: 404 });
 
-    if (session.user.role === "PLAYER" && player.user.id !== session.user.id) {
+    if (normalizedRole === ROLE.PLAYER && player.user.id !== session.user.id) {
       return NextResponse.json(
         { error: "Players can only register their own profile" },
         { status: 403 }
       );
     }
-    if (session.user.role === "PLAYER" && body.status && body.status !== "PENDING") {
+    if (normalizedRole === ROLE.PLAYER && body.status && body.status !== "PENDING") {
       return NextResponse.json(
         { error: "Players cannot set their own approval status" },
         { status: 403 }
@@ -101,8 +102,8 @@ export async function POST(
       const teamLeague = await prisma.teamLeague.findUnique({
         where: { teamId_leagueId: { teamId, leagueId: id } },
       });
-      if (!teamLeague || teamLeague.status !== "APPROVED") {
-        return NextResponse.json({ error: "Team is not approved in this league" }, { status: 400 });
+      if (!teamLeague || !["ACTIVE", "APPROVED"].includes(teamLeague.status)) {
+        return NextResponse.json({ error: "Team is not assigned to this league" }, { status: 400 });
       }
 
       const assignedCount = await prisma.playerLeagueRegistration.count({

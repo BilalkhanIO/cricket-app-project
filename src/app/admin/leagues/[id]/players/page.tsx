@@ -2,9 +2,6 @@
 
 import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/Button";
-
-type RegistrationStatus = "PENDING" | "APPROVED" | "REJECTED" | "WAITLISTED";
 
 type TeamOption = {
   id: string;
@@ -18,14 +15,10 @@ type TeamOption = {
 
 type PlayerRegistration = {
   id: string;
-  status: RegistrationStatus;
-  notes: string | null;
-  registeredAt: string;
   team: {
     id: string;
     name: string;
     shortName: string;
-    logo: string | null;
   } | null;
   player: {
     id: string;
@@ -50,32 +43,13 @@ type LeaguePayload = {
     name: string;
     season: string;
     year: number;
-    playerRegistrationStatus: "OPEN" | "CLOSED";
-    registrationOpenDate: string | null;
-    registrationCloseDate: string | null;
-    parentLeague: {
-      id: string;
-      name: string;
-      season: string;
-      year: number;
-    } | null;
+    parentLeague: { id: string; name: string; season: string; year: number } | null;
     teams: TeamOption[];
     playerRegistrations: PlayerRegistration[];
   };
 };
 
-const STATUS_STYLES: Record<RegistrationStatus, string> = {
-  PENDING: "bg-yellow-100 text-yellow-800",
-  APPROVED: "bg-emerald-100 text-emerald-700",
-  REJECTED: "bg-red-100 text-red-700",
-  WAITLISTED: "bg-slate-100 text-slate-700",
-};
-
-export default function LeaguePlayerManagementPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default function LeaguePlayerManagementPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [league, setLeague] = useState<LeaguePayload["league"] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -89,7 +63,7 @@ export default function LeaguePlayerManagementPage({
       const res = await fetch(`/api/leagues/${id}`);
       const data: LeaguePayload = await res.json();
       if (!res.ok) {
-        setError((data as { error?: string }).error || "Failed to load league player management");
+        setError((data as { error?: string }).error || "Failed to load");
         return;
       }
       setLeague(data.league);
@@ -100,84 +74,12 @@ export default function LeaguePlayerManagementPage({
     }
   };
 
-  useEffect(() => {
-    loadLeague();
-  }, [id]);
+  useEffect(() => { loadLeague(); }, [id]);
 
-  const approvedTeams = useMemo(
-    () => (league?.teams || []).filter((team) => team.status === "APPROVED"),
+  const assignableTeams = useMemo(
+    () => (league?.teams || []).filter((team) => ["ACTIVE", "APPROVED"].includes(team.status)),
     [league]
   );
-
-  const counts = useMemo(() => {
-    const registrations = league?.playerRegistrations || [];
-    return {
-      total: registrations.length,
-      pending: registrations.filter((item) => item.status === "PENDING").length,
-      approved: registrations.filter((item) => item.status === "APPROVED").length,
-      assigned: registrations.filter((item) => item.team).length,
-    };
-  }, [league]);
-
-  const updateLeagueRegistration = async (playerRegistrationStatus: "OPEN" | "CLOSED") => {
-    setBusyKey("league-registration");
-    setError("");
-    try {
-      const res = await fetch(`/api/leagues/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerRegistrationStatus }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "Failed to update player registration state");
-        return;
-      }
-      setLeague((current) =>
-        current
-          ? {
-              ...current,
-              playerRegistrationStatus: data.league.playerRegistrationStatus,
-            }
-          : current
-      );
-    } catch {
-      setError("Failed to update player registration state");
-    } finally {
-      setBusyKey(null);
-    }
-  };
-
-  const updateRegistrationStatus = async (playerId: string, status: RegistrationStatus) => {
-    setBusyKey(`status-${playerId}-${status}`);
-    setError("");
-    try {
-      const res = await fetch(`/api/leagues/${id}/players`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerId, status }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "Failed to update player registration");
-        return;
-      }
-      setLeague((current) =>
-        current
-          ? {
-              ...current,
-              playerRegistrations: current.playerRegistrations.map((item) =>
-                item.player.id === playerId ? data.registration : item
-              ),
-            }
-          : current
-      );
-    } catch {
-      setError("Failed to update player registration");
-    } finally {
-      setBusyKey(null);
-    }
-  };
 
   const assignTeam = async (playerId: string, teamId: string) => {
     setBusyKey(`assign-${playerId}`);
@@ -186,16 +88,10 @@ export default function LeaguePlayerManagementPage({
       const res = await fetch(`/api/leagues/${id}/players/${playerId}/assign-team`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          teamId: teamId || null,
-          status: teamId ? "APPROVED" : "PENDING",
-        }),
+        body: JSON.stringify({ teamId: teamId || null, status: teamId ? "APPROVED" : "PENDING" }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "Failed to assign player to team");
-        return;
-      }
+      if (!res.ok) { setError(data.error || "Failed to assign player to team"); return; }
       setLeague((current) =>
         current
           ? {
@@ -215,186 +111,110 @@ export default function LeaguePlayerManagementPage({
 
   if (loading) {
     return (
-      <div className="space-y-4 animate-pulse">
-        <div className="h-10 w-72 rounded bg-gray-200" />
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          {[1, 2, 3, 4].map((item) => (
-            <div key={item} className="h-24 rounded-xl bg-gray-100" />
-          ))}
-        </div>
-        <div className="h-72 rounded-2xl bg-gray-100" />
+      <div className="space-y-4">
+        <div className="h-10 w-72 rounded bg-[#1b3656] animate-pulse" />
+        <div className="h-72 rounded bg-[#001c3a] animate-pulse" />
       </div>
     );
   }
 
   if (!league) {
-    return <div className="rounded-xl border bg-white p-6 text-sm text-red-600">{error || "League not found"}</div>;
+    return <div className="border border-red-500/30 bg-red-900/20 p-6 text-sm text-red-400">{error || "League not found"}</div>;
   }
+
+  const assigned = league.playerRegistrations.filter((r) => r.team).length;
 
   return (
     <div className="space-y-6">
-      <div className="section-banner rounded-[2rem] px-5 py-6 text-white sm:px-6 sm:py-7">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <Link href={`/admin/leagues/${id}`} className="text-sm text-[#c8c8b0] hover:text-white">
-              ← {league.name}
-            </Link>
-            <h1 className="mt-2 text-2xl font-bold sm:text-3xl">Player Management</h1>
-            <p className="mt-2 text-sm text-[#d6d9df]">
-              {league.parentLeague ? `${league.parentLeague.name} · ` : ""}
-              {league.season} {league.year} season squad control, approvals, and assignments.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant={league.playerRegistrationStatus === "OPEN" ? "success" : "outline"}
-              size="sm"
-              loading={busyKey === "league-registration" && league.playerRegistrationStatus !== "OPEN"}
-              onClick={() => updateLeagueRegistration("OPEN")}
-            >
-              Open Player Registration
-            </Button>
-            <Button
-              variant={league.playerRegistrationStatus === "CLOSED" ? "danger" : "outline"}
-              size="sm"
-              loading={busyKey === "league-registration" && league.playerRegistrationStatus !== "CLOSED"}
-              onClick={() => updateLeagueRegistration("CLOSED")}
-            >
-              Close Player Registration
-            </Button>
-          </div>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-3 text-xs uppercase tracking-[0.14em] text-[#c8c8b0]">
-          <span>Player registration: {league.playerRegistrationStatus}</span>
-          <span>
-            Window: {league.registrationOpenDate ? new Date(league.registrationOpenDate).toLocaleDateString() : "Manual"} to{" "}
-            {league.registrationCloseDate ? new Date(league.registrationCloseDate).toLocaleDateString() : "Manual"}
-          </span>
-          <span>Approved teams available: {approvedTeams.length}</span>
-        </div>
+      <div className="border border-white/10 bg-[#001c3a] px-6 py-6">
+        <Link href={`/admin/leagues/${id}`} className="text-xs font-black uppercase tracking-[0.18em] text-[#9bb2d1] hover:text-white">
+          ← {league.name}
+        </Link>
+        <h1 className="mt-3 font-[var(--font-display)] text-3xl font-black uppercase tracking-tight text-white">
+          Player Squad
+        </h1>
+        <p className="mt-1 text-sm text-[#9bb2d1]">
+          {league.parentLeague ? `${league.parentLeague.name} · ` : ""}
+          {league.season} {league.year} — assign players to teams.
+        </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {[
-          { label: "Registrations", value: counts.total },
-          { label: "Pending Review", value: counts.pending },
-          { label: "Approved", value: counts.approved },
-          { label: "Assigned to Teams", value: counts.assigned },
+          { label: "Total players", value: league.playerRegistrations.length },
+          { label: "Assigned to team", value: assigned },
+          { label: "Unassigned", value: league.playerRegistrations.length - assigned },
         ].map((item) => (
-          <div key={item.label} className="rounded-xl border bg-white p-4">
-            <div className="text-2xl font-bold text-gray-900">{item.value}</div>
-            <div className="text-sm text-gray-500">{item.label}</div>
+          <div key={item.label} className="border border-white/10 bg-[#001c3a] px-5 py-4">
+            <p className="font-[var(--font-display)] text-3xl font-black text-white">{item.value}</p>
+            <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">{item.label}</p>
           </div>
         ))}
       </div>
 
-      {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+      {error && (
+        <div className="border border-red-500/30 bg-red-900/20 px-4 py-3 text-sm text-red-400">{error}</div>
+      )}
 
-      <div className="overflow-hidden rounded-2xl border bg-white">
-        <div className="flex items-center justify-between border-b px-5 py-4">
-          <div>
-            <h2 className="font-bold text-gray-900">Season Player Pool</h2>
-            <p className="text-sm text-gray-500">
-              Approve registrations, assign players to approved teams, and keep each season squad scoped to this league.
-            </p>
-          </div>
+      <div className="border border-white/10 bg-[#001c3a]">
+        <div className="border-b border-white/10 px-5 py-4">
+          <h2 className="font-[var(--font-display)] text-2xl font-black uppercase tracking-tight text-white">
+            Squad assignment
+          </h2>
+          <p className="mt-1 text-sm text-[#9bb2d1]">
+            Assign each player to a team in this competition.
+          </p>
         </div>
 
         {league.playerRegistrations.length === 0 ? (
-          <div className="px-5 py-12 text-center text-sm text-gray-500">
-            No player registrations yet for this season.
+          <div className="px-5 py-12 text-center text-sm text-[#9bb2d1]">
+            No players in this competition yet.
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] text-sm">
-              <thead className="bg-gray-50 text-xs uppercase tracking-[0.12em] text-gray-500">
-                <tr>
-                  <th className="px-4 py-3 text-left">Player</th>
-                  <th className="px-4 py-3 text-left">Season Role</th>
-                  <th className="px-4 py-3 text-left">Current Team</th>
-                  <th className="px-4 py-3 text-left">Assign Team</th>
-                  <th className="px-4 py-3 text-left">Status</th>
-                  <th className="px-4 py-3 text-left">Actions</th>
+            <table className="w-full min-w-[640px] text-sm">
+              <thead>
+                <tr className="border-b border-white/10 text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
+                  <th className="px-5 py-3 text-left">Player</th>
+                  <th className="px-5 py-3 text-left">Role</th>
+                  <th className="px-5 py-3 text-left">Base team</th>
+                  <th className="px-5 py-3 text-left">Assign to team</th>
                 </tr>
               </thead>
-              <tbody>
-                {league.playerRegistrations.map((registration) => (
-                  <tr key={registration.id} className="border-t border-gray-100 align-top">
-                    <td className="px-4 py-4">
+              <tbody className="divide-y divide-white/5">
+                {league.playerRegistrations.map((reg) => (
+                  <tr key={reg.id} className="align-middle">
+                    <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
-                        {registration.player.user.profileImage ? (
-                          <img
-                            src={registration.player.user.profileImage}
-                            alt={registration.player.user.name}
-                            className="h-10 w-10 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[color:var(--card-muted)] text-sm font-bold text-[color:var(--primary-dark)]">
-                            {registration.player.user.name.charAt(0)}
-                          </div>
-                        )}
+                        <div className="flex h-9 w-9 items-center justify-center bg-[#12324d] text-sm font-black text-white">
+                          {reg.player.user.name.charAt(0)}
+                        </div>
                         <div>
-                          <div className="font-semibold text-gray-900">{registration.player.user.name}</div>
-                          <div className="text-xs text-gray-500">{registration.player.user.email}</div>
+                          <p className="font-bold uppercase tracking-[0.08em] text-white">{reg.player.user.name}</p>
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#9bb2d1]">{reg.player.user.email}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-4 text-gray-600">{registration.player.role.replaceAll("_", " ")}</td>
-                    <td className="px-4 py-4">
-                      <div className="font-medium text-gray-900">
-                        {registration.team?.name || "Unassigned for this season"}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        Base team: {registration.player.team?.name || "None"}
-                      </div>
+                    <td className="px-5 py-4 text-[10px] font-black uppercase tracking-[0.14em] text-[#9bb2d1]">
+                      {reg.player.role.replace(/_/g, " ")}
                     </td>
-                    <td className="px-4 py-4">
+                    <td className="px-5 py-4 text-sm font-bold text-[#d4e3ff]">
+                      {reg.player.team?.name || <span className="text-[#9bb2d1]">None</span>}
+                    </td>
+                    <td className="px-5 py-4">
                       <select
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                        value={registration.team?.id || ""}
-                        disabled={busyKey === `assign-${registration.player.id}`}
-                        onChange={(event) => assignTeam(registration.player.id, event.target.value)}
+                        className="w-full border border-white/10 bg-[#00142b] px-3 py-2 text-sm font-bold text-white focus:border-[#4ae183] focus:outline-none disabled:opacity-50"
+                        value={reg.team?.id || ""}
+                        disabled={busyKey === `assign-${reg.player.id}`}
+                        onChange={(e) => assignTeam(reg.player.id, e.target.value)}
                       >
                         <option value="">Unassigned</option>
-                        {approvedTeams.map((team) => (
-                          <option key={team.team.id} value={team.team.id}>
-                            {team.team.name} ({team.team.shortName})
+                        {assignableTeams.map((t) => (
+                          <option key={t.team.id} value={t.team.id}>
+                            {t.team.name} ({t.team.shortName})
                           </option>
                         ))}
                       </select>
-                    </td>
-                    <td className="px-4 py-4">
-                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLES[registration.status]}`}>
-                        {registration.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          variant="success"
-                          loading={busyKey === `status-${registration.player.id}-APPROVED`}
-                          onClick={() => updateRegistrationStatus(registration.player.id, "APPROVED")}
-                        >
-                          Approve
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          loading={busyKey === `status-${registration.player.id}-WAITLISTED`}
-                          onClick={() => updateRegistrationStatus(registration.player.id, "WAITLISTED")}
-                        >
-                          Waitlist
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          loading={busyKey === `status-${registration.player.id}-REJECTED`}
-                          onClick={() => updateRegistrationStatus(registration.player.id, "REJECTED")}
-                        >
-                          Reject
-                        </Button>
-                      </div>
                     </td>
                   </tr>
                 ))}

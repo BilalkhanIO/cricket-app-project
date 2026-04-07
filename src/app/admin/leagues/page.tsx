@@ -19,7 +19,7 @@ async function getLeagues() {
 export default async function AdminLeaguesPage() {
   const leagues = await getLeagues();
   const activeCount = leagues.filter((league) => league.status === "ACTIVE").length;
-  const registrationCount = leagues.filter((league) => league.status === "REGISTRATION").length;
+  const setupCount = leagues.filter((league) => ["DRAFT", "REGISTRATION"].includes(league.status)).length;
 
   return (
     <div className="space-y-5">
@@ -29,7 +29,7 @@ export default async function AdminLeaguesPage() {
             <p className="text-xs uppercase tracking-[0.24em] text-[#c8c8b0]">League Operations</p>
             <h1 className="mt-2 text-3xl font-bold tracking-tight">League Management</h1>
             <p className="mt-2 text-sm text-[#c4c6cf]">
-              Create competitions, review registration state, and move into fixture and scoring operations from one control surface.
+              Create tournaments, manage setup, and move into fixtures, scoring, and public match operations from one control surface.
             </p>
           </div>
           <div className="flex gap-3">
@@ -42,14 +42,14 @@ export default async function AdminLeaguesPage() {
               <div className="text-[11px] uppercase tracking-[0.18em] text-[#c4c6cf]">Active</div>
             </div>
             <div className="rounded-[1.25rem] border border-white/10 bg-white/10 px-4 py-3 text-center">
-              <div className="text-2xl font-bold">{registrationCount}</div>
-              <div className="text-[11px] uppercase tracking-[0.18em] text-[#c4c6cf]">Open</div>
+              <div className="text-2xl font-bold">{setupCount}</div>
+              <div className="text-[11px] uppercase tracking-[0.18em] text-[#c4c6cf]">Setup</div>
             </div>
           </div>
         </div>
         <div className="mt-5">
           <Link href="/admin/leagues/new" className="inline-flex items-center rounded-xl bg-[#06bb63] px-4 py-2 text-sm font-semibold text-[#00142b] hover:bg-[#4ae183]">
-            + Create League
+            + Create Tournament
           </Link>
         </div>
       </div>
@@ -59,7 +59,7 @@ export default async function AdminLeaguesPage() {
           <div className="text-center py-16">
             <div className="text-5xl mb-4">🏆</div>
             <h3 className="text-xl font-semibold text-gray-700 mb-2">No Leagues</h3>
-            <Link href="/admin/leagues/new" className="text-[color:var(--primary)] hover:underline">Create your first league →</Link>
+            <Link href="/admin/leagues/new" className="text-[color:var(--primary)] hover:underline">Create your first tournament →</Link>
           </div>
         </Card>
       ) : (

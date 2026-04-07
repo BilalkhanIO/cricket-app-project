@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { StatusBadge } from "@/components/ui/Badge";
 import { formatDate } from "@/lib/utils";
+import PoolConfigEditor from "./PoolConfigEditor";
 
 export const dynamic = 'force-dynamic';
 
@@ -48,10 +49,10 @@ export default async function AdminLeagueDetailPage({ params }: { params: Promis
   const { id } = await params;
   const league = await getLeague(id);
   if (!league) notFound();
-  const approvedTeams = league.teams.filter((team) => team.status === "APPROVED").length;
-  const pendingTeams = league.teams.filter((team) => team.status === "PENDING").length;
+  const activeTeams = league.teams.filter((team) => ["ACTIVE", "APPROVED"].includes(team.status)).length;
+  const setupTeams = league.teams.length - activeTeams;
   const liveMatches = league.matches.filter((match) => match.status === "LIVE").length;
-  const approvedPlayers = league.playerRegistrations.filter((player) => player.status === "APPROVED").length;
+  const totalSquadPlayers = league.teams.reduce((sum, entry) => sum + entry.team._count.players, 0);
 
   return (
     <div className="space-y-5 sm:space-y-6">
@@ -66,7 +67,7 @@ export default async function AdminLeagueDetailPage({ params }: { params: Promis
             {league.matchFormat} · {league.season} · {formatDate(league.startDate)} to {formatDate(league.endDate)}
           </p>
           <div className="flex flex-wrap gap-3 text-xs uppercase tracking-[0.14em] text-[#c8c8b0]">
-            <span>Player registration: {league.playerRegistrationStatus}</span>
+            <span>Tournament status: {league.status}</span>
             {league.parentLeague && (
               <span>
                 Parent competition: {league.parentLeague.name}
@@ -77,10 +78,10 @@ export default async function AdminLeagueDetailPage({ params }: { params: Promis
         </div>
         <div className="mt-4 grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
           <Link href={`/admin/leagues/${league.id}/teams`} className="inline-flex items-center justify-center bg-[color:var(--primary)] text-white px-3 py-2.5 rounded-xl text-sm font-semibold hover:bg-[color:var(--primary-dark)]">
-            Team Registrations
+            Team Assignment
           </Link>
           <Link href={`/admin/leagues/${league.id}/players`} className="inline-flex items-center justify-center bg-emerald-600 text-white px-3 py-2.5 rounded-xl text-sm font-semibold hover:bg-emerald-700">
-            Player Management
+            Player Assignment
           </Link>
           <Link href={`/admin/leagues/${league.id}/fixtures`} className="inline-flex items-center justify-center bg-[color:var(--primary-dark)] text-white px-3 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#17364e]">
             Generate Fixtures
@@ -105,9 +106,9 @@ export default async function AdminLeagueDetailPage({ params }: { params: Promis
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         {[
-          { label: "Approved Teams", value: approvedTeams, sub: `${pendingTeams} pending` },
+          { label: "Assigned Teams", value: activeTeams, sub: setupTeams > 0 ? `${setupTeams} in setup` : "ready for fixtures" },
           { label: "Matches", value: league.matches.length, sub: `${liveMatches} live` },
-          { label: "Players", value: league.playerRegistrations.length, sub: `${approvedPlayers} approved` },
+          { label: "Squad Players", value: totalSquadPlayers, sub: `${league.teams.length} teams linked` },
           { label: "Season", value: league.season, sub: league.parentLeague ? league.parentLeague.name : league.matchFormat },
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-xl border p-4">
@@ -119,6 +120,8 @@ export default async function AdminLeagueDetailPage({ params }: { params: Promis
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <PoolConfigEditor leagueId={league.id} initialValue={league.poolConfigJson} />
+
         {/* Teams */}
         <Card>
           <CardHeader>
@@ -128,7 +131,7 @@ export default async function AdminLeagueDetailPage({ params }: { params: Promis
           </CardHeader>
           <CardBody className="p-0">
             {league.teams.length === 0 ? (
-              <p className="text-center py-6 text-gray-400 text-sm">No teams registered</p>
+              <p className="text-center py-6 text-gray-400 text-sm">No teams assigned yet</p>
             ) : (
               league.teams.map((tl) => (
                 <div key={tl.id} className="flex items-center justify-between px-4 py-3 border-b border-gray-50 last:border-0">

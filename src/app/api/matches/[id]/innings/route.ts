@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { canScoreMatch } from "@/lib/permissions";
-import { ROLE, isAdminRole } from "@/lib/roles";
+import { ROLE, isAdminRole, normalizeRole } from "@/lib/roles";
 
 export const dynamic = 'force-dynamic';
 
@@ -34,8 +34,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     });
     if (!match) return NextResponse.json({ error: "Match not found" }, { status: 404 });
 
-    const isAdmin = isAdminRole(session.user.role) || session.user.role === ROLE.LEAGUE_STAFF;
-    const isAssignedScorer = session.user.role === ROLE.SCORER && match.scorerId === session.user.id;
+    const effectiveRole = normalizeRole(session.user.role);
+    const isAdmin = isAdminRole(session.user.role);
+    const isAssignedScorer = effectiveRole === ROLE.SCORER && match.scorerId === session.user.id;
     if (!canScoreMatch(session.user.role) && !isAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -65,10 +66,31 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     });
 
     // Update match status to LIVE
-    await prisma.match.update({
+    const updatedMatch = await prisma.match.update({
       where: { id },
       data: { status: "LIVE" },
+      include: {
+        homeTeam: { select: { name: true, shortName: true, managerId: true } },
+        awayTeam: { select: { name: true, shortName: true, managerId: true } },
+      },
     });
+
+    // Notify team managers when first innings starts
+    if (inningsNumber === 1) {
+      const managerIds = [updatedMatch.homeTeam.managerId, updatedMatch.awayTeam.managerId].filter(Boolean) as string[];
+      if (managerIds.length > 0) {
+        await prisma.notification.createMany({
+          data: managerIds.map((uid) => ({
+            userId: uid,
+            matchId: id,
+            type: "MATCH_STARTED",
+            title: "Match is now live",
+            message: `${updatedMatch.homeTeam.shortName} vs ${updatedMatch.awayTeam.shortName} has started.`,
+          })),
+          skipDuplicates: true,
+        }).catch(() => {});
+      }
+    }
 
     return NextResponse.json({ innings }, { status: 201 });
   } catch (error) {

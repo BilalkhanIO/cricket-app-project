@@ -1,12 +1,41 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarDays, ShieldCheck, Trophy, Users } from "lucide-react";
 import prisma from "@/lib/prisma";
 import PublicShell from "@/components/layout/PublicShell";
 import PlayerStatsCharts from "./PlayerStatsCharts";
+import ShareButton from "@/components/ui/ShareButton";
 import { OVERALL_LEAGUE_KEY } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const player = await prisma.player.findUnique({
+    where: { id },
+    select: {
+      user: { select: { name: true, battingStyle: true, bowlingStyle: true } },
+      team: { select: { name: true } },
+      role: true,
+    },
+  });
+  if (!player) return { title: "Player Not Found — CricketLeague" };
+
+  const title = `${player.user.name} — ${player.team?.name ?? "Cricket"} | CricketLeague`;
+  const parts = [player.role, player.user.battingStyle, player.user.bowlingStyle].filter(Boolean);
+  const description = `${player.user.name} cricket profile${player.team ? ` · ${player.team.name}` : ""}${parts.length ? ` · ${parts.join(" · ")}` : ""}. Stats, match history, and records.`;
+
+  const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+  const ogImage = `${baseUrl}/api/og/player/${id}`;
+
+  return {
+    title,
+    description,
+    openGraph: { title, description, type: "profile", images: [{ url: ogImage, width: 1200, height: 630 }] },
+    twitter: { card: "summary_large_image", title, description, images: [ogImage] },
+  };
+}
 
 async function getPlayer(id: string) {
   return prisma.player.findUnique({
@@ -147,15 +176,27 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {player.isCaptain && <span className="bg-[#c8c8b0] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#303221]">Captain</span>}
                   {player.isViceCaptain && <span className="bg-[#12324d] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#d4e3ff]">Vice captain</span>}
                   {player.isWicketkeeper && <span className="bg-[#1b3656] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-white">Wicketkeeper</span>}
                   {player.jerseyNumber && <span className="bg-[#12324d] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#d4e3ff]">#{player.jerseyNumber}</span>}
+                  {player.availabilityStatus && player.availabilityStatus !== "AVAILABLE" && (
+                    <span className={`px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${
+                      player.availabilityStatus === "INJURED"
+                        ? "bg-[#93000a] text-[#ffdad6]"
+                        : "bg-[#3a2e00] text-[#fbbf24]"
+                    }`}>
+                      {player.availabilityStatus.replace(/_/g, " ")}
+                    </span>
+                  )}
+                  <ShareButton label="Share profile" />
                 </div>
 
                 <p className="max-w-2xl text-sm leading-7 text-[#9bb2d1]">
-                  Public player profile with overall career numbers, league-by-league production, recent batting and bowling returns, awards, and team context.
+                  {player.user.battingStyle || player.user.bowlingStyle
+                    ? [player.user.battingStyle, player.user.bowlingStyle].filter(Boolean).join(" · ")
+                    : `Career stats, match history, awards, and team information for ${player.user.name}.`}
                 </p>
 
                 <div className="grid gap-3 sm:grid-cols-2">

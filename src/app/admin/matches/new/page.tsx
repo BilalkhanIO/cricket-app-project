@@ -93,7 +93,7 @@ export default function NewMatchPage() {
         <div className="rounded-2xl border border-[color:var(--border-color)] bg-[color:var(--card-muted)] px-4 py-4 text-sm text-[color:var(--color-ink)]">
           Flow:
           <div className="mt-2 grid gap-1 text-xs text-[color:var(--color-ink-soft)]">
-            <p>1. Select a league and two approved teams.</p>
+            <p>1. Select a league and two assigned teams.</p>
             <p>2. Pick a scorer now or leave it unassigned.</p>
             <p>3. Use the matches board to reassign the scorer any time.</p>
             <p>4. The scorer console stays private; the public match center updates automatically.</p>

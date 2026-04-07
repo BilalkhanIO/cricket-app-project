@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { jsonWithCors, optionsWithCors } from "@/lib/api-cors";
 import prisma from "@/lib/prisma";
 import { canCreateLeague } from "@/lib/permissions";
-import { ROLE } from "@/lib/roles";
+import { ROLE, type UserRole } from "@/lib/roles";
 
 export const dynamic = 'force-dynamic';
 
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Assigned scorer is not available" }, { status: 400 });
       }
 
-      if (![ROLE.SCORER, ROLE.LEAGUE_ADMIN, ROLE.SUPER_ADMIN].includes(scorer.role as typeof ROLE[keyof typeof ROLE])) {
+      if (!([ROLE.SCORER, ROLE.LEAGUE_ADMIN, ROLE.SUPER_ADMIN] as string[]).includes(scorer.role)) {
         return NextResponse.json({ error: "Assigned user does not have scorer permissions" }, { status: 400 });
       }
     }

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 
 import { jsonWithCors, optionsWithCors } from "@/lib/api-cors";
+import { getQualificationStatus } from "@/lib/pools";
 import prisma from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -26,7 +27,11 @@ export async function GET(
   try {
     const { id } = await params;
 
-    const [pointsTable, matches] = await Promise.all([
+    const [league, pointsTable, matches] = await Promise.all([
+      prisma.league.findUnique({
+        where: { id },
+        select: { poolConfigJson: true },
+      }),
       prisma.pointsTable.findMany({
         where: { leagueId: id },
         include: {
@@ -46,11 +51,22 @@ export async function GET(
       }),
     ]);
 
+    const groupedRows = pointsTable.reduce<Record<string, typeof pointsTable>>((accumulator, row) => {
+      const key = row.group || "Overall";
+      if (!accumulator[key]) accumulator[key] = [];
+      accumulator[key].push(row);
+      return accumulator;
+    }, {});
+
     return jsonWithCors(req, {
-      pointsTable: pointsTable.map((row) => ({
-        ...row,
-        formGuide: getFormGuide(row.teamId, matches),
-      })),
+      pointsTable: Object.entries(groupedRows).flatMap(([groupName, rows]) =>
+        rows.map((row, index) => ({
+          ...row,
+          groupName,
+          qualificationStatus: getQualificationStatus(index, rows.length, groupName, league?.poolConfigJson),
+          formGuide: getFormGuide(row.teamId, matches),
+        }))
+      ),
     });
   } catch {
     return jsonWithCors(req, { error: "Failed to fetch points table" }, { status: 500 });

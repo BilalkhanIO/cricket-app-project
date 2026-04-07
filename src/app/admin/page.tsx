@@ -66,7 +66,7 @@ async function getDashboardStats() {
     select: { matchDate: true, status: true },
   });
 
-  // Player registration trend (last 6 months)
+  // Player growth trend (last 6 months)
   const recentPlayers = await prisma.player.findMany({
     where: { createdAt: { gte: sixMonthsAgo } },
     select: { createdAt: true },
@@ -134,7 +134,7 @@ export default async function AdminDashboard() {
     { label: "Live Now", value: stats.liveMatches.length, icon: "⚡", href: "/admin/matches?status=LIVE", color: "bg-red-50 border-red-100" },
     { label: "Upcoming", value: stats.upcomingMatches, icon: "📆", href: "/admin/matches?status=UPCOMING", color: "bg-sky-50 border-sky-100" },
     { label: "Completed", value: stats.completedMatches, icon: "✅", href: "/admin/matches?status=COMPLETED", color: "bg-emerald-50 border-emerald-100" },
-    { label: "Pending Approvals", value: stats.pendingTeams, icon: "⏳", href: "/admin/teams?pending=true", color: "bg-yellow-50 border-yellow-100" },
+    { label: "Pending Team Rows", value: stats.pendingTeams, icon: "⏳", href: "/admin/teams?pending=true", color: "bg-yellow-50 border-yellow-100" },
     { label: "Registered Users", value: stats.usersCount, icon: "👥", href: "/admin/users", color: "bg-indigo-50 border-indigo-100" },
   ];
 

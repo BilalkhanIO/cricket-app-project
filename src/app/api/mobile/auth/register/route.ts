@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import { jsonWithCors, optionsWithCors } from "@/lib/api-cors";
 import prisma from "@/lib/prisma";
 import { createMobileAccessToken } from "@/lib/mobile-auth";
-import { ROLE, canSelfRegister } from "@/lib/roles";
+import { ROLE, canSelfRegister, normalizeRole } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const requestedRole = role || ROLE.FAN;
+    const requestedRole = normalizeRole(role || ROLE.VIEWER) || ROLE.VIEWER;
     if (!canSelfRegister(requestedRole)) {
       return jsonWithCors(
         req,

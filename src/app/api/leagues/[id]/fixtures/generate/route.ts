@@ -56,6 +56,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     matchTimeMinute = 0,
     daysBetweenMatches = 2,
     stage = "GROUP",
+    useAssignedGroups = true,
   } = body;
 
   if (!teamIds || teamIds.length < 2) {
@@ -65,14 +66,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const league = await prisma.league.findUnique({ where: { id } });
   if (!league) return NextResponse.json({ error: "League not found" }, { status: 404 });
 
-  const approvedEntries = await prisma.teamLeague.findMany({
-    where: { leagueId: id, status: "APPROVED" },
-    select: { teamId: true },
+  const activeEntries = await prisma.teamLeague.findMany({
+    where: { leagueId: id, status: { in: ["ACTIVE", "APPROVED"] } },
+    select: { teamId: true, group: true },
   });
-  const approvedTeamIds = new Set(approvedEntries.map((entry) => entry.teamId));
-  if (!teamIds.every((teamId: string) => approvedTeamIds.has(teamId))) {
+  const eligibleTeamIds = new Set(activeEntries.map((entry) => entry.teamId));
+  if (!teamIds.every((teamId: string) => eligibleTeamIds.has(teamId))) {
     return NextResponse.json(
-      { error: "All selected teams must be approved for this league" },
+      { error: "All selected teams must be assigned to this league before fixtures can be generated" },
       { status: 400 }
     );
   }
@@ -80,19 +81,66 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Duplicate teams are not allowed" }, { status: 400 });
   }
 
-  let matchPairs: [string, string][] = [];
+  const groupMap = new Map(activeEntries.map((entry) => [entry.teamId, entry.group || "Ungrouped"]));
+  let matchPairs: Array<{ homeTeamId: string; awayTeamId: string; groupName: string | null }> = [];
 
   if (type === "ROUND_ROBIN") {
-    const rounds = generateRoundRobin(teamIds);
-    matchPairs = rounds.flat();
+    if (stage === "GROUP" && useAssignedGroups) {
+      const groupedTeamIds = teamIds.reduce((accumulator: Record<string, string[]>, teamId: string) => {
+        const groupName = groupMap.get(teamId) || "Ungrouped";
+        if (!accumulator[groupName]) accumulator[groupName] = [];
+        accumulator[groupName].push(teamId);
+        return accumulator;
+      }, {} as Record<string, string[]>);
+
+      matchPairs = Object.entries(groupedTeamIds).flatMap(([groupName, ids]) =>
+        generateRoundRobin(ids as string[]).flat().map(([homeTeamId, awayTeamId]) => ({
+          homeTeamId,
+          awayTeamId,
+          groupName,
+        }))
+      );
+    } else {
+      matchPairs = generateRoundRobin(teamIds).flat().map(([homeTeamId, awayTeamId]) => ({
+        homeTeamId,
+        awayTeamId,
+        groupName: null,
+      }));
+    }
   } else if (type === "DOUBLE_ROUND_ROBIN") {
-    const rounds = generateRoundRobin(teamIds);
-    const homeAway = rounds.flat();
-    // reverse home/away for second leg
-    const returnLeg: [string, string][] = homeAway.map(([h, a]) => [a, h]);
-    matchPairs = [...homeAway, ...returnLeg];
+    const groupedSets =
+      stage === "GROUP" && useAssignedGroups
+        ? Object.values(
+            teamIds.reduce((accumulator: Record<string, string[]>, teamId: string) => {
+              const groupName = groupMap.get(teamId) || "Ungrouped";
+              if (!accumulator[groupName]) accumulator[groupName] = [];
+              accumulator[groupName].push(teamId);
+              return accumulator;
+            }, {} as Record<string, string[]>)
+          )
+        : [teamIds];
+
+    matchPairs = groupedSets.flatMap((ids) => {
+      const groupName = groupMap.get(ids[0]) || null;
+      const rounds = generateRoundRobin(ids);
+      const firstLeg = rounds.flat().map(([homeTeamId, awayTeamId]) => ({
+        homeTeamId,
+        awayTeamId,
+        groupName,
+      }));
+      const returnLeg = rounds.flat().map(([homeTeamId, awayTeamId]) => ({
+        homeTeamId: awayTeamId,
+        awayTeamId: homeTeamId,
+        groupName,
+      }));
+      return [...firstLeg, ...returnLeg];
+    });
   } else if (type === "KNOCKOUT") {
-    matchPairs = generateKnockout(teamIds);
+    matchPairs = generateKnockout(teamIds).map(([homeTeamId, awayTeamId]) => ({
+      homeTeamId,
+      awayTeamId,
+      groupName: null,
+    }));
   }
 
   // Schedule matches from startDate with daysBetweenMatches gap
@@ -104,7 +152,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const existingCount = await prisma.match.count({ where: { leagueId: id } });
 
   for (let i = 0; i < matchPairs.length; i++) {
-    const [homeTeamId, awayTeamId] = matchPairs[i];
+    const { homeTeamId, awayTeamId, groupName } = matchPairs[i];
     const matchDate = new Date(base);
     matchDate.setDate(base.getDate() + i * daysBetweenMatches);
     matchDate.setHours(matchTimeHour, matchTimeMinute, 0, 0);
@@ -119,6 +167,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         matchFormat: league.matchFormat,
         overs: league.oversPerInnings,
         stage,
+        groupName,
         matchNumber: existingCount + matchNumber,
         status: "UPCOMING",
       },

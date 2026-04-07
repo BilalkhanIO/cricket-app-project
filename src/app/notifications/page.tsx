@@ -24,8 +24,8 @@ const typeIcon: Record<string, string> = {
   ANNOUNCEMENT:      "📢",
   FIXTURE_PUBLISHED: "📅",
   INNINGS_BREAK:     "☕",
-  TEAM_APPROVED:     "👕",
-  LEAGUE_REGISTRATION: "🏆",
+  SCHEDULE_UPDATED:  "🗓️",
+  TEAM_ANNOUNCEMENT: "👥",
   MATCH_REMINDER:    "⏰",
 };
 

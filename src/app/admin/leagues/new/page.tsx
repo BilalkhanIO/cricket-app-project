@@ -23,8 +23,6 @@ export default function NewLeaguePage() {
     year: new Date().getFullYear(),
     startDate: "",
     endDate: "",
-    registrationOpenDate: "",
-    registrationCloseDate: "",
     tournamentType: "ROUND_ROBIN",
     matchFormat: "T20",
     maxTeams: 8,
@@ -35,10 +33,16 @@ export default function NewLeaguePage() {
     pointsPerNoResult: 1,
     squadSizeLimit: 15,
     playingXISize: 11,
+    poolConfigJson: JSON.stringify(
+      [
+        { name: "Pool A", qualificationSlots: 2 },
+        { name: "Pool B", qualificationSlots: 2 },
+      ],
+      null,
+      2,
+    ),
     superOverEnabled: true,
-    allowMultiTeamPlayers: false,
-    playerRegistrationStatus: "OPEN",
-    status: "REGISTRATION",
+    status: "DRAFT",
   });
 
   useEffect(() => {
@@ -91,7 +95,7 @@ export default function NewLeaguePage() {
     <div className="max-w-3xl">
       <div className="flex items-center gap-3 mb-6">
         <button onClick={() => router.back()} className="text-gray-500 hover:text-gray-700 text-sm">← Back</button>
-        <h1 className="text-2xl font-bold text-gray-900">Create New League</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Create Tournament</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
@@ -120,10 +124,6 @@ export default function NewLeaguePage() {
             <div className="grid grid-cols-2 gap-4">
               <Input label="Start Date *" name="startDate" type="date" value={form.startDate} onChange={handleChange} required />
               <Input label="End Date *" name="endDate" type="date" value={form.endDate} onChange={handleChange} required />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <Input label="Player Registration Open" name="registrationOpenDate" type="date" value={form.registrationOpenDate} onChange={handleChange} />
-              <Input label="Player Registration Close" name="registrationCloseDate" type="date" value={form.registrationCloseDate} onChange={handleChange} />
             </div>
           </CardBody>
         </Card>
@@ -163,33 +163,23 @@ export default function NewLeaguePage() {
               <Input label="Points/No Result" name="pointsPerNoResult" type="number" value={form.pointsPerNoResult} onChange={handleChange} min={0} max={3} />
             </div>
             <Select label="Status" name="status" value={form.status} onChange={handleChange}
-              options={[
-                { value: "DRAFT", label: "Draft" },
-                { value: "REGISTRATION", label: "Open for Registration" },
-                { value: "ACTIVE", label: "Active" },
-              ]}
-            />
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <Select
-                label="Player Registration"
-                name="playerRegistrationStatus"
-                value={form.playerRegistrationStatus}
-                onChange={handleChange}
                 options={[
-                  { value: "OPEN", label: "Open" },
-                  { value: "CLOSED", label: "Closed" },
+                  { value: "DRAFT", label: "Draft" },
+                  { value: "REGISTRATION", label: "Setup in Progress" },
+                  { value: "ACTIVE", label: "Active" },
                 ]}
               />
-              <label className="flex items-center gap-3 rounded-2xl border border-[color:var(--border-color)] bg-[color:var(--card-bg)] px-4 py-3 text-sm font-medium text-[color:var(--color-ink)]">
-                <input
-                  type="checkbox"
-                  name="allowMultiTeamPlayers"
-                  checked={form.allowMultiTeamPlayers}
-                  onChange={handleChange}
-                />
-                Allow players from already-registered squads
-              </label>
-            </div>
+            <Textarea
+              label="Pool Configuration JSON"
+              name="poolConfigJson"
+              value={form.poolConfigJson}
+              onChange={handleChange}
+              rows={6}
+              placeholder='[{"name":"Pool A","qualificationSlots":2}]'
+            />
+            <p className="text-xs text-gray-500">
+              Optional. Use this when the league runs multiple pools or groups. Standings qualification uses these slots per pool.
+            </p>
           </CardBody>
         </Card>
 

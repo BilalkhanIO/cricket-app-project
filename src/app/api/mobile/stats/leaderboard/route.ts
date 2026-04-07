@@ -13,14 +13,137 @@ export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url);
         const type = searchParams.get("type") || "batting";
-        const leagueId = searchParams.get("leagueId");
+        const leagueId = searchParams.get("leagueId") || undefined;
         const limit = Math.min(Number(searchParams.get("limit") || 20), 50);
+
+        const leagueFilter = leagueId ? { leagueId } : {};
+
+        if (type === "sixes") {
+            const players = await prisma.playerStats.findMany({
+                where: { sixes: { gt: 0 }, ...leagueFilter },
+                include: {
+                    player: {
+                        include: {
+                            user: { select: { name: true, profileImage: true } },
+                            team: { select: { id: true, name: true, shortName: true, logo: true } },
+                        },
+                    },
+                },
+                orderBy: [{ sixes: "desc" }, { runs: "desc" }],
+                take: limit,
+            });
+            return jsonWithCors(req, {
+                type: "sixes",
+                leaderboard: players.map((s, i) => ({
+                    rank: i + 1,
+                    playerId: s.playerId,
+                    playerName: s.player.user.name,
+                    playerImage: s.player.user.profileImage,
+                    team: s.player.team,
+                    matches: s.matchesPlayed,
+                    sixes: s.sixes,
+                    runs: s.runs,
+                    innings: s.innings,
+                })),
+            });
+        }
+
+        if (type === "average") {
+            const players = await prisma.playerStats.findMany({
+                where: { innings: { gte: 3 }, average: { gt: 0 }, ...leagueFilter },
+                include: {
+                    player: {
+                        include: {
+                            user: { select: { name: true, profileImage: true } },
+                            team: { select: { id: true, name: true, shortName: true, logo: true } },
+                        },
+                    },
+                },
+                orderBy: [{ average: "desc" }, { runs: "desc" }],
+                take: limit,
+            });
+            return jsonWithCors(req, {
+                type: "average",
+                leaderboard: players.map((s, i) => ({
+                    rank: i + 1,
+                    playerId: s.playerId,
+                    playerName: s.player.user.name,
+                    playerImage: s.player.user.profileImage,
+                    team: s.player.team,
+                    matches: s.matchesPlayed,
+                    innings: s.innings,
+                    average: s.average,
+                    runs: s.runs,
+                    highestScore: s.highestScore,
+                })),
+            });
+        }
+
+        if (type === "strikeRate") {
+            const players = await prisma.playerStats.findMany({
+                where: { innings: { gte: 3 }, strikeRate: { gt: 0 }, ...leagueFilter },
+                include: {
+                    player: {
+                        include: {
+                            user: { select: { name: true, profileImage: true } },
+                            team: { select: { id: true, name: true, shortName: true, logo: true } },
+                        },
+                    },
+                },
+                orderBy: [{ strikeRate: "desc" }, { runs: "desc" }],
+                take: limit,
+            });
+            return jsonWithCors(req, {
+                type: "strikeRate",
+                leaderboard: players.map((s, i) => ({
+                    rank: i + 1,
+                    playerId: s.playerId,
+                    playerName: s.player.user.name,
+                    playerImage: s.player.user.profileImage,
+                    team: s.player.team,
+                    matches: s.matchesPlayed,
+                    innings: s.innings,
+                    strikeRate: s.strikeRate,
+                    runs: s.runs,
+                })),
+            });
+        }
+
+        if (type === "economy") {
+            const players = await prisma.playerStats.findMany({
+                where: { oversBowled: { gt: 2 }, economy: { gt: 0 }, ...leagueFilter },
+                include: {
+                    player: {
+                        include: {
+                            user: { select: { name: true, profileImage: true } },
+                            team: { select: { id: true, name: true, shortName: true, logo: true } },
+                        },
+                    },
+                },
+                orderBy: [{ economy: "asc" }, { wickets: "desc" }],
+                take: limit,
+            });
+            return jsonWithCors(req, {
+                type: "economy",
+                leaderboard: players.map((s, i) => ({
+                    rank: i + 1,
+                    playerId: s.playerId,
+                    playerName: s.player.user.name,
+                    playerImage: s.player.user.profileImage,
+                    team: s.player.team,
+                    matches: s.matchesPlayed,
+                    economy: s.economy,
+                    wickets: s.wickets,
+                    oversBowled: s.oversBowled,
+                })),
+            });
+        }
 
         if (type === "bowling") {
             const bowlers = await prisma.playerStats.findMany({
                 where: {
                     wickets: { gt: 0 },
-                    ...(leagueId && { leagueId }),
+                    ...leagueFilter,
                 },
                 include: {
                     player: {
@@ -53,10 +176,7 @@ export async function GET(req: NextRequest) {
         }
 
         const batsmen = await prisma.playerStats.findMany({
-            where: {
-                runs: { gt: 0 },
-                ...(leagueId && { leagueId }),
-            },
+            where: { runs: { gt: 0 }, ...leagueFilter },
             include: {
                 player: {
                     include: {

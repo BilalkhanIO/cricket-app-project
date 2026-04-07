@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -11,10 +12,35 @@ import {
   Users,
 } from "lucide-react";
 import prisma from "@/lib/prisma";
+import { getQualificationSlotsForPool, getQualificationStatus } from "@/lib/pools";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import PublicShell from "@/components/layout/PublicShell";
+import ShareButton from "@/components/ui/ShareButton";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const league = await prisma.league.findUnique({
+    where: { id },
+    select: { name: true, season: true, matchFormat: true, description: true },
+  });
+  if (!league) return { title: "League Not Found — CricketLeague" };
+
+  const title = `${league.name} ${league.season} — CricketLeague`;
+  const description = league.description || `${league.matchFormat ?? "Cricket"} tournament — standings, fixtures, teams, and stats for ${league.name} ${league.season}.`;
+
+  const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+  // Use standings snapshot as OG image (more data-rich than generic league card)
+  const ogImage = `${baseUrl}/api/og/standings/${id}`;
+
+  return {
+    title,
+    description,
+    openGraph: { title, description, type: "website", images: [{ url: ogImage, width: 1200, height: 630 }] },
+    twitter: { card: "summary_large_image", title, description, images: [ogImage] },
+  };
+}
 
 async function getLeague(id: string) {
   return prisma.league.findUnique({
@@ -36,7 +62,7 @@ async function getLeague(id: string) {
             },
           },
         },
-        where: { status: "APPROVED" },
+        where: { status: { in: ["ACTIVE", "APPROVED"] } },
       },
       matches: {
         include: {
@@ -101,6 +127,22 @@ function formatLabel(value: string) {
   return value.replace(/_/g, " ");
 }
 
+function getFixtureSectionTitle(match: any) {
+  if (match.groupName && match.stage) {
+    return `${match.groupName} · ${formatLabel(match.stage)}`;
+  }
+
+  if (match.groupName) {
+    return match.groupName;
+  }
+
+  if (match.stage) {
+    return formatLabel(match.stage);
+  }
+
+  return "Overall schedule";
+}
+
 function getFormGuide(teamId: string, matches: any[]) {
   const completedMatches = matches
     .filter((match) => match.status === "COMPLETED" && (match.homeTeamId === teamId || match.awayTeamId === teamId))
@@ -128,22 +170,6 @@ function getStatusTone(status: string) {
   return "bg-[#12324d] text-[#9bb2d1]";
 }
 
-function getRegistrationCopy(league: any) {
-  if (league.playerRegistrationStatus === "OPEN") {
-    return league.registrationCloseDate
-      ? `Player registration closes ${formatDate(league.registrationCloseDate)}`
-      : "Player registration is open";
-  }
-
-  if (league.status === "REGISTRATION") {
-    return league.registrationCloseDate
-      ? `League registration closes ${formatDate(league.registrationCloseDate)}`
-      : "League registration is open";
-  }
-
-  return "Registration closed";
-}
-
 function MatchBoard({ match }: { match: any }) {
   const homeInning = getInning(match, match.homeTeamId);
   const awayInning = getInning(match, match.awayTeamId);
@@ -158,6 +184,11 @@ function MatchBoard({ match }: { match: any }) {
           <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#7f9abd]">
             {match.status === "LIVE" ? "Live match" : match.status === "COMPLETED" ? "Final result" : "Scheduled fixture"}
           </p>
+          {(match.groupName || match.stage) ? (
+            <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#4ae183]">
+              {[match.groupName, match.stage].filter(Boolean).join(" · ").replace(/_/g, " ")}
+            </p>
+          ) : null}
           <p className="mt-2 font-[var(--font-display)] text-2xl font-black uppercase tracking-tight text-white">
             {match.homeTeam.shortName} vs {match.awayTeam.shortName}
           </p>
@@ -198,6 +229,42 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
     ...row,
     formGuide: getFormGuide(row.teamId, league.matches as any[]),
   }));
+  const groupedPointsTable = enrichedPointsTable.reduce<Record<string, typeof enrichedPointsTable>>((accumulator, row) => {
+    const key = row.group || "Overall";
+    if (!accumulator[key]) accumulator[key] = [];
+    accumulator[key].push(row);
+    return accumulator;
+  }, {});
+  const groupedStandingsWithQualification = Object.fromEntries(
+    Object.entries(groupedPointsTable).map(([groupName, rows]) => [
+      groupName,
+      rows.map((row, index) => ({
+        ...row,
+        qualificationStatus: getQualificationStatus(index, rows.length, groupName, league.poolConfigJson),
+      })),
+    ])
+  );
+  const groupedTeams = league.teams.reduce<Record<string, typeof league.teams>>((accumulator, row) => {
+    const key = row.group || "Overall";
+    if (!accumulator[key]) accumulator[key] = [];
+    accumulator[key].push(row);
+    return accumulator;
+  }, {});
+  const groupedUpcomingMatches = upcomingMatches.reduce<Record<string, typeof upcomingMatches>>((accumulator, match) => {
+    const key = getFixtureSectionTitle(match);
+    if (!accumulator[key]) accumulator[key] = [];
+    accumulator[key].push(match);
+    return accumulator;
+  }, {});
+  const groupedCompletedMatches = completedMatches
+    .slice()
+    .reverse()
+    .reduce<Record<string, typeof completedMatches>>((accumulator, match) => {
+      const key = getFixtureSectionTitle(match);
+      if (!accumulator[key]) accumulator[key] = [];
+      accumulator[key].push(match);
+      return accumulator;
+    }, {});
 
   const sections = [
     { id: "overview", label: "Overview" },
@@ -229,16 +296,19 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
 
             <div className="mt-6 grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-end">
               <div className="space-y-5">
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className={`px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${getStatusTone(league.status)}`}>
-                    {formatLabel(league.status)}
-                  </span>
-                  <span className="bg-[#12324d] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
-                    {league.matchFormat}
-                  </span>
-                  <span className="bg-[#12324d] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
-                    {formatLabel(league.tournamentType)}
-                  </span>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className={`px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${getStatusTone(league.status)}`}>
+                      {formatLabel(league.status)}
+                    </span>
+                    <span className="bg-[#12324d] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
+                      {league.matchFormat}
+                    </span>
+                    <span className="bg-[#12324d] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
+                      {formatLabel(league.tournamentType)}
+                    </span>
+                  </div>
+                  <ShareButton label="Share league" />
                 </div>
 
                 <div>
@@ -253,7 +323,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
 
                 <p className="max-w-2xl text-sm leading-7 text-[#9bb2d1] sm:text-base">
                   {league.description ||
-                    `Public league board for fixtures, standings, results, registration windows, announcements, sponsors, and season history under ${league.admin.name}.`}
+                    `${league.matchFormat ? league.matchFormat + " tournament" : "Cricket league"} — ${league.season}. Live fixtures, standings, results, stats, and team information.`}
                 </p>
 
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -277,7 +347,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                   { value: league._count.teams, label: "Teams" },
                   { value: league._count.matches, label: "Matches" },
                   { value: liveMatches.length, label: "Live" },
-                  { value: league._count.playerRegistrations, label: "Players" },
+                  { value: league.teams.reduce((sum, teamLeague) => sum + teamLeague.team._count.players, 0), label: "Squad players" },
                 ].map((stat) => (
                   <div key={stat.label} className="border border-white/10 bg-[#001c3a] px-4 py-4">
                     <p className="font-[var(--font-display)] text-3xl font-black text-white">{stat.value}</p>
@@ -297,9 +367,9 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                 </p>
               </div>
               <div className="border border-white/10 bg-[#001c3a] p-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#7f9abd]">Registration</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#7f9abd]">Phase</p>
                 <p className="mt-2 text-sm font-bold uppercase tracking-[0.14em] text-white">
-                  {getRegistrationCopy(league)}
+                  {league.status === "REGISTRATION" ? "Setup in progress" : formatLabel(league.status)}
                 </p>
               </div>
               <div className="border border-white/10 bg-[#001c3a] p-4">
@@ -409,22 +479,28 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                 Standings will appear once league results are recorded.
               </div>
             ) : (
-              <div className="mt-6 overflow-x-auto border border-white/10 bg-[#001c3a]">
-                <table className="min-w-full text-sm">
-                  <thead className="border-b border-white/10 bg-[#00142b] text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
-                    <tr>
-                      <th className="px-4 py-4 text-left">Team</th>
-                      <th className="px-3 py-4 text-center">M</th>
-                      <th className="px-3 py-4 text-center">W</th>
-                      <th className="px-3 py-4 text-center">L</th>
-                      <th className="px-3 py-4 text-center">T</th>
-                      <th className="px-3 py-4 text-center">Pts</th>
-                      <th className="px-3 py-4 text-center">NRR</th>
-                      <th className="px-4 py-4 text-left">Form</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {enrichedPointsTable.map((row, index) => (
+              <div className="mt-6 space-y-6">
+                {Object.entries(groupedStandingsWithQualification).map(([groupName, rows]) => (
+                  <div key={groupName} className="overflow-x-auto border border-white/10 bg-[#001c3a]">
+                    <div className="border-b border-white/10 bg-[#08203d] px-4 py-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#4ae183]">
+                      {groupName}
+                    </div>
+                    <table className="min-w-full text-sm">
+                      <thead className="border-b border-white/10 bg-[#00142b] text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
+                        <tr>
+                          <th className="px-4 py-4 text-left">Team</th>
+                          <th className="px-3 py-4 text-center">M</th>
+                          <th className="px-3 py-4 text-center">W</th>
+                          <th className="px-3 py-4 text-center">L</th>
+                          <th className="px-3 py-4 text-center">T</th>
+                          <th className="px-3 py-4 text-center">Pts</th>
+                          <th className="px-3 py-4 text-center">NRR</th>
+                          <th className="px-3 py-4 text-center">Status</th>
+                          <th className="px-4 py-4 text-left">Form</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                    {rows.map((row, index) => (
                       <tr key={row.id} className="border-b border-white/10 last:border-b-0">
                         <td className="px-4 py-4">
                           <div className="flex items-center gap-3">
@@ -453,6 +529,17 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                           {row.netRunRate > 0 ? "+" : ""}
                           {row.netRunRate.toFixed(3)}
                         </td>
+                        <td className="px-3 py-4 text-center">
+                          <span
+                            className={`px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${
+                              row.qualificationStatus === "Qualified"
+                                ? "bg-[#4ae183] text-[#003919]"
+                                : "bg-[#12324d] text-[#d4e3ff]"
+                            }`}
+                          >
+                            {row.qualificationStatus}
+                          </span>
+                        </td>
                         <td className="px-4 py-4">
                           <div className="flex gap-1">
                             {row.formGuide.map((result: string, formIndex: number) => (
@@ -473,8 +560,15 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                         </td>
                       </tr>
                     ))}
-                  </tbody>
-                </table>
+                      </tbody>
+                    </table>
+                    <div className="border-t border-white/10 bg-[#00142b] px-4 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-[#9bb2d1]">
+                      Qualification marker uses current standings order.{" "}
+                      {`${getQualificationSlotsForPool(groupName, league.poolConfigJson)} `}
+                      teams shown as qualified in this pool.
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </section>
@@ -511,28 +605,46 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
 
               <div>
                 <p className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#c8c8b0]">Upcoming fixtures</p>
-                <div className="grid gap-4">
-                  {upcomingMatches.length > 0 ? (
-                    upcomingMatches.slice(0, 5).map((match) => <MatchBoard key={match.id} match={match} />)
-                  ) : (
-                    <div className="border border-white/10 bg-[#001c3a] p-6 text-sm text-[#9bb2d1]">
-                      No upcoming fixtures have been scheduled yet.
-                    </div>
-                  )}
-                </div>
+                {upcomingMatches.length > 0 ? (
+                  <div className="space-y-5">
+                    {Object.entries(groupedUpcomingMatches).map(([sectionTitle, matches]) => (
+                      <div key={sectionTitle}>
+                        <p className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#9bb2d1]">
+                          {sectionTitle}
+                        </p>
+                        <div className="grid gap-4">
+                          {matches.slice(0, 5).map((match) => <MatchBoard key={match.id} match={match} />)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="border border-white/10 bg-[#001c3a] p-6 text-sm text-[#9bb2d1]">
+                    No upcoming fixtures have been scheduled yet.
+                  </div>
+                )}
               </div>
 
               <div>
                 <p className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#7f9abd]">Recent results</p>
-                <div className="grid gap-4">
-                  {completedMatches.length > 0 ? (
-                    completedMatches.slice(-5).reverse().map((match) => <MatchBoard key={match.id} match={match} />)
-                  ) : (
-                    <div className="border border-white/10 bg-[#001c3a] p-6 text-sm text-[#9bb2d1]">
-                      Results will appear once completed matches are locked in.
-                    </div>
-                  )}
-                </div>
+                {completedMatches.length > 0 ? (
+                  <div className="space-y-5">
+                    {Object.entries(groupedCompletedMatches).map(([sectionTitle, matches]) => (
+                      <div key={sectionTitle}>
+                        <p className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#9bb2d1]">
+                          {sectionTitle}
+                        </p>
+                        <div className="grid gap-4">
+                          {matches.slice(0, 5).map((match) => <MatchBoard key={match.id} match={match} />)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="border border-white/10 bg-[#001c3a] p-6 text-sm text-[#9bb2d1]">
+                    Results will appear once completed matches are locked in.
+                  </div>
+                )}
               </div>
             </div>
           </section>
@@ -548,11 +660,15 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
 
               {league.teams.length === 0 ? (
                 <div className="mt-6 border border-white/10 bg-[#001c3a] p-6 text-sm text-[#9bb2d1]">
-                  No approved teams are listed for this league yet.
+                  No teams have been assigned to this league yet.
                 </div>
               ) : (
-                <div className="mt-6 grid gap-4 md:grid-cols-2">
-                  {league.teams.map((teamLeague) => (
+                <div className="mt-6 space-y-6">
+                  {Object.entries(groupedTeams).map(([groupName, teams]) => (
+                    <div key={groupName}>
+                      <p className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-[#4ae183]">{groupName}</p>
+                      <div className="grid gap-4 md:grid-cols-2">
+                  {teams.map((teamLeague) => (
                     <Link
                       key={teamLeague.teamId}
                       href={`/teams/${teamLeague.teamId}`}
@@ -591,6 +707,9 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                       </div>
                     </Link>
                   ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -606,9 +725,9 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   {[
                     { label: "Powerplay", value: `${league.powerplayOvers} overs` },
-                    { label: "DLS", value: league.dlsEnabled ? "Enabled" : "Disabled" },
                     { label: "Super over", value: league.superOverEnabled ? "Enabled" : "Disabled" },
-                    { label: "Multi-team players", value: league.allowMultiTeamPlayers ? "Allowed" : "Blocked" },
+                    { label: "Match format", value: league.matchFormat },
+                    { label: "Tournament type", value: formatLabel(league.tournamentType) },
                     { label: "Minimum overs", value: `${league.minimumOversForResult} overs` },
                     { label: "Tie rule", value: league.tieRule || "Standard" },
                   ].map((item) => (
@@ -790,7 +909,7 @@ export default async function LeagueDetailPage({ params }: { params: Promise<{ i
                       Matchday ready
                     </p>
                     <p className="mt-3 text-sm font-medium leading-6">
-                      Follow standings, match boards, registration, season lineage, awards, and public league updates from one complete league page.
+                      Follow standings, match boards, season lineage, awards, and public league updates from one complete league page.
                     </p>
                   </div>
                 </div>

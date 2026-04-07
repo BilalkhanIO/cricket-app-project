@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { jsonWithCors, optionsWithCors } from "@/lib/api-cors";
+import { isValidPoolConfigJson, serializePoolConfig } from "@/lib/pools";
 import prisma from "@/lib/prisma";
 import { canCreateLeague } from "@/lib/permissions";
 
@@ -52,6 +53,12 @@ export async function POST(req: NextRequest) {
     const powerplayOvers = Number(data.powerplayOvers ?? 6);
     const playerRegistrationStatus = data.playerRegistrationStatus || "CLOSED";
 
+    if (!isValidPoolConfigJson(data.poolConfigJson)) {
+      return NextResponse.json({ error: "Invalid pool configuration JSON" }, { status: 400 });
+    }
+
+    const poolConfigJson = serializePoolConfig(data.poolConfigJson);
+
     if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
       return NextResponse.json({ error: "Invalid start/end date" }, { status: 400 });
     }
@@ -101,6 +108,7 @@ export async function POST(req: NextRequest) {
         adminId: session.user.id,
         parentLeagueId,
         playerRegistrationStatus,
+        poolConfigJson,
         startDate,
         endDate,
         registrationOpenDate: registrationOpenDate || null,
